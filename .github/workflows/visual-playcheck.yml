@@ -41,7 +41,7 @@ jobs:
       - name: Visual and play check
         run: |
           mkdir -p visual-check
-          cat > /tmp/qa-visual.mjs <<'EOF'
+          cat > qa-visual.mjs <<'EOF'
           import { chromium } from 'playwright';
           import fs from 'node:fs';
 
@@ -190,7 +190,7 @@ jobs:
           await browser.close();
           fs.writeFileSync('visual-check/report.json', JSON.stringify(report, null, 2));
           EOF
-          node /tmp/qa-visual.mjs
+          node qa-visual.mjs
           cat visual-check/report.json
       - name: Upload visual check
         uses: actions/upload-artifact@v4
