@@ -9,7 +9,9 @@ type Coord = { row: number; col: number };
 type ColumnQueues = Orb[][];
 type IntentKind = "attack" | "heavy" | "pierce" | "drain" | "disrupt";
 type EnemyKind = "warden" | "bastion" | "oracle" | "null" | "trickster";
-type ResolutionPhase = "idle" | "swap" | "clear" | "drop" | "attack" | "enemy";
+type ResolutionPhase = "idle" | "swap" | "clear" | "drop" | "attack" | "enemy" | "victory";
+type SwapMotion = { a: Coord; b: Coord } | null;
+type StageClearState = { stage: number; gold: number; xp: number } | null;
 
 type EnemyDefinition = {
   kind: EnemyKind;
@@ -101,6 +103,22 @@ const ENEMY_SIGIL: Record<EnemyKind, string> = {
   oracle: "☿",
   null: "✧",
   trickster: "◈",
+};
+
+const ENEMY_DIALOGUE: Record<EnemyKind, string> = {
+  warden: "盤面の先まで見えている。焦って消せば、次の一手を失うぞ。",
+  bastion: "三つ並べただけでは、この装甲は砕けない。",
+  oracle: "傷を見せなさい。その痛みごと、私の命に変えてあげる。",
+  null: "盾に頼るな。次の刃は、その向こう側へ届く。",
+  trickster: "NEXTを信じる？ なら、並びを少しだけ変えてあげよう。",
+};
+
+const ENEMY_HINT: Record<EnemyKind, string> = {
+  warden: "3手目の強打をNOW/NEXTで確認。先にDEFを作るか、撃破を狙う。",
+  bastion: "単発3消し攻撃は無効。4消しか2 COMBO以上を仕込む。",
+  oracle: "DRAIN前はHP受けを避け、DEFで吸収を止める。",
+  null: "PIERCEはDEF無視。回復・撃破・次ターン用DEFの準備を優先。",
+  trickster: "DISRUPT前に列別NEXTを使い切るか、シフト後の列を予測する。",
 };
 
 function delay(ms: number): Promise<void> {
@@ -303,6 +321,27 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
     matchedCount,
     largestAttackRun,
   };
+}
+
+function computeDropDistances(matches: Set<string>): Map<string, number> {
+  const distances = new Map<string, number>();
+  for (let col = 0; col < SIZE; col += 1) {
+    const survivorRows: number[] = [];
+    let holes = 0;
+    for (let row = 0; row < SIZE; row += 1) {
+      if (matches.has(cellKey(row, col))) holes += 1;
+      else survivorRows.push(row);
+    }
+    for (let row = 0; row < holes; row += 1) {
+      distances.set(cellKey(row, col), Math.min(6, holes - row + 1));
+    }
+    survivorRows.forEach((sourceRow, index) => {
+      const destRow = holes + index;
+      const distance = destRow - sourceRow;
+      if (distance > 0) distances.set(cellKey(destRow, col), Math.min(6, distance));
+    });
+  }
+  return distances;
 }
 
 function adjacent(a: Coord, b: Coord): boolean {
@@ -533,6 +572,10 @@ export default function PuzzleRPGGame() {
   const [clearingCells, setClearingCells] = useState<Set<string>>(new Set());
   const [combatPop, setCombatPop] = useState("");
   const [resultChips, setResultChips] = useState<string[]>([]);
+  const [swapMotion, setSwapMotion] = useState<SwapMotion>(null);
+  const [dropMotion, setDropMotion] = useState<Map<string, number>>(new Map());
+  const [stageIntro, setStageIntro] = useState(true);
+  const [stageClear, setStageClear] = useState<StageClearState>(null);
 
   const maxEnemyHp = enemyMaxHp(stage);
   const enemy = enemyDefinition(stage);
@@ -564,22 +607,33 @@ export default function PuzzleRPGGame() {
     setClearingCells(new Set());
     setCombatPop("");
     setResultChips([]);
+    setSwapMotion(null);
+    setDropMotion(new Map());
+    setStageIntro(true);
+    setStageClear(null);
   }
 
-  function finishEnemyDefeat(currentStage: number) {
+  async function finishEnemyDefeat(currentStage: number) {
     const nextStage = currentStage + 1;
     const gainedGold = 12 + currentStage * 4;
     const gainedXp = 28 + currentStage * 6;
-    setStage(nextStage);
-    setEnemyHp(enemyMaxHp(nextStage));
-    setEnemyTurn(0);
+    setResolutionPhase("victory");
+    setCombatPop("STAGE CLEAR!");
+    setStageClear({ stage: currentStage, gold: gainedGold, xp: gainedXp });
     setGold((value) => value + gainedGold);
     setXp((value) => value + gainedXp);
     setMessage(`STAGE ${currentStage} CLEAR • 盤面/NEXT持ち越し`);
+    await delay(1050);
+    setStage(nextStage);
+    setEnemyHp(enemyMaxHp(nextStage));
+    setEnemyTurn(0);
+    setStageClear(null);
+    setStageIntro(true);
+    setCombatPop("");
   }
 
-  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string) {
-    if (isResolving || gameOver) return;
+  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string, swapPair?: [Coord, Coord]) {
+    if (isResolving || gameOver || stageIntro || stageClear) return;
     setIsResolving(true);
     setSelected(null);
     setSkillMode(false);
@@ -589,8 +643,10 @@ export default function PuzzleRPGGame() {
     const plan = buildCascadePlan(nextBoard, columnQueues);
 
     setResolutionPhase("swap");
+    setSwapMotion(swapPair ? { a: swapPair[0], b: swapPair[1] } : null);
     setBoard(nextBoard);
-    await delay(120);
+    await delay(swapPair ? 205 : 120);
+    setSwapMotion(null);
 
     for (let index = 0; index < plan.frames.length; index += 1) {
       const frame = plan.frames[index]!;
@@ -601,10 +657,12 @@ export default function PuzzleRPGGame() {
       await delay(175);
 
       setClearingCells(new Set());
+      setDropMotion(computeDropDistances(frame.matches));
       setBoard(frame.boardAfter);
       setColumnQueues(frame.queuesAfter);
       setResolutionPhase("drop");
-      await delay(185);
+      await delay(245);
+      setDropMotion(new Map());
     }
 
     if (plan.frames.length === 0) {
@@ -648,13 +706,11 @@ export default function PuzzleRPGGame() {
     if (enemyAfter <= 0) {
       setCombatPop("BREAK!");
       await delay(250);
-      finishEnemyDefeat(stage);
+      await finishEnemyDefeat(stage);
       setCombo(0);
       setClearingCells(new Set());
       setResolutionPhase("idle");
       setIsResolving(false);
-      await delay(280);
-      setCombatPop("");
       setResultChips([]);
       return;
     }
@@ -722,26 +778,39 @@ export default function PuzzleRPGGame() {
       return;
     }
 
-    void resolveTurn(swapCells(board, selected, nextCoord));
+    void resolveTurn(swapCells(board, selected, nextCoord), false, undefined, [selected, nextCoord]);
   }
 
   function toggleSkillMode() {
-    if (gameOver || isResolving || skill < 100) return;
+    if (gameOver || isResolving || stageIntro || stageClear || skill < 100) return;
     setSkillMode((value) => !value);
     setSelected(null);
     setMessage(skillMode ? "PRISM SHIFT CANCEL" : "PRISM SHIFT • 変換する1枚を選択");
   }
 
   function castShift(orb: Orb) {
-    if (!skillMode || !selected || skill < 100 || gameOver || isResolving) return;
+    if (!skillMode || !selected || skill < 100 || gameOver || isResolving || stageIntro || stageClear) return;
     const transformed = cloneBoard(board);
     const before = transformed[selected.row]![selected.col]!;
     transformed[selected.row]![selected.col] = orb;
     void resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]}`);
   }
 
-  const setupMode = !isResolving && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
+  const setupMode = !isResolving && !stageIntro && !stageClear && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
   const enemyVisualClass = `${styles.enemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""} ${resolutionPhase === "attack" ? styles.enemyStruck : ""}`;
+  const swapClassFor = (row: number, col: number): string => {
+    if (!swapMotion) return "";
+    const { a, b } = swapMotion;
+    let source: Coord | null = null;
+    let target: Coord | null = null;
+    if (row === a.row && col === a.col) { source = b; target = a; }
+    else if (row === b.row && col === b.col) { source = a; target = b; }
+    if (!source || !target) return "";
+    if (source.col < target.col) return styles.swapFromLeft;
+    if (source.col > target.col) return styles.swapFromRight;
+    if (source.row < target.row) return styles.swapFromUp;
+    return styles.swapFromDown;
+  };
 
   return (
     <main className={styles.shell}>
@@ -757,6 +826,7 @@ export default function PuzzleRPGGame() {
       </div>
 
       <section className={styles.enemyCard} aria-label="enemy status">
+        <div className={styles.enemySceneGlow} aria-hidden="true" />
         <div className={enemyVisualClass} aria-hidden="true">
           <span className={styles.enemyAura} />
           <span className={styles.enemyWingLeft} />
@@ -778,6 +848,13 @@ export default function PuzzleRPGGame() {
           <div className={styles.passive}>{enemy.passive}</div>
         </div>
       </section>
+
+      {resolutionPhase === "attack" ? (
+        <div className={styles.playerAttackFx} aria-hidden="true"><i /><i /><i /></div>
+      ) : null}
+      {resolutionPhase === "enemy" ? (
+        <div className={`${styles.enemyAttackFx} ${styles[`enemyAttack_${intent.kind}`] ?? ""}`} aria-hidden="true"><i /><i /><i /></div>
+      ) : null}
 
       <section className={styles.intents} aria-label="enemy intents">
         <div className={styles.intentCard}>
@@ -833,17 +910,20 @@ export default function PuzzleRPGGame() {
         </section>
 
         <section className={styles.boardWrap} aria-label="puzzle board">
-          <div className={`${styles.board} ${resolutionPhase === "swap" ? styles.boardSwap : ""} ${resolutionPhase === "drop" ? styles.boardDrop : ""}`}>
+          <div className={styles.board}>
             {board.map((row, rowIndex) => row.map((orb, colIndex) => {
               const key = cellKey(rowIndex, colIndex);
               const isSelected = selected?.row === rowIndex && selected?.col === colIndex;
               const setupHint = setupMode && analysis.setupHintCells.has(key);
               const isClearing = clearingCells.has(key);
+              const swapClass = swapClassFor(rowIndex, colIndex);
+              const dropDistance = dropMotion.get(key) ?? 0;
+              const dropClass = dropDistance > 0 ? styles[`drop${dropDistance}`] : "";
               return (
                 <button
                   key={`${rowIndex}-${colIndex}`}
                   type="button"
-                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""}`}
+                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""} ${swapClass} ${dropClass}`}
                   aria-label={`${ORB_NAME[orb]} orb row ${rowIndex + 1} column ${colIndex + 1}`}
                   aria-pressed={isSelected}
                   disabled={isResolving}
@@ -899,6 +979,31 @@ export default function PuzzleRPGGame() {
           {gameOver ? "RETRY" : "RESET"}
         </button>
       </section>
+
+      {stageIntro ? (
+        <div className={styles.stageIntroOverlay} role="dialog" aria-label={`Stage ${stage} briefing`}>
+          <div className={styles.introStageLabel}>STAGE {stage}</div>
+          <div className={`${styles.introEnemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""}`} aria-hidden="true">
+            <span className={styles.enemyAura} /><span className={styles.enemyWingLeft} /><span className={styles.enemyWingRight} />
+            <span className={styles.enemyAccentLeft} /><span className={styles.enemyAccentRight} />
+            <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span><span className={styles.enemyBase} />
+          </div>
+          <div className={styles.introEnemyName}>{enemy.name}</div>
+          <div className={styles.enemySpeech}>「{ENEMY_DIALOGUE[enemy.kind]}」</div>
+          <div className={styles.tacticalHint}><strong>TACTICAL HINT</strong><span>{ENEMY_HINT[enemy.kind]}</span></div>
+          <button type="button" className={styles.battleStartButton} onClick={() => { setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START</button>
+        </div>
+      ) : null}
+
+      {stageClear ? (
+        <div className={styles.stageClearOverlay} aria-live="assertive">
+          <div className={styles.clearBurst} aria-hidden="true" />
+          <div className={styles.clearStage}>STAGE {stageClear.stage}</div>
+          <div className={styles.clearTitle}>CLEAR!</div>
+          <div className={styles.clearRewards}><span>+{stageClear.gold} ◈</span><span>+{stageClear.xp} XP</span></div>
+          <div className={styles.clearCarry}>BOARD + NEXT CARRIED</div>
+        </div>
+      ) : null}
 
       {gameOver ? (
         <div className={styles.gameOverCard}>
