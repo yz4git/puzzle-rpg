@@ -49,9 +49,11 @@ jobs:
           const battleEnemy = page.getByLabel('enemy status').getByRole('img',{name:'Void Warden'});
           const battleEnemyMetrics = await battleEnemy.evaluate(el=>({naturalWidth:el.naturalWidth,naturalHeight:el.naturalHeight,rect:el.getBoundingClientRect().toJSON()}));
           const board = await page.locator('[aria-label="puzzle board"]').boundingBox();
+          const orbBackgrounds = await page.locator('button[aria-label*=" orb row "] > span').evaluateAll(els=>els.slice(0,8).map(el=>getComputedStyle(el).backgroundImage));
           const metrics = await page.evaluate(()=>({innerWidth,innerHeight,scrollY,scrollHeight:document.documentElement.scrollHeight,tiles:document.querySelectorAll('button[aria-label*=" orb row "]').length}));
-          fs.writeFileSync('qa-pixel-ui/report.json',JSON.stringify({heroMetrics,introMetrics,speech,battleEnemyMetrics,board,metrics,errors},null,2));
+          fs.writeFileSync('qa-pixel-ui/report.json',JSON.stringify({heroMetrics,introMetrics,speech,battleEnemyMetrics,board,orbBackgrounds,metrics,errors},null,2));
           if(!heroMetrics.naturalWidth || !introMetrics.naturalWidth || !battleEnemyMetrics.naturalWidth) throw new Error('pixel sprite failed to load');
+          if(!orbBackgrounds.every(v=>v.includes('/assets/pixel8/orbs/'))) throw new Error(`generated orb sprite missing: ${orbBackgrounds.join(',')}`);
           if(metrics.tiles!==36) throw new Error(`expected 36 tiles, got ${metrics.tiles}`);
           if(errors.length) throw new Error(errors.join('\n'));
           await browser.close();
