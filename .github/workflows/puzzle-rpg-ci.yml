@@ -5,15 +5,15 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/puzzle-rpg-ci.yml'
-      - 'scripts/apply-review-pass-1-5.py'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,18 +24,83 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Install image tooling
-        run: python -m pip install --quiet pillow
-      - name: Apply review pass 1-5
-        run: python scripts/apply-review-pass-1-5.py
-      - name: Puzzle RPG TypeScript check
+      - name: TypeScript check
         run: npx tsc -p tsconfig.puzzle.json --noEmit
-      - name: Production build
-        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
-      - name: Commit implementation
+      - name: Install Playwright
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css public/assets/pixel8/orbs/heart.png
-          git commit -m 'Implement review pass 1-5 and separate heart palette'
-          git push origin HEAD:main
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Visual QA
+        run: |
+          cat > review-pass-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          fs.mkdirSync('review-pass-qa',{recursive:true});
+          const browser=await chromium.launch({headless:true});
+          const context=await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});
+          const page=await context.newPage();
+          const errors=[];
+          page.on('console',m=>{if(m.type()==='error') errors.push(m.text())});
+          page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
+          await page.screenshot({path:'review-pass-qa/01-title.png'});
+          const titleTop=await page.locator('[aria-label="Puzzle RPG title"]').evaluate(el=>el.getBoundingClientRect().top);
+          await page.getByRole('button',{name:'START GAME'}).click();
+          await page.getByRole('button',{name:'BATTLE START'}).click();
+          await page.waitForTimeout(120);
+          await page.screenshot({path:'review-pass-qa/02-battle.png'});
+          const metrics=await page.evaluate(()=>{
+            const board=document.querySelector('[aria-label="puzzle board"]')?.getBoundingClientRect();
+            const action=[...document.querySelectorAll('section')].find(el=>el.textContent?.includes('PRISM SHIFT') && el.textContent?.includes('RESET'))?.getBoundingClientRect();
+            const hearts=[...document.querySelectorAll('button[aria-label^="heart orb"]')];
+            const fires=[...document.querySelectorAll('button[aria-label^="fire orb"]')];
+            const styleOf=(el)=>el?getComputedStyle(el):null;
+            return {
+              board:board?.toJSON(), action:action?.toJSON(),
+              gap:board&&action?action.top-board.bottom:null,
+              heartBg:styleOf(hearts[0])?.backgroundColor||null,
+              fireBg:styleOf(fires[0])?.backgroundColor||null,
+              tiles:document.querySelectorAll('button[aria-label*=" orb row "]').length,
+              scrollY, scrollHeight:document.documentElement.scrollHeight, innerHeight
+            };
+          });
+          // Find and execute the first adjacent preview that deals damage.
+          const tiles=page.locator('button[aria-label*=" orb row "]');
+          let attackFound=false;
+          for(let i=0;i<await tiles.count() && !attackFound;i++){
+            await tiles.nth(i).click();
+            await page.waitForTimeout(10);
+            const candidate=await page.evaluate(()=>{
+              const bs=[...document.querySelectorAll('button[aria-label*=" orb row "]')];
+              return bs.findIndex(b=>/DMG|BREAK|\d+\s*·\s*\d+C/.test(b.querySelector('small')?.textContent||''));
+            });
+            if(candidate>=0){
+              await tiles.nth(candidate).click();
+              for(let k=0;k<20;k++){
+                await page.waitForTimeout(35);
+                if(await page.locator('[class*="playerAttackFx"]').isVisible().catch(()=>false)){
+                  await page.screenshot({path:'review-pass-qa/03-attack.png'});
+                  attackFound=true; break;
+                }
+              }
+            } else {
+              await tiles.nth(i).click();
+            }
+          }
+          fs.writeFileSync('review-pass-qa/report.json',JSON.stringify({titleTop,metrics,attackFound,errors},null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(metrics.tiles!==36 || metrics.scrollY!==0) throw new Error('layout regression');
+          if(metrics.gap===null || metrics.gap>150) throw new Error(`action gap too large: ${metrics.gap}`);
+          if(metrics.heartBg===metrics.fireBg) throw new Error('heart/fire background colors are not separated');
+          if(!attackFound) throw new Error('attack FX was not observed');
+          await browser.close();
+          JS
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/review-pass.log 2>&1 & PID=$!
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          node review-pass-qa.mjs
+          kill $PID || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-pass-qa
+          path: review-pass-qa
