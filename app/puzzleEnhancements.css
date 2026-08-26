@@ -1,4 +1,10 @@
 /* Runtime visual reinforcement kept outside the game CSS module so it can evolve independently. */
+.runtimeBootFrame {
+  position: fixed;
+  inset: 0;
+  background: #020202;
+}
+
 body.runtimeDanger::before,
 body.runtimeCritical::before {
   content: "";
