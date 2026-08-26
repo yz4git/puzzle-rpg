@@ -101,3 +101,4 @@ jobs:
           git add app/PuzzleRPGGame.module.css
           git commit -m 'Use generated 8-bit orb icons across UI'
           git push origin HEAD:main
+# trigger after workflow registration
