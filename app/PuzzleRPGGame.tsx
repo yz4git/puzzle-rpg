@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import styles from "./PuzzleRPGGame.module.css";
+import { EnemySprite } from "./enemyAssets";
+import { playSfx, primeAudio } from "./gameAudio";
 
 type Orb = "fire" | "water" | "light" | "heart" | "guard";
 type Board = Orb[][];
@@ -622,6 +624,7 @@ export default function PuzzleRPGGame() {
     const nextStage = currentStage + 1;
     const gainedGold = 12 + currentStage * 4;
     const gainedXp = 28 + currentStage * 6;
+    playSfx("stageClear");
     setResolutionPhase("victory");
     setCombatPop("STAGE CLEAR!");
     setStageClear({ stage: currentStage, gold: gainedGold, xp: gainedXp });
@@ -662,6 +665,7 @@ export default function PuzzleRPGGame() {
     setResolutionPhase("swap");
     setSwapMotion(swapPair ? { a: swapPair[0], b: swapPair[1] } : null);
     setBoard(nextBoard);
+    if (swapPair) playSfx("swap");
     await delay(swapPair ? 205 : 120);
     setSwapMotion(null);
 
@@ -671,6 +675,7 @@ export default function PuzzleRPGGame() {
       setClearingCells(frame.matches);
       setCombo(index + 1);
       setResolutionPhase("clear");
+      playSfx(index === 0 ? "match" : "cascade");
       await delay(175);
 
       setClearingCells(new Set());
@@ -678,6 +683,7 @@ export default function PuzzleRPGGame() {
       setBoard(frame.boardAfter);
       setColumnQueues(frame.queuesAfter);
       setResolutionPhase("drop");
+      playSfx("drop");
       await delay(245);
       setDropMotion(new Map());
     }
@@ -706,6 +712,8 @@ export default function PuzzleRPGGame() {
     setPlayerHp(healedHp);
     setPlayerShield(shieldBeforeEnemy);
     setEnemyHp(enemyAfter);
+    if (plan.heal > 0) playSfx("heal");
+    if (plan.shield > 0) playSfx("shield");
 
     const chips: string[] = [];
     if (actualAttack > 0) chips.push(`${actualAttack} DMG`);
@@ -726,12 +734,14 @@ export default function PuzzleRPGGame() {
     if (actualAttack > 0 || plateBlocks) {
       setAttackSources(attackSourceList.slice(0, 10));
       setResolutionPhase("attack");
+      playSfx(plateBlocks ? "block" : "playerAttack");
       setCombatPop(plateBlocks ? "PLATE BLOCK" : `${actualAttack} DMG`);
       await delay(340);
       setAttackSources([]);
     }
 
     if (enemyAfter <= 0) {
+      playSfx("enemyBreak");
       setCombatPop("BREAK!");
       await delay(250);
       await finishEnemyDefeat(stage);
@@ -757,6 +767,7 @@ export default function PuzzleRPGGame() {
 
     setDamageTaken(enemyResult.hpDamage);
     setResolutionPhase("enemy");
+    playSfx(enemyResult.hpDamage > 0 ? (effectiveIntent.kind === "pierce" ? "pierce" : "damage") : "block");
     setCombatPop(enemyResult.hpDamage > 0 ? `-${enemyResult.hpDamage} HP` : `BLOCK ${enemyResult.blocked}`);
     await delay(enemyResult.hpDamage > 0 ? 420 : 280);
 
@@ -774,6 +785,7 @@ export default function PuzzleRPGGame() {
     );
 
     if (enemyResult.hpAfter <= 0) {
+      playSfx("gameOver");
       setGameOver(true);
       setMessage(`GAME OVER • ${enemyResult.summary}`);
     }
@@ -799,18 +811,21 @@ export default function PuzzleRPGGame() {
     }
 
     if (!selected) {
+      playSfx("uiSelect");
       setSelected(nextCoord);
       setMessage("①選択中 • ②光っている隣接パネルを選択");
       return;
     }
 
     if (selected.row === row && selected.col === col) {
+      playSfx("uiSelect");
       setSelected(null);
       setMessage("選択解除 • 交換する1枚目を選択");
       return;
     }
 
     if (!adjacent(selected, nextCoord)) {
+      playSfx("uiSelect");
       setSelected(nextCoord);
       setMessage("①選択を変更 • ②光っている隣接パネルを選択");
       return;
@@ -821,6 +836,7 @@ export default function PuzzleRPGGame() {
 
   function toggleSkillMode() {
     if (gameOver || isResolving || stageIntro || stageClear || skill < 100) return;
+    playSfx("uiConfirm");
     setSkillMode((value) => !value);
     setSelected(null);
     setMessage(skillMode ? "PRISM SHIFT CANCEL" : "PRISM SHIFT • 変換する1枚を選択");
@@ -828,6 +844,7 @@ export default function PuzzleRPGGame() {
 
   function castShift(orb: Orb) {
     if (!skillMode || !selected || skill < 100 || gameOver || isResolving || stageIntro || stageClear) return;
+    playSfx("skill");
     const transformed = cloneBoard(board);
     const before = transformed[selected.row]![selected.col]!;
     transformed[selected.row]![selected.col] = orb;
@@ -838,7 +855,7 @@ export default function PuzzleRPGGame() {
   }
 
   const setupMode = !isResolving && !stageIntro && !stageClear && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
-  const enemyVisualClass = `${styles.enemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""} ${resolutionPhase === "attack" ? styles.enemyStruck : ""}`;
+  const enemyPixelClass = `${styles.enemyPixelSprite} ${resolutionPhase === "attack" ? styles.enemyPixelStruck : ""}`;
   const swapClassFor = (row: number, col: number): string => {
     if (!swapMotion) return "";
     const { a, b } = swapMotion;
@@ -868,17 +885,7 @@ export default function PuzzleRPGGame() {
 
       <section className={styles.enemyCard} aria-label="enemy status">
         <div className={styles.enemySceneGlow} aria-hidden="true" />
-        <div className={enemyVisualClass} aria-hidden="true">
-          <span className={styles.enemyAura} />
-          <span className={styles.enemyWingLeft} />
-          <span className={styles.enemyWingRight} />
-          <span className={styles.enemyAccentLeft} />
-          <span className={styles.enemyAccentRight} />
-          <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span>
-          <span className={styles.enemyFace}><i /><i /></span>
-          <span className={styles.enemyWeapon} />
-          <span className={styles.enemyBase} />
-        </div>
+        <EnemySprite kind={enemy.kind} className={enemyPixelClass} />
         <div className={styles.enemyInfo}>
           <div className={styles.enemyHeader}>
             <div className={styles.enemyName}>{enemy.name} {stage}</div>
@@ -1053,7 +1060,7 @@ export default function PuzzleRPGGame() {
             {ORBS.map((orb) => <span key={orb} className={styles[orb]}>{ORB_LABEL[orb]}</span>)}
           </div>
           <div className={styles.titleSystems}><span>INTENT</span><span>NEXT</span><span>TACTICAL SETUP</span></div>
-          <button type="button" className={styles.titleStartButton} onClick={() => { setShowTitle(false); setStageIntro(true); setMessage("STAGE BRIEFING • 敵のルールを確認"); }}>START GAME</button>
+          <button type="button" className={styles.titleStartButton} onClick={() => { primeAudio(); playSfx("uiConfirm"); setShowTitle(false); setStageIntro(true); setMessage("STAGE BRIEFING • 敵のルールを確認"); }}>START GAME</button>
           <div className={styles.titleFoot}>1 MOVE = 1 TURN</div>
         </div>
       ) : null}
@@ -1061,15 +1068,11 @@ export default function PuzzleRPGGame() {
       {stageIntro && !showTitle ? (
         <div className={styles.stageIntroOverlay} role="dialog" aria-label={`Stage ${stage} briefing`}>
           <div className={styles.introStageLabel}>STAGE {stage}</div>
-          <div className={`${styles.introEnemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""}`} aria-hidden="true">
-            <span className={styles.enemyAura} /><span className={styles.enemyWingLeft} /><span className={styles.enemyWingRight} />
-            <span className={styles.enemyAccentLeft} /><span className={styles.enemyAccentRight} />
-            <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span><span className={styles.enemyFace}><i /><i /></span><span className={styles.enemyWeapon} /><span className={styles.enemyBase} />
-          </div>
+          <EnemySprite kind={enemy.kind} className={styles.introPixelSprite} intro />
           <div className={styles.introEnemyName}>{enemy.name}</div>
           <div className={styles.enemySpeech}>「{ENEMY_DIALOGUE[enemy.kind]}」</div>
           <div className={styles.tacticalHint}><strong>TACTICAL HINT</strong><span>{ENEMY_HINT[enemy.kind]}</span></div>
-          <button type="button" className={styles.battleStartButton} onClick={() => { setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START</button>
+          <button type="button" className={styles.battleStartButton} onClick={() => { primeAudio(); playSfx("uiConfirm"); setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START</button>
         </div>
       ) : null}
 
