@@ -1,10 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./puzzleEnhancements.css";
 
 const isGitHubPagesBuild = process.env.VOXEL_RALLY_PAGES === "1";
 const githubPagesBasePath = isGitHubPagesBuild
   ? `/${process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "puzzle-rpg"}`
   : "";
+
+const enemyPreloads = [
+  "/assets/pixel8/warden.png",
+  "/assets/pixel8/bastion.png",
+  "/assets/pixel8/oracle.png",
+  "/assets/pixel8/null-knight.png",
+  "/assets/pixel8/trickster.png",
+];
 
 export const metadata: Metadata = {
   title: "Puzzle RPG",
@@ -35,6 +44,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
+      <head>
+        {enemyPreloads.map((src) => (
+          <link key={src} rel="preload" as="image" href={`${githubPagesBasePath}${src}`} />
+        ))}
+      </head>
       <body>{children}</body>
     </html>
   );
