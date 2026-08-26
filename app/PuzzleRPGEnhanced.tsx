@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import PuzzleRPGGame from "./PuzzleRPGGame";
 import { PIXEL_ART_ASSETS } from "./pixelArtAssets";
 
-// Stable no-match opening board with three immediately discoverable 4+ match swaps.
-// Orb indexes follow fire / water / light / heart / guard.
+// No-match base board with three immediately discoverable 4+ match swaps.
+// Each run rotates colors and mirrors axes, preserving those tactical shapes
+// without presenting the exact same opening every time.
 const OPENING_BOARD_TEMPLATE = [
   4, 3, 3, 0, 3, 1,
   3, 3, 2, 3, 4, 0,
@@ -17,22 +18,42 @@ const OPENING_BOARD_TEMPLATE = [
 
 let randomInstalled = false;
 let templateIndex = 0;
+let openingSequence: number[] = [...OPENING_BOARD_TEMPLATE];
 let lastOrbBucket: number | null = null;
 let nativeRandom: (() => number) | null = null;
+
+function prepareOpeningSequence() {
+  if (!nativeRandom) return;
+  const colorShift = Math.floor(nativeRandom() * 5);
+  const mirrorX = nativeRandom() < 0.5;
+  const mirrorY = nativeRandom() < 0.5;
+  const next: number[] = [];
+  for (let row = 0; row < 6; row += 1) {
+    for (let col = 0; col < 6; col += 1) {
+      const sourceRow = mirrorY ? 5 - row : row;
+      const sourceCol = mirrorX ? 5 - col : col;
+      const orb = OPENING_BOARD_TEMPLATE[sourceRow * 6 + sourceCol]!;
+      next.push((orb + colorShift) % 5);
+    }
+  }
+  openingSequence = next;
+}
 
 function resetSpawnSequence() {
   templateIndex = 0;
   lastOrbBucket = null;
+  prepareOpeningSequence();
 }
 
 function installPuzzleSpawnBalancer() {
   if (randomInstalled || typeof window === "undefined") return;
   randomInstalled = true;
   nativeRandom = Math.random.bind(Math);
+  prepareOpeningSequence();
 
   Math.random = () => {
-    if (templateIndex < OPENING_BOARD_TEMPLATE.length) {
-      const bucket = OPENING_BOARD_TEMPLATE[templateIndex++]!;
+    if (templateIndex < openingSequence.length) {
+      const bucket = openingSequence[templateIndex++]!;
       lastOrbBucket = bucket;
       return (bucket + 0.31) / 5;
     }
