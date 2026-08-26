@@ -1292,3 +1292,63 @@
 /* Lower HUD copy no longer competes with the board. */
 .ruleHint{min-height:13px!important;padding:1px 3px!important;font-size:7px!important;line-height:1!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.message{min-height:12px!important;max-height:14px!important;padding:0 3px!important;font-size:6.5px!important;line-height:1!important;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-height:760px) and (orientation:portrait){.titleScene{height:146px}.titleHeroSprite{width:88px!important;transform:translateX(-50%) scale(1.26)!important}.titleLogo span{font-size:40px!important}.titleLogo strong{font-size:52px!important}.titleSystems{padding:4px!important}.titleOrbs{display:flex!important}}
+
+
+/* TACTICAL_BALANCE_V3_VISUAL — remove remaining anti-aliased slash/beam language. */
+.titleScreen { justify-content:center !important; }
+.titleScene { height:170px !important; }
+
+/* The old rotated full-screen beam read as modern/vector. The projectile squares,
+   charge sprite and impact burst now carry the direction on their own. */
+.attackTrail { display:none !important; }
+.attackCharge { width:36px !important; height:36px !important; }
+
+/* Real HP damage is a hard frame flash plus pixel debris, never long smooth slashes. */
+.damageVignette::before,
+.damageVignette::after { display:none !important; }
+.damageVignette i {
+  width:8px !important;
+  height:8px !important;
+  background:#fff !important;
+  box-shadow:8px 0 0 #d8334e,0 8px 0 #7b1428 !important;
+  transform:none !important;
+  animation:damagePixelShard8 .4s steps(4,end) both !important;
+}
+.damageVignette i:nth-of-type(1){ left:35% !important; top:60% !important; --px:-48px; --py:-58px; }
+.damageVignette i:nth-of-type(2){ left:65% !important; top:60% !important; --px:48px; --py:-58px; }
+.damageVignette i:nth-of-type(3){ left:38% !important; top:72% !important; --px:-54px; --py:44px; }
+.damageVignette i:nth-of-type(4){ left:62% !important; top:72% !important; --px:54px; --py:44px; }
+@keyframes damagePixelShard8 {
+  0% { opacity:0; translate:0 0; }
+  25%,55% { opacity:1; }
+  100% { opacity:0; translate:var(--px) var(--py); }
+}
+
+.enemyAttackFx::before { display:none !important; }
+.enemyAttackFx i {
+  width:9px !important;
+  height:9px !important;
+  background:#fff !important;
+  box-shadow:9px 0 0 #d8334e,0 9px 0 #7b1428 !important;
+  transform:none !important;
+  animation:enemyPixelShot8 .3s steps(4,end) both !important;
+}
+.enemyAttackFx i:nth-child(1){ left:24% !important; top:28% !important; --ex:120px; --ey:330px; }
+.enemyAttackFx i:nth-child(2){ left:18% !important; top:32% !important; --ex:150px; --ey:300px; animation-delay:.04s !important; }
+.enemyAttackFx i:nth-child(3){ left:30% !important; top:26% !important; --ex:100px; --ey:350px; animation-delay:.08s !important; }
+@keyframes enemyPixelShot8 {
+  0% { opacity:0; translate:0 0; }
+  20%,70% { opacity:1; }
+  100% { opacity:0; translate:var(--ex) var(--ey); }
+}
+.enemyAttack_pierce i { background:#dcecff !important; box-shadow:9px 0 0 #6688d8 !important; }
+.enemyAttack_drain i { background:#ffb0cd !important; box-shadow:9px 0 0 #7a073b !important; }
+.enemyAttack_disrupt i { background:#f2cf38 !important; box-shadow:9px 0 0 #7d3bb0,0 9px 0 #2fbf87 !important; }
+
+/* Keep the bottom controls where a portrait phone player expects them. */
+.actionBar { margin-top:auto; }
+
+@media (max-height:760px) and (orientation:portrait) {
+  .titleScreen { justify-content:center !important; }
+  .titleScene { height:142px !important; }
+}

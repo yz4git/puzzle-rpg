@@ -302,8 +302,9 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
     // 回復・防御・ゲージ面で十分に価値が残る。
     const cascadeWeight = safety === 0 ? 1 : safety === 1 ? 0.52 : 0.34;
     weightedAttack += frameAttack * cascadeWeight;
-    heal += frameHeal;
-    shield += frameShield;
+    const resourceCascadeWeight = safety === 0 ? 1 : safety === 1 ? 0.55 : 0.35;
+    heal += frameHeal * resourceCascadeWeight;
+    shield += frameShield * resourceCascadeWeight;
 
     const collapsed = collapse(next, matches, queues);
     frames.push({
@@ -323,6 +324,9 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
   const combo = frames.length;
   const comboMultiplier = 1 + Math.min(0.18, Math.max(0, combo - 1) * 0.09);
   const resourceMultiplier = 1 + Math.min(0.1, Math.max(0, combo - 1) * 0.05);
+  // A damaging turn only receives a fraction of incidental HEART/DEF cascades.
+  // A dedicated non-damaging resource turn gets a small tactical bonus instead.
+  const resourceCommitment = weightedAttack > 0 ? 0.35 : 1.15;
 
   return {
     frames,
@@ -330,8 +334,8 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
     finalQueues: refillColumnQueues(queues),
     combo,
     attack: Math.floor(weightedAttack * comboMultiplier),
-    heal: Math.floor(heal * resourceMultiplier),
-    shield: Math.floor(shield * resourceMultiplier),
+    heal: Math.floor(heal * resourceMultiplier * resourceCommitment),
+    shield: Math.floor(shield * resourceMultiplier * resourceCommitment),
     matchedCount,
     largestAttackRun,
   };
@@ -802,9 +806,12 @@ export default function PuzzleRPGGame() {
       setMessage(skillLabel ? `${skillLabel} • SETUP` : "SETUP • 次の形を作った");
     }
 
+    const resourceTurn = plan.attack === 0 && plan.frames.length > 0;
     const skillGain = isSetupTurn
       ? 24
-      : Math.min(16, plan.matchedCount * 2 + Math.max(0, plan.combo - 1) * 3);
+      : resourceTurn
+        ? Math.min(18, plan.matchedCount * 2 + Math.max(0, plan.combo - 1) * 3)
+        : Math.min(12, plan.matchedCount + Math.max(0, plan.combo - 1) * 2);
     setSkill(consumeSkill ? skillGain : Math.min(100, skill + skillGain));
 
     const healedHp = Math.min(PLAYER_MAX_HP, playerHp + plan.heal);
@@ -1158,7 +1165,7 @@ export default function PuzzleRPGGame() {
             ? `SETUP推奨 • ${intent.label} ${intent.power} → 威力65% / PRISM+24`
             : setupMode
               ? `SETUP候補 • 次手 最大${analysis.bestSetupScore}`
-              : `消せる手 ${analysis.immediateMoves} • ⬢=DEF • 長期戦は敵威力↑`}
+              : `消せる手 ${analysis.immediateMoves} • 攻撃中の♥/DEF効果↓ • 長期戦は敵威力↑`}
       </div>
       <div className={styles.message} role="status">{message}</div>
 
