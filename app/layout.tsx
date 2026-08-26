@@ -1,20 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import "./cart-rogue-mobile-fix.css";
-import CartViewportSync from "./CartViewportSync";
 
 const isGitHubPagesBuild = process.env.VOXEL_RALLY_PAGES === "1";
 const githubPagesBasePath = isGitHubPagesBuild
-  ? `/${process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "sky-dancer"}`
+  ? `/${process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "puzzle-rpg"}`
   : "";
 
 export const metadata: Metadata = {
-  title: "Sky Dancer — Turbo Hunt",
-  description: "iPhone Safari向けthree.js高速空中アクション。戦闘機で空を駆け、Turbo RAMで敵編隊を突破する。",
+  title: "Puzzle RPG",
+  description: "iPhone縦画面で遊ぶ、連鎖とスキルが気持ちいいパズルRPG。",
   manifest: `${githubPagesBasePath}/manifest.json`,
   appleWebApp: {
     capable: true,
-    title: "Sky Dancer",
+    title: "Puzzle RPG",
     statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false },
@@ -31,16 +29,13 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#78c9ee",
+  themeColor: "#11182d",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
-      <body>
-        <CartViewportSync />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
