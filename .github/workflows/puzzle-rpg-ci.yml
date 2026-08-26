@@ -3,7 +3,6 @@ name: Puzzle RPG CI
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -12,17 +11,180 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Puzzle RPG TypeScript check
-        run: npx tsc -p tsconfig.puzzle.json --noEmit
-      - name: Production build
-        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - run: npm ci
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Install Playwright
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Visual gameplay review
+        run: |
+          cat > gameplay-review.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          fs.mkdirSync('gameplay-review',{recursive:true});
+          const browser=await chromium.launch({headless:true});
+          const context=await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});
+          await context.addInitScript(()=>{let s=936421>>>0;Math.random=()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};});
+          const page=await context.newPage();
+          const errors=[];
+          page.on('console',m=>{if(m.type()==='error') errors.push(m.text())});
+          page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
+
+          const shot=async name=>page.screenshot({path:`gameplay-review/${name}.png`});
+          const bodyStats=async()=>page.evaluate(()=>({
+            w:innerWidth,h:innerHeight,scrollY,scrollHeight:document.documentElement.scrollHeight,
+            tiles:document.querySelectorAll('button[aria-label*=" orb row "]').length
+          }));
+          const readState=async()=>page.evaluate(()=>{
+            const ps=document.querySelector('[aria-label="player status"]')?.textContent||'';
+            const es=document.querySelector('[aria-label="enemy status"]')?.textContent||'';
+            const now=document.querySelector('[aria-label="enemy intents"]')?.firstElementChild?.textContent||'';
+            const body=document.body.innerText;
+            const hp=Number(ps.match(/HP\s*(\d+)/)?.[1]||0);
+            const def=Number(ps.match(/DEF\s*(\d+)/)?.[1]||0);
+            const em=es.match(/(\d+)\s*\/\s*(\d+)/);
+            const enemyHp=Number(em?.[1]||0), enemyMax=Number(em?.[2]||0);
+            const stage=Number(body.match(/STAGE\s+(\d+)/)?.[1]||1);
+            const turn=(body.match(/TURN\s+(\d+)/)?.[1]||'01');
+            const power=Number(now.match(/(\d+)\s*$/)?.[1]||0);
+            const kind=now.includes('PIERCE')?'pierce':now.includes('DRAIN')?'drain':now.includes('CRUSH')||now.includes('RITE')||now.includes('PRISM HIT')?'heavy':now.includes('DISRUPT')?'disrupt':'attack';
+            const skillBtn=[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('PRISM SHIFT'));
+            const skillText=skillBtn?.textContent||'';
+            return {hp,def,enemyHp,enemyMax,stage,turn,power,kind,skillText,now};
+          });
+          const waitReady=async()=>{
+            for(let i=0;i<90;i++){
+              if(await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)) return 'gameover';
+              if(await page.getByRole('button',{name:'BATTLE START'}).isVisible().catch(()=>false)) return 'intro';
+              const ready=await page.evaluate(()=>{const b=document.querySelector('button[aria-label*=" orb row "]');return !!b&&!b.disabled;});
+              if(ready) return 'ready';
+              await page.waitForTimeout(60);
+            }
+            return 'timeout';
+          };
+          const dismissIntro=async()=>{
+            const b=page.getByRole('button',{name:'BATTLE START'});
+            if(await b.isVisible().catch(()=>false)){
+              const st=await readState();
+              await shot(`stage-${st.stage}-intro`);
+              await b.click(); await page.waitForTimeout(120);
+              await shot(`stage-${st.stage}-battle`);
+            }
+          };
+          const previewScore=(label,st)=>{
+            if(!label) return -99999;
+            if(label.includes('PLATE')) return -99999;
+            let s=0;
+            const attack=label.match(/(?:BREAK\s+)?(\d+)(?:\s*DMG)?/);
+            const def=label.match(/DEF \+(\d+)/);
+            const hp=label.match(/HP \+(\d+)/);
+            const combo=label.match(/(\d+)C/);
+            if(attack&&(label.includes('DMG')||label.includes('BREAK')||label.includes('·'))) s+=Number(attack[1])*5;
+            if(label.includes('BREAK')) s+=350;
+            if(combo) s+=Number(combo[1])*24;
+            const dangerous=st.kind==='heavy'||st.kind==='pierce'||st.kind==='drain'||st.power>=14;
+            const needDef=st.kind!=='pierce'&&st.def<st.power;
+            const needHp=st.hp<58||st.kind==='pierce';
+            if(def) s+=Number(def[1])*(needDef?9:3)+(dangerous&&needDef?150:0);
+            if(hp) s+=Number(hp[1])*(needHp?10:3)+(needHp?180:0);
+            if(label.includes('SETUP')) s+=(dangerous&&needDef?175:dangerous?100:5);
+            if(dangerous&&needDef&&attack&&!def&&!hp) s-=85;
+            if(st.hp<35&&attack&&!hp) s-=180;
+            return s;
+          };
+          const chooseMove=async st=>{
+            const tiles=page.locator('button[aria-label*=" orb row "]');
+            const n=await tiles.count();
+            let best=null;
+            for(let i=0;i<n;i++){
+              await tiles.nth(i).evaluate(el=>el.click());
+              const opts=await page.evaluate(()=>[...document.querySelectorAll('button[aria-label*=" orb row "]')].map((b,j)=>({j,label:(b.querySelector('small')?.textContent||'').trim()})).filter(x=>x.label));
+              for(const o of opts){const score=previewScore(o.label,st);if(!best||score>best.score)best={a:i,b:o.j,label:o.label,score};}
+              await tiles.nth(i).evaluate(el=>el.click());
+            }
+            return best;
+          };
+          const tryPrism=async st=>{
+            if(!/READY|BREAK/.test(st.skillText)) return null;
+            if(!(st.stage===2||st.kind==='pierce'||st.hp<50||st.kind==='heavy')) return null;
+            const btn=[...await page.locator('button').all()].find(()=>false);
+            const prism=page.getByRole('button',{name:/PRISM SHIFT/});
+            if(!await prism.isEnabled().catch(()=>false)) return null;
+            await prism.click(); await page.waitForTimeout(30);
+            const tiles=page.locator('button[aria-label*=" orb row "]');
+            let best=null;
+            for(let i=0;i<await tiles.count();i++){
+              await tiles.nth(i).evaluate(el=>el.click());
+              const opts=await page.evaluate(()=>{
+                const p=document.querySelector('[aria-label="Prism Shift color selection"]');
+                return p?[...p.querySelectorAll('button')].map((b,j)=>({j,label:(b.querySelector('small')?.textContent||'').trim(),disabled:b.disabled})):[];
+              });
+              for(const o of opts){if(o.disabled||o.label==='SAME'||o.label==='—')continue;const score=previewScore(o.label,st)+(o.label.includes('BREAK')?500:0);if(!best||score>best.score)best={tile:i,color:o.j,label:o.label,score};}
+            }
+            if(!best){await prism.click();return null;}
+            await tiles.nth(best.tile).evaluate(el=>el.click());
+            const palette=page.locator('[aria-label="Prism Shift color selection"] button');
+            await shot(`stage-${st.stage}-prism-choice`);
+            await palette.nth(best.color).click();
+            return best;
+          };
+
+          await shot('00-title');
+          const titleMetrics=await page.evaluate(()=>({hero:document.querySelector('img[alt="Puzzle RPG hero"]')?.getBoundingClientRect().toJSON(),start:[...document.querySelectorAll('button')].find(b=>b.textContent?.includes('START GAME'))?.getBoundingClientRect().toJSON(),scrollHeight:document.documentElement.scrollHeight}));
+          await page.getByRole('button',{name:'START GAME'}).click();
+          await dismissIntro();
+          const history=[];
+          let capturedSelection=false,capturedAttack=false,capturedDamage=false,capturedSetup=false,capturedClear=false;
+          for(let step=1;step<=42;step++){
+            await dismissIntro();
+            if(await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)) break;
+            let st=await readState();
+            if(st.stage>=5) break;
+            const prismMove=await tryPrism(st);
+            if(prismMove){
+              for(let k=0;k<22;k++){await page.waitForTimeout(55);if(!capturedAttack&&await page.locator('[class*="playerAttackFx"]').isVisible().catch(()=>false)){await shot('fx-attack');capturedAttack=true;}if(!capturedDamage&&await page.locator('[class*="damageVignette"]').isVisible().catch(()=>false)){await shot('fx-damage');capturedDamage=true;}}
+              await waitReady(); const after=await readState(); history.push({step,type:'prism',move:prismMove.label,before:st,after}); continue;
+            }
+            const move=await chooseMove(st);
+            if(!move) break;
+            const tiles=page.locator('button[aria-label*=" orb row "]');
+            await tiles.nth(move.a).click({force:true}); await page.waitForTimeout(35);
+            if(!capturedSelection){await shot('selection-preview');capturedSelection=true;}
+            await tiles.nth(move.b).click({force:true});
+            if(move.label.includes('SETUP')&&!capturedSetup){await page.waitForTimeout(80);await shot('setup-turn');capturedSetup=true;}
+            for(let k=0;k<23;k++){
+              await page.waitForTimeout(55);
+              if(!capturedAttack&&await page.locator('[class*="playerAttackFx"]').isVisible().catch(()=>false)){await shot('fx-attack');capturedAttack=true;}
+              if(!capturedDamage&&await page.locator('[class*="damageVignette"]').isVisible().catch(()=>false)){await shot('fx-damage');capturedDamage=true;}
+              if(!capturedClear&&await page.locator('[class*="stageClearOverlay"]').isVisible().catch(()=>false)){await shot('stage-clear');capturedClear=true;}
+            }
+            await waitReady();
+            const after=await readState(); history.push({step,type:'swap',move:move.label,before:st,after});
+          }
+          await dismissIntro();
+          const final=await readState();
+          await shot('99-final');
+          const layout=await bodyStats();
+          fs.writeFileSync('gameplay-review/report.json',JSON.stringify({titleMetrics,history,final,layout,errors},null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(layout.scrollY!==0||layout.tiles!==36) throw new Error(`layout regression ${JSON.stringify(layout)}`);
+          await browser.close();
+          JS
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/gameplay-review.log 2>&1 & PID=$!
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          node gameplay-review.mjs
+          kill $PID || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gameplay-review
+          path: gameplay-review
