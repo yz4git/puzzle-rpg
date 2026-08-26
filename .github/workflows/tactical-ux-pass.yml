@@ -1,0 +1,36 @@
+name: Tactical UX Pass
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/tactical-ux-pass.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply tactical UX pass
+        run: python .github/scripts/tactical_ux_pass.py
+      - name: Verify
+        run: |
+          npx tsc -p tsconfig.puzzle.json --noEmit
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit implementation
+        run: |
+          git config user.name "yz4git"
+          git config user.email "65384484+yz4git@users.noreply.github.com"
+          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css
+          git diff --cached --quiet && exit 0
+          git commit -m "Deepen tactical setup and presentation"
+          git push origin HEAD:main
