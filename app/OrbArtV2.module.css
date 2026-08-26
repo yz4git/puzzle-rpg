@@ -67,6 +67,69 @@
   box-shadow: inset 0 0 0 2px #000, 0 0 0 2px rgba(255,255,255,.25), 0 0 12px rgba(255,255,255,.3) !important;
 }
 
+/* Drop animation sprites are divs rather than board buttons. Give them the
+   exact same Orb Art skin so iOS never shows the browser/base white tile while
+   the identity-preserving drop layer is moving. */
+.root :global([class*="dropSprite"]) {
+  border-radius: 4px !important;
+  border: 2px solid rgba(197, 210, 235, .18) !important;
+  background: #080b12 !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(0,0,0,.88),
+    inset 0 6px 0 rgba(255,255,255,.025),
+    0 2px 0 #000 !important;
+  overflow: hidden !important;
+  opacity: 1 !important;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.root :global([class*="dropSprite"] img) {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 72% !important;
+  height: 72% !important;
+  object-fit: contain;
+  image-rendering: pixelated;
+  opacity: 1 !important;
+  animation: none !important;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  filter: saturate(1.05) contrast(1.1) drop-shadow(2px 2px 0 #000);
+}
+
+.root :global([class*="dropSprite"][class*="fire"]) {
+  border-color: rgba(255, 91, 39, .42) !important;
+  background: linear-gradient(180deg, #210806, #0b0708 78%) !important;
+  box-shadow: inset 0 0 0 2px #050303, inset 0 -7px 0 rgba(86, 17, 8, .35), 0 2px 0 #000 !important;
+}
+.root :global([class*="dropSprite"][class*="water"]) {
+  border-color: rgba(72, 167, 255, .42) !important;
+  background: linear-gradient(180deg, #061327, #060a12 78%) !important;
+  box-shadow: inset 0 0 0 2px #02050a, inset 0 -7px 0 rgba(12, 44, 91, .38), 0 2px 0 #000 !important;
+}
+.root :global([class*="dropSprite"][class*="light"]) {
+  border-color: rgba(255, 219, 71, .46) !important;
+  background: linear-gradient(180deg, #211b05, #0b0905 78%) !important;
+  box-shadow: inset 0 0 0 2px #050400, inset 0 -7px 0 rgba(92, 72, 9, .33), 0 2px 0 #000 !important;
+}
+.root :global([class*="dropSprite"][class*="heart"]) {
+  border-color: rgba(255, 94, 175, .48) !important;
+  background: linear-gradient(180deg, #250719, #0c060b 78%) !important;
+  box-shadow: inset 0 0 0 2px #060203, inset 0 -7px 0 rgba(96, 13, 59, .34), 0 2px 0 #000 !important;
+}
+.root :global([class*="dropSprite"][class*="guard"]) {
+  border-color: rgba(155, 224, 255, .42) !important;
+  background: linear-gradient(180deg, #0b1b23, #070b0f 78%) !important;
+  box-shadow: inset 0 0 0 2px #020506, inset 0 -7px 0 rgba(27, 70, 85, .34), 0 2px 0 #000 !important;
+}
+
+.root :global([class*="dropSprite"][class*="fire"] img) { filter: saturate(1.22) contrast(1.16) hue-rotate(-4deg) drop-shadow(2px 2px 0 #000); }
+.root :global([class*="dropSprite"][class*="heart"] img) { filter: saturate(1.2) contrast(1.12) hue-rotate(7deg) brightness(1.08) drop-shadow(2px 2px 0 #000); }
+.root :global([class*="dropSprite"][class*="guard"] img) { filter: saturate(.72) contrast(1.2) brightness(1.12) drop-shadow(2px 2px 0 #000); }
+
 .root :global([aria-label="column next puzzle orbs"] [class*="nextOrb"]),
 .root :global([aria-label="column next puzzle orbs"] [class*="nextOrbBack"]) {
   border-radius: 2px !important;
