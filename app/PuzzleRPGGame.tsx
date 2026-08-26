@@ -83,7 +83,7 @@ type EnemyActionResult = {
 
 const SIZE = 6;
 const PLAYER_MAX_HP = 100;
-const PLAYER_MAX_SHIELD = 60;
+const PLAYER_MAX_SHIELD = 42;
 const COLUMN_QUEUE_DEPTH = 14;
 const ORBS: Orb[] = ["fire", "water", "light", "heart", "guard"];
 
@@ -104,9 +104,9 @@ const ORB_NAME: Record<Orb, string> = {
 };
 
 const ATTACK_PER_ORB: Record<Orb, number> = {
-  fire: 7,
-  water: 6,
-  light: 8,
+  fire: 6,
+  water: 5,
+  light: 7,
   heart: 0,
   guard: 0,
 };
@@ -293,14 +293,14 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
       const row = Number(rowText);
       const col = Number(colText);
       const orb = next[row]![col]!;
-      if (orb === "heart") frameHeal += 4;
-      else if (orb === "guard") frameShield += 6;
+      if (orb === "heart") frameHeal += 3;
+      else if (orb === "guard") frameShield += 5;
       else frameAttack += ATTACK_PER_ORB[orb];
     }
 
     // 後段の偶発落ちコンほど攻撃寄与を弱める。NEXTを読んだ意図的な連鎖は
     // 回復・防御・ゲージ面で十分に価値が残る。
-    const cascadeWeight = safety === 0 ? 1 : safety === 1 ? 0.72 : 0.55;
+    const cascadeWeight = safety === 0 ? 1 : safety === 1 ? 0.52 : 0.34;
     weightedAttack += frameAttack * cascadeWeight;
     heal += frameHeal;
     shield += frameShield;
@@ -321,8 +321,8 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
   }
 
   const combo = frames.length;
-  const comboMultiplier = 1 + Math.min(0.3, Math.max(0, combo - 1) * 0.15);
-  const resourceMultiplier = 1 + Math.min(0.2, Math.max(0, combo - 1) * 0.1);
+  const comboMultiplier = 1 + Math.min(0.18, Math.max(0, combo - 1) * 0.09);
+  const resourceMultiplier = 1 + Math.min(0.1, Math.max(0, combo - 1) * 0.05);
 
   return {
     frames,
@@ -463,14 +463,14 @@ function enemyMaxHp(stage: number): number {
   const early = Math.min(stage - 1, 5);
   const mid = Math.max(0, Math.min(stage - 6, 5));
   const late = Math.max(0, stage - 11);
-  return 88 + early * 21 + mid * 16 + late * 21;
+  return 112 + early * 26 + mid * 22 + late * 28;
 }
 
 function enemyBaseAttack(stage: number): number {
   const early = Math.min(stage - 1, 5);
   const mid = Math.max(0, Math.min(stage - 6, 5));
   const late = Math.max(0, stage - 11);
-  return 7 + Math.floor(early * 1.15 + mid * 0.8 + late * 1.15);
+  return 10 + Math.floor(early * 1.45 + mid * 1.05 + late * 1.5);
 }
 
 function enemyDefinition(stage: number): EnemyDefinition {
@@ -481,7 +481,7 @@ function enemyDefinition(stage: number): EnemyDefinition {
         kind: "bastion",
         name: "IRON BASTION",
         passive: "PLATE：単発3消し攻撃を無効。4消し・連鎖で突破",
-        armor: 4 + tier,
+        armor: 6 + tier * 2,
       };
     case 2:
       return {
@@ -556,33 +556,34 @@ function findPrismBreakOpportunity(board: Board, queues: ColumnQueues, enemy: En
 }
 
 function enemyIntent(stage: number, enemyTurn: number, enemy: EnemyDefinition): EnemyIntent {
-  const base = enemyBaseAttack(stage);
+  // Escalation prevents indefinite attack-only play: every 3 enemy turns adds +1 power.
+  const base = enemyBaseAttack(stage) + Math.floor(enemyTurn / 3);
   const phase = enemyTurn % 3;
 
   if (enemy.kind === "bastion") {
-    if (phase === 2) return { kind: "heavy", label: "CRUSH", icon: "💥", power: base + 6, detail: "次の強打。SHIELD推奨" };
-    return { kind: "attack", label: "ATTACK", icon: "⚔", power: base + 1, detail: "SHIELDで軽減可能" };
+    if (phase === 2) return { kind: "heavy", label: "CRUSH", icon: "💥", power: base + 8, detail: "強打。DEF/SETUP必須級" };
+    return { kind: "attack", label: "ATTACK", icon: "⚔", power: base + 2, detail: "DEFで軽減可能" };
   }
 
   if (enemy.kind === "oracle") {
-    if (phase === 1) return { kind: "drain", label: "DRAIN", icon: "☠", power: base + 2, detail: "HPダメージ分だけ回復" };
-    if (phase === 2) return { kind: "heavy", label: "BLOOD RITE", icon: "◆", power: base + 5, detail: "強打。吸収なし" };
-    return { kind: "attack", label: "ATTACK", icon: "⚔", power: base, detail: "SHIELDで軽減可能" };
+    if (phase === 1) return { kind: "drain", label: "DRAIN", icon: "☠", power: base + 4, detail: "HPダメージ以上に回復" };
+    if (phase === 2) return { kind: "heavy", label: "BLOOD RITE", icon: "◆", power: base + 7, detail: "強打。吸収なし" };
+    return { kind: "attack", label: "ATTACK", icon: "⚔", power: base, detail: "DEFで軽減可能" };
   }
 
   if (enemy.kind === "null") {
-    if (phase === 1) return { kind: "pierce", label: "PIERCE", icon: "✧", power: base + 2, detail: "SHIELD無視。HPを確保" };
-    return { kind: phase === 2 ? "heavy" : "attack", label: phase === 2 ? "CRUSH" : "ATTACK", icon: phase === 2 ? "💥" : "⚔", power: base + (phase === 2 ? 5 : 0), detail: "SHIELDで軽減可能" };
+    if (phase === 1) return { kind: "pierce", label: "PIERCE", icon: "✧", power: base + 4, detail: "DEF無視。HPを確保" };
+    return { kind: phase === 2 ? "heavy" : "attack", label: phase === 2 ? "CRUSH" : "ATTACK", icon: phase === 2 ? "💥" : "⚔", power: base + (phase === 2 ? 7 : 0), detail: "DEFで軽減可能" };
   }
 
   if (enemy.kind === "trickster") {
-    if (phase === 0) return { kind: "disrupt", label: "DISRUPT", icon: "⟳", power: Math.max(4, base - 2), detail: "攻撃後、NEXT列を右へシフト" };
-    if (phase === 2) return { kind: "heavy", label: "PRISM HIT", icon: "◇", power: base + 5, detail: "強打。今のNEXTを活用" };
-    return { kind: "attack", label: "ATTACK", icon: "⚔", power: base, detail: "SHIELDで軽減可能" };
+    if (phase === 0) return { kind: "disrupt", label: "DISRUPT", icon: "⟳", power: Math.max(7, base), detail: "攻撃後、NEXT列を右へシフト" };
+    if (phase === 2) return { kind: "heavy", label: "PRISM HIT", icon: "◇", power: base + 7, detail: "強打。今のNEXTを活用" };
+    return { kind: "attack", label: "ATTACK", icon: "⚔", power: base, detail: "DEFで軽減可能" };
   }
 
-  if (phase === 2) return { kind: "heavy", label: "VOID CRUSH", icon: "💥", power: base + 6, detail: "3手目の強打" };
-  return { kind: "attack", label: "ATTACK", icon: "⚔", power: base, detail: "SHIELDで軽減可能" };
+  if (phase === 2) return { kind: "heavy", label: "VOID CRUSH", icon: "💥", power: base + 8, detail: "3手目の強打" };
+  return { kind: "attack", label: "ATTACK", icon: "⚔", power: base, detail: "DEFで軽減可能" };
 }
 
 function disruptColumnQueues(queues: ColumnQueues): ColumnQueues {
@@ -618,8 +619,9 @@ function computeEnemyAction(
     hpAfter = Math.max(0, hpBefore - hpDamage);
 
     if (intent.kind === "drain") {
-      enemyHpAfter = Math.min(maxEnemyHp, enemyHpBefore + hpDamage);
-      summary = hpDamage > 0 ? `${intent.label} -${hpDamage} / 敵+${hpDamage}` : `${intent.label} BLOCK`;
+      const drainHeal = Math.ceil(hpDamage * 1.25);
+      enemyHpAfter = Math.min(maxEnemyHp, enemyHpBefore + drainHeal);
+      summary = hpDamage > 0 ? `${intent.label} -${hpDamage} / 敵+${drainHeal}` : `${intent.label} BLOCK`;
     } else if (intent.kind === "disrupt") {
       queuesAfter = disruptColumnQueues(queuesBefore);
       summary = `${intent.label}${hpDamage > 0 ? ` -${hpDamage}` : ""} / NEXT SHIFT`;
@@ -681,6 +683,7 @@ export default function PuzzleRPGGame() {
   const enemy = enemyDefinition(stage);
   const intent = enemyIntent(stage, enemyTurn, enemy);
   const nextIntent = enemyIntent(stage, enemyTurn + 1, enemy);
+  const enemyPressure = Math.floor(enemyTurn / 3);
   const level = 1 + Math.floor(xp / 100);
   const xpIntoLevel = xp % 100;
   const analysis = useMemo(() => analyzeBoard(board), [board]);
@@ -729,7 +732,7 @@ export default function PuzzleRPGGame() {
     setXp((value) => value + gainedXp);
     setMessage(`STAGE ${currentStage} CLEAR • 盤面/NEXT持ち越し`);
     await delay(1050);
-    setPlayerShield((value) => Math.floor(value * 0.5));
+    setPlayerShield((value) => Math.floor(value * 0.25));
     setStage(nextStage);
     setEnemyHp(enemyMaxHp(nextStage));
     setEnemyTurn(0);
@@ -800,8 +803,8 @@ export default function PuzzleRPGGame() {
     }
 
     const skillGain = isSetupTurn
-      ? 28
-      : Math.min(20, plan.matchedCount * 2 + Math.max(0, plan.combo - 1) * 4);
+      ? 24
+      : Math.min(16, plan.matchedCount * 2 + Math.max(0, plan.combo - 1) * 3);
     setSkill(consumeSkill ? skillGain : Math.min(100, skill + skillGain));
 
     const healedHp = Math.min(PLAYER_MAX_HP, playerHp + plan.heal);
@@ -830,8 +833,8 @@ export default function PuzzleRPGGame() {
     if (plan.shield > 0) chips.push(`+${plan.shield} DEF`);
     if (isSetupTurn) {
       chips.push("TACTICAL SETUP");
-      chips.push("INTENT 50%");
-      chips.push("PRISM +28");
+      chips.push("INTENT 65%");
+      chips.push("PRISM +24");
     } else if (plan.frames.length === 0) {
       chips.push("SHIFT SETUP");
     }
@@ -863,7 +866,7 @@ export default function PuzzleRPGGame() {
     }
 
     const effectiveIntent = isSetupTurn
-      ? { ...intent, power: Math.max(1, Math.ceil(intent.power * 0.5)) }
+      ? { ...intent, power: Math.max(1, Math.ceil(intent.power * 0.65)) }
       : intent;
     const enemyResult = computeEnemyAction(
       effectiveIntent,
@@ -888,7 +891,7 @@ export default function PuzzleRPGGame() {
     setEnemyTurn((value) => value + 1);
     setMessage(
       isSetupTurn
-        ? `TACTICAL SETUP • PRISM +28 • ${enemyResult.summary}`
+        ? `TACTICAL SETUP • PRISM +24 • ${enemyResult.summary}`
         : plan.frames.length === 0
           ? `SHIFT SETUP • ${enemyResult.summary}`
         : `${actualAttack > 0 ? `${actualAttack} DMG • ` : ""}${enemyResult.summary}`,
@@ -1007,6 +1010,7 @@ export default function PuzzleRPGGame() {
           <div className={styles.stage}>STAGE {stage}</div>
         </div>
         <div className={styles.resources}>
+          <span className={styles.turnCounter}>TURN {String(enemyTurn + 1).padStart(2, "0")}{enemyPressure > 0 ? ` ↑${enemyPressure}` : ""}</span>
           <span>LV {level}</span>
           <span>◈ {gold}</span>
         </div>
@@ -1149,12 +1153,12 @@ export default function PuzzleRPGGame() {
 
       <div className={`${styles.ruleHint} ${setupMode ? styles.setupAlert : ""}`}>
         {selected && !skillMode
-          ? "② 隣接パネル上の予測結果を見て選択 • PLATE×は無効攻撃"
+          ? "予測を見て隣接パネルを選択 • PLATE×は無効"
           : setupRecommended
-            ? `SETUP RECOMMENDED • NOW ${intent.label} ${intent.power} → 金枠交換で威力50% + PRISM28`
+            ? `SETUP推奨 • ${intent.label} ${intent.power} → 威力65% / PRISM+24`
             : setupMode
-              ? `即消しなし → 金枠が有力SETUP（次手 最大${analysis.bestSetupScore}候補）`
-              : `消せる交換 ${analysis.immediateMoves} • SETUP=敵威力50%+PRISM28 • ⬢×3でDEF`}
+              ? `SETUP候補 • 次手 最大${analysis.bestSetupScore}`
+              : `消せる手 ${analysis.immediateMoves} • ⬢=DEF • 長期戦は敵威力↑`}
       </div>
       <div className={styles.message} role="status">{message}</div>
 
@@ -1197,13 +1201,16 @@ export default function PuzzleRPGGame() {
           <div className={styles.titleKicker}>TACTICAL PUZZLE RPG</div>
           <div className={styles.titleLogo}><span>PUZZLE</span><strong>RPG</strong></div>
           <div className={styles.titleTagline}>READ THE INTENT. BUILD THE BOARD. BREAK THE ENEMY.</div>
-          <img
-            className={styles.titleHeroSprite}
-            src={PIXEL_ART_ASSETS.hero}
-            alt="Puzzle RPG hero"
-            draggable={false}
-            decoding="async"
-          />
+          <div className={styles.titleScene}>
+            <div className={styles.titleHorizon} aria-hidden="true" />
+            <img
+              className={styles.titleHeroSprite}
+              src={PIXEL_ART_ASSETS.hero}
+              alt="Puzzle RPG hero"
+              draggable={false}
+              decoding="async"
+            />
+          </div>
           <div className={styles.titleOrbs} aria-hidden="true">
             {ORBS.map((orb) => <span key={orb} className={styles[orb]}>{ORB_LABEL[orb]}</span>)}
           </div>
@@ -1219,7 +1226,7 @@ export default function PuzzleRPGGame() {
           <EnemySprite kind={enemy.kind} className={styles.introPixelSprite} intro />
           <div className={styles.introEnemyName}>{enemy.name}</div>
           <div className={styles.enemySpeech}>「{ENEMY_DIALOGUE[enemy.kind]}」</div>
-          <div className={styles.tacticalHint}><strong>TACTICAL HINT</strong><span>{ENEMY_HINT[enemy.kind]}</span></div>
+          <div className={styles.tacticalHint}><strong>攻略ヒント</strong><span>{ENEMY_HINT[enemy.kind]}　※3手ごとに敵威力+1</span></div>
           <button type="button" className={styles.battleStartButton} onClick={() => { primeAudio(); playSfx("uiConfirm"); setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START</button>
         </div>
       ) : null}
@@ -1230,7 +1237,7 @@ export default function PuzzleRPGGame() {
           <div className={styles.clearStage}>STAGE {stageClear.stage}</div>
           <div className={styles.clearTitle}>CLEAR!</div>
           <div className={styles.clearRewards}><span>+{stageClear.gold} ◈</span><span>+{stageClear.xp} XP</span></div>
-          <div className={styles.clearCarry}>BOARD + NEXT CARRIED • DEF 50% CARRIED</div>
+          <div className={styles.clearCarry}>BOARD + NEXT CARRIED • DEF 25% CARRIED</div>
         </div>
       ) : null}
 
