@@ -1,0 +1,176 @@
+.root :global(.runtimePlayerAttackFx) {
+  overflow: visible !important;
+  filter: none !important;
+}
+
+.root :global(.runtimePlayerAttackFx)::before,
+.root :global(.runtimePlayerAttackFx)::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.root :global(.runtimePlayerAttackFx)::before {
+  background: rgba(255,255,255,.55);
+  animation: hitWhiteFlash .26s steps(3, end) both;
+}
+
+.root :global(.runtimePlayerAttackFx)::after {
+  background:
+    linear-gradient(90deg, transparent 47%, rgba(255,255,255,.9) 47% 53%, transparent 53%),
+    linear-gradient(180deg, transparent 47%, rgba(255,255,255,.7) 47% 53%, transparent 53%);
+  clip-path: polygon(47% 0,53% 0,53% 42%,100% 42%,100% 58%,53% 58%,53% 100%,47% 100%,47% 58%,0 58%,0 42%,47% 42%);
+  opacity: 0;
+  animation: crossImpact .34s steps(4, end) both;
+}
+
+.root :global(.runtimeEnemyStruck) {
+  animation: enemyHitV2 .34s steps(5, end) both !important;
+  transform-origin: 50% 68%;
+}
+
+.root :global(.runtimeDamageFx) {
+  animation: playerDamageV2 .38s steps(5, end) both !important;
+}
+
+.root :global(.runtimeDamageFx)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  pointer-events: none;
+  border: 8px solid #e52f39;
+  box-shadow: inset 0 0 0 4px #5e080d;
+  animation: dangerFrame .38s steps(4, end) both;
+}
+
+.root :global(.runtimeClearingTile)::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  z-index: 8;
+  pointer-events: none;
+  border: 3px solid #fff;
+  box-shadow:
+    7px 0 0 -3px #fff,
+    -7px 0 0 -3px #fff,
+    0 7px 0 -3px #fff,
+    0 -7px 0 -3px #fff;
+  animation: orbBreakV2 .2s steps(4, end) both;
+}
+
+.root :global(.runtimeStageClear) {
+  animation: stageClearV2 .8s steps(6, end) both !important;
+}
+
+.root :global(.runtimeStageClear)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(255, 244, 159, .75);
+  animation: clearFlashV2 .55s steps(5, end) both;
+}
+
+.root :global([class*="combatPop"]) {
+  border-radius: 2px !important;
+  border: 2px solid #fff !important;
+  background: #b91d2f !important;
+  color: #fff !important;
+  text-shadow: 2px 2px 0 #000 !important;
+  box-shadow: 3px 3px 0 #000 !important;
+  animation-timing-function: steps(4, end) !important;
+}
+
+.root :global([class*="combo"]) {
+  border-radius: 2px !important;
+  border: 2px solid #fff !important;
+  background: #f6d94f !important;
+  color: #211600 !important;
+  box-shadow: 3px 3px 0 #000 !important;
+  animation-timing-function: steps(4, end) !important;
+}
+
+.root :global([class*="resultChips"] span) {
+  border-radius: 2px !important;
+  border: 1px solid rgba(255,255,255,.64) !important;
+  background: #080b12 !important;
+  box-shadow: 2px 2px 0 #000 !important;
+}
+
+@keyframes hitWhiteFlash {
+  0% { opacity: 0; }
+  18% { opacity: .85; }
+  36% { opacity: 0; }
+  52% { opacity: .36; }
+  100% { opacity: 0; }
+}
+
+@keyframes crossImpact {
+  0%, 22% { opacity: 0; transform: scale(.4); }
+  23% { opacity: .8; transform: scale(.55); }
+  46% { opacity: .55; transform: scale(.8); }
+  70% { opacity: .24; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+
+@keyframes enemyHitV2 {
+  0% { transform: translate(0,0); filter: brightness(1); }
+  18% { transform: translate(7px,-2px); filter: brightness(3) contrast(1.6); }
+  36% { transform: translate(-6px,1px); filter: invert(1) brightness(2); }
+  54% { transform: translate(4px,0); filter: brightness(2); }
+  72% { transform: translate(-2px,0); filter: brightness(1.3); }
+  100% { transform: translate(0,0); filter: brightness(1); }
+}
+
+@keyframes playerDamageV2 {
+  0% { transform: translateX(0); filter: none; }
+  20% { transform: translateX(-6px); filter: brightness(1.9) saturate(1.6); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); filter: brightness(1.3); }
+  80% { transform: translateX(1px); }
+  100% { transform: translateX(0); filter: none; }
+}
+
+@keyframes dangerFrame {
+  0% { opacity: 0; }
+  15% { opacity: .95; }
+  36% { opacity: .2; }
+  58% { opacity: .78; }
+  100% { opacity: 0; }
+}
+
+@keyframes orbBreakV2 {
+  0% { opacity: 0; transform: scale(.65); }
+  24% { opacity: 1; transform: scale(.9); }
+  50% { opacity: .85; transform: scale(1.15); }
+  76% { opacity: .45; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(1.62); }
+}
+
+@keyframes stageClearV2 {
+  0% { filter: brightness(1); }
+  18% { filter: brightness(2.5); }
+  34% { filter: brightness(1); }
+  50% { filter: brightness(2); }
+  100% { filter: brightness(1); }
+}
+
+@keyframes clearFlashV2 {
+  0% { opacity: 0; }
+  18% { opacity: .88; }
+  40% { opacity: 0; }
+  58% { opacity: .55; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root :global(.runtimePlayerAttackFx)::before,
+  .root :global(.runtimePlayerAttackFx)::after,
+  .root :global(.runtimeEnemyStruck),
+  .root :global(.runtimeDamageFx),
+  .root :global(.runtimeClearingTile)::after,
+  .root :global(.runtimeStageClear) { animation: none !important; }
+}
