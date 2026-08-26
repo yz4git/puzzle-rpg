@@ -1,0 +1,92 @@
+.root :global(button[aria-label*=" orb row "]) {
+  border-radius: 4px !important;
+  border: 2px solid rgba(197, 210, 235, .18) !important;
+  background: #080b12 !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(0,0,0,.88),
+    inset 0 6px 0 rgba(255,255,255,.025),
+    0 2px 0 #000 !important;
+  overflow: visible !important;
+}
+
+.root :global(button[aria-label*=" orb row "])::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.018);
+}
+
+.root :global(button[aria-label*=" orb row "] img) {
+  position: relative;
+  z-index: 1;
+  width: 72% !important;
+  height: 72% !important;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: saturate(1.05) contrast(1.1) drop-shadow(2px 2px 0 #000);
+  animation: orbIdle 1.6s steps(2, end) infinite;
+  transform: translateZ(0);
+}
+
+.root :global(button[aria-label^="fire orb"]) {
+  border-color: rgba(255, 91, 39, .42) !important;
+  background: linear-gradient(180deg, #210806, #0b0708 78%) !important;
+  box-shadow: inset 0 0 0 2px #050303, inset 0 -7px 0 rgba(86, 17, 8, .35), 0 2px 0 #000 !important;
+}
+.root :global(button[aria-label^="water orb"]) {
+  border-color: rgba(72, 167, 255, .42) !important;
+  background: linear-gradient(180deg, #061327, #060a12 78%) !important;
+  box-shadow: inset 0 0 0 2px #02050a, inset 0 -7px 0 rgba(12, 44, 91, .38), 0 2px 0 #000 !important;
+}
+.root :global(button[aria-label^="light orb"]) {
+  border-color: rgba(255, 219, 71, .46) !important;
+  background: linear-gradient(180deg, #211b05, #0b0905 78%) !important;
+  box-shadow: inset 0 0 0 2px #050400, inset 0 -7px 0 rgba(92, 72, 9, .33), 0 2px 0 #000 !important;
+}
+.root :global(button[aria-label^="heart orb"]) {
+  border-color: rgba(255, 94, 175, .48) !important;
+  background: linear-gradient(180deg, #250719, #0c060b 78%) !important;
+  box-shadow: inset 0 0 0 2px #060203, inset 0 -7px 0 rgba(96, 13, 59, .34), 0 2px 0 #000 !important;
+}
+.root :global(button[aria-label^="guard orb"]) {
+  border-color: rgba(155, 224, 255, .42) !important;
+  background: linear-gradient(180deg, #0b1b23, #070b0f 78%) !important;
+  box-shadow: inset 0 0 0 2px #020506, inset 0 -7px 0 rgba(27, 70, 85, .34), 0 2px 0 #000 !important;
+}
+
+.root :global(button[aria-label^="fire orb"] img) { filter: saturate(1.22) contrast(1.16) hue-rotate(-4deg) drop-shadow(2px 2px 0 #000); }
+.root :global(button[aria-label^="heart orb"] img) { filter: saturate(1.2) contrast(1.12) hue-rotate(7deg) brightness(1.08) drop-shadow(2px 2px 0 #000); }
+.root :global(button[aria-label^="guard orb"] img) { filter: saturate(.72) contrast(1.2) brightness(1.12) drop-shadow(2px 2px 0 #000); }
+
+.root :global(button[aria-label*=" orb row "][aria-pressed="true"]) {
+  outline: 3px solid #f8fbff !important;
+  outline-offset: -1px !important;
+  box-shadow: inset 0 0 0 2px #000, 0 0 0 2px rgba(255,255,255,.25), 0 0 12px rgba(255,255,255,.3) !important;
+}
+
+.root :global([aria-label="column next puzzle orbs"] [class*="nextOrb"]),
+.root :global([aria-label="column next puzzle orbs"] [class*="nextOrbBack"]) {
+  border-radius: 2px !important;
+  border: 1px solid rgba(210, 225, 255, .25) !important;
+  box-shadow: inset 0 0 0 1px #000;
+  image-rendering: pixelated;
+}
+
+.root :global([class*="movePreview"]) {
+  border-radius: 2px !important;
+  border: 1px solid #000 !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.45), 2px 2px 0 #000;
+  text-shadow: 1px 1px 0 #000;
+}
+
+@keyframes orbIdle {
+  0%, 100% { filter: brightness(1) contrast(1.1) drop-shadow(2px 2px 0 #000); }
+  50% { filter: brightness(1.08) contrast(1.14) drop-shadow(2px 2px 0 #000); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root :global(button[aria-label*=" orb row "] img) { animation: none; }
+}
