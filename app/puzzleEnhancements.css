@@ -1,0 +1,202 @@
+/* Runtime visual reinforcement kept outside the game CSS module so it can evolve independently. */
+body.runtimeDanger::before,
+body.runtimeCritical::before {
+  content: "";
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  pointer-events: none;
+  border: 5px solid #a51d35;
+  box-shadow: inset 0 0 0 4px #260008;
+  animation: runtimeDangerFrame .78s steps(2, end) infinite;
+}
+
+body.runtimeCritical::before {
+  border-width: 8px;
+  border-color: #ff304e;
+  box-shadow: inset 0 0 0 5px #52000f, inset 0 0 0 10px #070000;
+  animation-duration: .44s;
+}
+
+.runtimePinchBanner {
+  position: fixed;
+  z-index: 91;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 5px);
+  transform: translateX(-50%);
+  width: min(calc(100vw - 18px), 382px);
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 3px double #ff5b70;
+  background: #120205;
+  color: #fff;
+  box-shadow: 4px 4px 0 #000;
+  font-size: 9px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.runtimePinchBanner strong {
+  color: #ff6d7f;
+  font-size: 13px;
+  letter-spacing: .06em;
+  white-space: nowrap;
+  animation: runtimePinchText .62s steps(2, end) infinite;
+}
+
+.runtimePinchBanner span {
+  color: #ffe7ea;
+  font-weight: 900;
+}
+
+.runtimePinchCritical {
+  border-color: #fff;
+  background: #3a000b;
+  animation: runtimeCriticalBanner .44s steps(2, end) infinite;
+}
+
+.runtimePinchCritical strong {
+  color: #fff;
+  font-size: 15px;
+}
+
+@keyframes runtimeDangerFrame { 50% { opacity: .22; } }
+@keyframes runtimePinchText { 50% { color: #fff; } }
+@keyframes runtimeCriticalBanner { 50% { background: #860019; } }
+
+/* Stronger 8-bit attack: keep hard steps and square particles rather than smooth glow. */
+.runtimePlayerAttackFx::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: #fff !important;
+  opacity: 0 !important;
+  animation: runtimeAttackFlash .44s steps(4, end) forwards !important;
+  pointer-events: none !important;
+}
+
+.runtimePlayerAttackFx i {
+  width: 10px !important;
+  height: 10px !important;
+  box-shadow: 8px 0 0 currentColor, 0 8px 0 #fff, 8px 8px 0 currentColor !important;
+  filter: none !important;
+}
+
+.runtimePlayerAttackFx strong {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 0 !important;
+  border: 4px solid #fff !important;
+  box-shadow: 0 0 0 4px #000, 8px 0 0 #ffd447, -8px 0 0 #fff, 0 8px 0 #ff5a2e !important;
+  filter: none !important;
+}
+
+.runtimePlayerAttackFx em {
+  padding: 5px 10px !important;
+  border: 3px solid #fff !important;
+  background: #050505 !important;
+  color: #fff !important;
+  font-size: 22px !important;
+  font-style: normal !important;
+  box-shadow: 5px 5px 0 #000 !important;
+  text-shadow: 3px 3px 0 #7d2400 !important;
+  animation: runtimeHitText .42s steps(4, end) both !important;
+}
+
+.runtimeEnemyStruck,
+[data-pixel-sprite="enemy"][class*="Struck"],
+[data-pixel-sprite="enemy"][class*="struck"] {
+  animation: runtimeEnemyHit .42s steps(5, end) !important;
+}
+
+.runtimeDamageFx {
+  box-shadow: inset 0 0 0 8px #bd203a, inset 0 0 0 14px #3b000a !important;
+  animation: runtimeDamageFrame .42s steps(4, end) both !important;
+}
+
+.runtimeDamageFx > span {
+  padding: 6px 10px !important;
+  border: 3px solid #fff !important;
+  background: #160004 !important;
+  color: #fff !important;
+  font-size: 36px !important;
+  text-shadow: 4px 4px 0 #8b0018 !important;
+  box-shadow: 5px 5px 0 #000 !important;
+}
+
+.runtimeClearingTile::before,
+button[class*="clearing"]::before {
+  border-radius: 0 !important;
+  border-width: 4px !important;
+  box-shadow: 0 0 0 3px #000, 0 0 0 7px #fff !important;
+}
+
+.runtimeClearingTile::after,
+button[class*="clearing"]::after {
+  border-radius: 0 !important;
+  filter: none !important;
+  box-shadow: -24px 0 0 currentColor, 24px 0 0 currentColor, 0 -24px 0 currentColor, 0 24px 0 currentColor, -17px -17px 0 #fff, 17px 17px 0 #fff !important;
+}
+
+.runtimeStageClear::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 20 !important;
+  pointer-events: none !important;
+  background: #fff !important;
+  opacity: 0 !important;
+  animation: runtimeClearFlash .9s steps(4, end) both !important;
+}
+
+.runtimeStageClear [class*="clearTitle"] {
+  font-size: clamp(50px, 17vw, 82px) !important;
+  text-shadow: 5px 5px 0 #6c5300 !important;
+}
+
+@keyframes runtimeAttackFlash {
+  0%, 48%, 100% { opacity: 0; }
+  58% { opacity: .48; }
+  72% { opacity: .12; }
+}
+
+@keyframes runtimeHitText {
+  0%, 48% { opacity: 0; transform: scale(.45); }
+  58%, 78% { opacity: 1; transform: scale(1.25); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes runtimeEnemyHit {
+  0% { transform: translateX(0); filter: none; }
+  20% { transform: translateX(11px); filter: brightness(4) contrast(2); }
+  40% { transform: translateX(-9px); filter: invert(1) brightness(.3); }
+  62% { transform: translateX(7px); filter: brightness(3); }
+  82% { transform: translateX(-4px); filter: brightness(.6); }
+  100% { transform: translateX(0); filter: none; }
+}
+
+@keyframes runtimeDamageFrame {
+  0%, 100% { opacity: 0; }
+  12% { opacity: 1; background: rgba(255,255,255,.35); }
+  28%, 76% { opacity: 1; }
+}
+
+@keyframes runtimeClearFlash {
+  0% { opacity: .9; }
+  12% { opacity: 0; }
+  24% { opacity: .55; }
+  38%, 100% { opacity: 0; }
+}
+
+@media (max-height: 760px) and (orientation: portrait) {
+  .runtimePinchBanner {
+    min-height: 30px;
+    padding: 3px 6px;
+    font-size: 7px;
+  }
+  .runtimePinchBanner strong { font-size: 10px; }
+}
