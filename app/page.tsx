@@ -1,11 +1,11 @@
-import PuzzleRPGGame from "./PuzzleRPGGame";
+import PuzzleRPGEnhanced from "./PuzzleRPGEnhanced";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 
 export default function Page() {
   return (
     <>
       <ServiceWorkerRegistration />
-      <PuzzleRPGGame />
+      <PuzzleRPGEnhanced />
     </>
   );
 }
