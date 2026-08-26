@@ -54,8 +54,6 @@ function installPuzzleSpawnBalancer() {
   }, true);
 }
 
-if (typeof window !== "undefined") installPuzzleSpawnBalancer();
-
 type PinchState = {
   level: "safe" | "danger" | "critical";
   hp: number;
@@ -86,8 +84,11 @@ function decorateEffects() {
 }
 
 function inspectPinch(): PinchState {
-  const blockingDialog = document.querySelector('[aria-label="Puzzle RPG title"], [role="dialog"][aria-label^="Stage "]');
-  if (blockingDialog) return SAFE_PINCH;
+  const blockingDialog = document.querySelector(
+    '[aria-label="Puzzle RPG title"], [aria-label="Game Over"], [role="dialog"][aria-label^="Stage "]',
+  );
+  const clearOverlay = Array.from(document.querySelectorAll('[aria-live="assertive"]')).some((node) => node.textContent?.includes("CLEAR!"));
+  if (blockingDialog || clearOverlay) return SAFE_PINCH;
 
   const status = document.querySelector('[aria-label="player status"]');
   const intents = document.querySelector('[aria-label="enemy intents"]');
@@ -113,10 +114,11 @@ function samePinch(a: PinchState, b: PinchState) {
 }
 
 export default function PuzzleRPGEnhanced() {
-  installPuzzleSpawnBalancer();
+  const [mounted, setMounted] = useState(false);
   const [pinch, setPinch] = useState<PinchState>(SAFE_PINCH);
 
   useEffect(() => {
+    installPuzzleSpawnBalancer();
     for (const src of Object.values(PIXEL_ART_ASSETS.enemies)) {
       const image = new Image();
       image.loading = "eager";
@@ -125,7 +127,11 @@ export default function PuzzleRPGEnhanced() {
       image.src = src;
       image.decode?.().catch(() => undefined);
     }
+    setMounted(true);
+  }, []);
 
+  useEffect(() => {
+    if (!mounted) return;
     let frame = 0;
     const inspect = () => {
       frame = 0;
@@ -148,7 +154,9 @@ export default function PuzzleRPGEnhanced() {
       if (frame) window.cancelAnimationFrame(frame);
       document.body.classList.remove("runtimeDanger", "runtimeCritical");
     };
-  }, []);
+  }, [mounted]);
+
+  if (!mounted) return <div className="runtimeBootFrame" aria-hidden="true" />;
 
   return (
     <>
