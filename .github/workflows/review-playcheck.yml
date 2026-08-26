@@ -1,0 +1,131 @@
+name: Review playcheck
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/review-playcheck.yml']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - name: Run iPhone visual playcheck
+        run: |
+          cat > review-playcheck.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          fs.mkdirSync('review-playcheck',{recursive:true});
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});
+          const errors=[]; const turns=[]; const intros=[];
+          page.on('console',m=>{if(m.type()==='error') errors.push(m.text())});
+          page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
+          await page.screenshot({path:'review-playcheck/00-title.png'});
+          const titleMetrics=await page.evaluate(()=>({w:innerWidth,h:innerHeight,scrollHeight:document.documentElement.scrollHeight,hero:[...document.images].find(i=>i.alt==='Puzzle RPG hero')?.getBoundingClientRect().toJSON()}));
+          await page.getByRole('button',{name:'START GAME'}).click();
+
+          function scoreLabel(label){
+            if(!label) return -999;
+            if(label.includes('PLATE')) return -500;
+            let s=0;
+            const dmg=label.match(/(\d+)\s*DMG/); if(dmg) s+=Number(dmg[1])*4;
+            const combo=label.match(/(\d+)C/); if(combo) s+=Number(combo[1])*22;
+            if(label.includes('BREAK')) s+=120;
+            if(label.includes('DEF')) s+=26;
+            if(label.includes('HP')) s+=18;
+            if(label.includes('SETUP')) s+=8;
+            return s;
+          }
+          async function stageNumber(){
+            const t=await page.locator('[class*=stage]').first().textContent().catch(()=>null);
+            const m=t?.match(/STAGE\s+(\d+)/); return m?Number(m[1]):null;
+          }
+          async function dismissIntroIfNeeded(){
+            const btn=page.getByRole('button',{name:'BATTLE START'});
+            if(await btn.isVisible().catch(()=>false)){
+              const s=await stageNumber() ?? intros.length+1;
+              if(!intros.includes(s)){
+                await page.screenshot({path:`review-playcheck/stage-${s}-intro.png`});
+                intros.push(s);
+              }
+              await btn.click(); await page.waitForTimeout(180);
+              await page.screenshot({path:`review-playcheck/stage-${s}-battle.png`});
+            }
+          }
+          await dismissIntroIfNeeded();
+          // capture first selection guidance
+          const tiles=page.locator('button[aria-label*=" orb row "]');
+          await tiles.nth(14).click(); await page.waitForTimeout(100);
+          await page.screenshot({path:'review-playcheck/01-selection-guide.png'});
+          await tiles.nth(14).click();
+
+          for(let turn=1; turn<=45; turn++){
+            await dismissIntroIfNeeded();
+            if(await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)) break;
+            if((await stageNumber()??1)>=6) break;
+            const count=await tiles.count();
+            let best=null;
+            for(let i=0;i<count;i++){
+              if(await tiles.nth(i).isDisabled()) continue;
+              await tiles.nth(i).click(); await page.waitForTimeout(12);
+              for(let j=0;j<count;j++){
+                const small=tiles.nth(j).locator('small');
+                if(await small.count()){
+                  const label=(await small.textContent())?.trim()??'';
+                  const score=scoreLabel(label);
+                  if(!best || score>best.score) best={a:i,b:j,label,score};
+                }
+              }
+              // deselect current tile
+              await tiles.nth(i).click(); await page.waitForTimeout(8);
+            }
+            if(!best){
+              best={a:0,b:1,label:'fallback',score:-1};
+            }
+            const beforeStage=await stageNumber();
+            const before=await page.evaluate(()=>({scrollY,scrollHeight:document.documentElement.scrollHeight}));
+            await tiles.nth(best.a).click(); await page.waitForTimeout(25);
+            await tiles.nth(best.b).click();
+            if(turn===1 || turn===5 || turn===10 || turn===15 || turn===20 || turn===30){
+              await page.waitForTimeout(240);
+              await page.screenshot({path:`review-playcheck/turn-${String(turn).padStart(2,'0')}-fx.png`});
+            }
+            await page.waitForTimeout(1500);
+            const afterStage=await stageNumber();
+            const snap=await page.evaluate(()=>({
+              bodyText:document.body.innerText.slice(0,1400), scrollY, scrollHeight:document.documentElement.scrollHeight,
+              tileCount:document.querySelectorAll('button[aria-label*=" orb row "]').length,
+              orbBackgrounds:[...document.querySelectorAll('button[aria-label*=" orb row "] > span')].slice(0,6).map(e=>getComputedStyle(e).backgroundImage)
+            }));
+            turns.push({turn,beforeStage,afterStage,choice:best.label,score:best.score,...snap});
+            if(turn===1 || turn===5 || turn===10 || turn===15 || turn===20 || turn===30 || afterStage!==beforeStage){
+              await page.screenshot({path:`review-playcheck/turn-${String(turn).padStart(2,'0')}-result.png`});
+            }
+          }
+          await dismissIntroIfNeeded();
+          await page.screenshot({path:'review-playcheck/99-final.png'});
+          const final=await page.evaluate(()=>({scrollY,scrollHeight:document.documentElement.scrollHeight,tileCount:document.querySelectorAll('button[aria-label*=" orb row "]').length,innerWidth,innerHeight}));
+          fs.writeFileSync('review-playcheck/report.json',JSON.stringify({titleMetrics,intros,turns,final,errors},null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(final.tileCount!==36) throw new Error(`tile count ${final.tileCount}`);
+          await browser.close();
+          JS
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/puzzle-review.log 2>&1 & PID=$!
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          node review-playcheck.mjs
+          kill $PID || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-playcheck
+          path: review-playcheck
