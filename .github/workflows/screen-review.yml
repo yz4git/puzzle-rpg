@@ -1,0 +1,43 @@
+name: Puzzle RPG Screen Review
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/screen-review.yml'
+      - 'qa-screen-review.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install app dependencies
+        run: npm ci
+      - name: Install Chromium QA runtime
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start game
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/puzzle-rpg-vite.log 2>&1 &
+          for i in {1..60}; do curl -fsS http://127.0.0.1:4173 >/dev/null && exit 0; sleep 1; done
+          cat /tmp/puzzle-rpg-vite.log
+          exit 1
+      - name: Play and capture
+        run: node qa-screen-review.mjs
+      - name: Upload review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-screen-review
+          path: qa-screen-artifacts
+          if-no-files-found: warn
