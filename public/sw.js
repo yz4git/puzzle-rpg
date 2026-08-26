@@ -1,7 +1,7 @@
 const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, "").replace(/\/$/, "");
 const ROOT = `${BASE_PATH}/`;
-const CACHE_PREFIX = "sky-dancer-";
-const CACHE_VERSION = "v7";
+const CACHE_PREFIX = "puzzle-rpg-";
+const CACHE_VERSION = "v1";
 const CACHE = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const APP_SHELL = [ROOT, `${BASE_PATH}/manifest.json`, `${BASE_PATH}/favicon.svg`];
 
