@@ -1,0 +1,107 @@
+.root {
+  --stage-a: #18172d;
+  --stage-b: #0a0c17;
+  --stage-glow: rgba(103, 86, 190, .18);
+  --stage-pixel: rgba(142, 130, 222, .07);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.46)),
+    linear-gradient(180deg, var(--stage-a), var(--stage-b));
+  transition: background-color .2s steps(2, end);
+}
+
+.root::before,
+.root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.root::before {
+  z-index: 0;
+  opacity: .8;
+  background:
+    radial-gradient(ellipse at 50% 12%, var(--stage-glow) 0 18%, transparent 52%),
+    linear-gradient(90deg, transparent 0 8%, var(--stage-pixel) 8% 11%, transparent 11% 89%, var(--stage-pixel) 89% 92%, transparent 92%),
+    repeating-linear-gradient(180deg, transparent 0 31px, var(--stage-pixel) 31px 33px, transparent 33px 62px);
+}
+
+.root::after {
+  z-index: 0;
+  top: auto;
+  height: 34%;
+  opacity: .44;
+  background:
+    linear-gradient(90deg,
+      transparent 0 4%, rgba(0,0,0,.55) 4% 9%, transparent 9% 14%,
+      rgba(0,0,0,.45) 14% 20%, transparent 20% 28%, rgba(0,0,0,.5) 28% 34%,
+      transparent 34% 66%, rgba(0,0,0,.48) 66% 73%, transparent 73% 80%,
+      rgba(0,0,0,.5) 80% 87%, transparent 87% 92%, rgba(0,0,0,.55) 92% 97%, transparent 97%),
+    linear-gradient(180deg, transparent, rgba(0,0,0,.5));
+  clip-path: polygon(0 32%, 6% 32%, 6% 12%, 12% 12%, 12% 48%, 20% 48%, 20% 24%, 27% 24%, 27% 58%, 35% 58%, 35% 39%, 43% 39%, 43% 64%, 55% 64%, 55% 44%, 64% 44%, 64% 57%, 72% 57%, 72% 26%, 79% 26%, 79% 49%, 87% 49%, 87% 15%, 94% 15%, 94% 35%, 100% 35%, 100% 100%, 0 100%);
+}
+
+.root:has(:global([data-enemy-kind="warden"])) {
+  --stage-a: #161127;
+  --stage-b: #070811;
+  --stage-glow: rgba(116, 72, 223, .24);
+  --stage-pixel: rgba(151, 105, 255, .075);
+}
+
+.root:has(:global([data-enemy-kind="bastion"])) {
+  --stage-a: #241b0b;
+  --stage-b: #0b0906;
+  --stage-glow: rgba(222, 166, 47, .22);
+  --stage-pixel: rgba(224, 184, 86, .072);
+}
+
+.root:has(:global([data-enemy-kind="oracle"])) {
+  --stage-a: #251018;
+  --stage-b: #0b0609;
+  --stage-glow: rgba(214, 48, 88, .22);
+  --stage-pixel: rgba(231, 76, 115, .07);
+}
+
+.root:has(:global([data-enemy-kind="null"])) {
+  --stage-a: #111b25;
+  --stage-b: #06090d;
+  --stage-glow: rgba(145, 198, 244, .19);
+  --stage-pixel: rgba(172, 214, 255, .065);
+}
+
+.root:has(:global([data-enemy-kind="trickster"])) {
+  --stage-a: #14152a;
+  --stage-b: #080812;
+  --stage-glow: rgba(72, 210, 229, .18);
+  --stage-pixel: rgba(197, 90, 238, .07);
+}
+
+.root:has(:global([data-enemy-kind="trickster"]))::before {
+  background:
+    radial-gradient(ellipse at 35% 11%, rgba(64, 217, 235, .15), transparent 36%),
+    radial-gradient(ellipse at 67% 16%, rgba(202, 82, 235, .14), transparent 40%),
+    linear-gradient(90deg, transparent 0 8%, var(--stage-pixel) 8% 11%, transparent 11% 89%, rgba(65, 219, 234, .06) 89% 92%, transparent 92%),
+    repeating-linear-gradient(180deg, transparent 0 31px, var(--stage-pixel) 31px 33px, transparent 33px 62px);
+}
+
+.root :global([aria-label="puzzle zone"]),
+.root :global([aria-label="player status"]),
+.root :global([aria-label="enemy intents"] > div),
+.root :global([aria-label="enemy status"]) {
+  backdrop-filter: none !important;
+}
+
+.root :global([class*="stageIntroOverlay"]) {
+  background-color: rgba(2, 4, 9, .9) !important;
+  background-image:
+    linear-gradient(90deg, transparent 0 7%, var(--stage-pixel) 7% 8%, transparent 8% 92%, var(--stage-pixel) 92% 93%, transparent 93%),
+    radial-gradient(circle at 50% 28%, var(--stage-glow), transparent 46%) !important;
+}
+
+.root :global([data-pixel-sprite="enemy"][data-intro="true"]) {
+  filter: drop-shadow(5px 5px 0 #000) drop-shadow(0 0 6px var(--stage-glow));
+}
+
+@media (max-width: 430px) {
+  .root::after { opacity: .34; }
+}
