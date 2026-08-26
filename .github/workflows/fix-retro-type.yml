@@ -1,0 +1,26 @@
+name: Fix Retro Sprite Type
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/fix-retro-type.yml']
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/enemyAssets.tsx')
+          s=p.read_text().replace('import type { CSSProperties } from "react";', 'import type { CSSProperties, ReactElement } from "react";').replace('Array<JSX.Element>', 'Array<ReactElement>')
+          p.write_text(s)
+          w=Path('.github/workflows/install-retro-assets.yml')
+          w.write_text(w.read_text() + '\n# retry after React 19 type fix\n')
+          PY
+          git config user.name "yz4git"
+          git config user.email "65384484+yz4git@users.noreply.github.com"
+          git add app/enemyAssets.tsx .github/workflows/install-retro-assets.yml
+          git commit -m "Fix retro sprite React type"
+          git push
