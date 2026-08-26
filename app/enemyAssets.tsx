@@ -36,6 +36,7 @@ export function EnemySprite({
       fetchPriority="high"
       decoding="sync"
       data-pixel-sprite="enemy"
+      data-enemy-kind={kind}
       data-intro={intro ? "true" : "false"}
     />
   );
