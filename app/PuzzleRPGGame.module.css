@@ -769,7 +769,7 @@
 .awaitingNeighbor .tile:not(.selected):not(.adjacentChoice) { filter:brightness(.68) saturate(.72); opacity:.82; }
 .adjacentChoice { z-index:3; outline:3px solid rgba(102,235,255,.98); outline-offset:-2px; filter:brightness(1.22) saturate(1.12) !important; animation:adjacentPulse .62s ease-in-out infinite alternate; }
 .adjacentChoice::after { content:"TAP"; position:absolute; right:3px; bottom:3px; padding:2px 3px; border-radius:4px; background:rgba(6,26,38,.82); color:#c7f8ff; font-size:6px; font-weight:1000; letter-spacing:.05em; }
-@keyframes adjacentPulse { to { transform:scale(.96); box-shadow:inset 0 0 0 2px rgba(255,255,255,.26),0 0 15px rgba(91,222,255,.62); } }
+@keyframes adjacentPulse { from { box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 0 5px rgba(91,222,255,.22); } to { box-shadow:inset 0 0 0 2px rgba(255,255,255,.3),0 0 18px rgba(91,222,255,.72); } }
 
 /* Attack motes leave the matched panel region and converge on the enemy. */
 .playerAttackFx::before { content:""; position:absolute; left:50%; top:18%; width:76px; height:76px; transform:translate(-50%,-50%) scale(.2); border-radius:50%; background:radial-gradient(circle,#fff 0 8%,#ffe476 12%,rgba(139,108,255,.74) 30%,transparent 68%); box-shadow:0 0 24px #fff,0 0 52px rgba(137,103,255,.8); animation:impactBloom .34s .16s ease-out both; }
