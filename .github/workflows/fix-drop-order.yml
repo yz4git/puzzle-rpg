@@ -1,0 +1,40 @@
+name: Fix Drop Order
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix-drop-order.py'
+      - '.github/workflows/fix-drop-order.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply drop ordering fix
+        run: python3 scripts/fix-drop-order.py
+      - name: TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit fix
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css
+          git commit -m 'Fix clear-to-drop animation ordering'
+          git push
