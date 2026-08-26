@@ -3,6 +3,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import styles from "./PuzzleRPGGame.module.css";
 import { EnemySprite } from "./enemyAssets";
+import { PIXEL_ART_ASSETS } from "./pixelArtAssets";
 import { playSfx, primeAudio, type GameSfx } from "./gameAudio";
 
 type Orb = "fire" | "water" | "light" | "heart" | "guard";
@@ -1196,6 +1197,13 @@ export default function PuzzleRPGGame() {
           <div className={styles.titleKicker}>TACTICAL PUZZLE RPG</div>
           <div className={styles.titleLogo}><span>PUZZLE</span><strong>RPG</strong></div>
           <div className={styles.titleTagline}>READ THE INTENT. BUILD THE BOARD. BREAK THE ENEMY.</div>
+          <img
+            className={styles.titleHeroSprite}
+            src={PIXEL_ART_ASSETS.hero}
+            alt="Puzzle RPG hero"
+            draggable={false}
+            decoding="async"
+          />
           <div className={styles.titleOrbs} aria-hidden="true">
             {ORBS.map((orb) => <span key={orb} className={styles[orb]}>{ORB_LABEL[orb]}</span>)}
           </div>
