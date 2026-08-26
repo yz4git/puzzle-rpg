@@ -1,0 +1,67 @@
+name: Install Retro Assets
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/install-retro-assets.yml']
+permissions:
+  contents: write
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch game integration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('app/PuzzleRPGGame.tsx')
+          s=p.read_text()
+          s=s.replace('import styles from "./PuzzleRPGGame.module.css";', 'import styles from "./PuzzleRPGGame.module.css";\nimport { EnemySprite } from "./enemyAssets";\nimport { playSfx, primeAudio } from "./gameAudio";')
+          s=s.replace('    setResolutionPhase("victory");\n    setCombatPop("STAGE CLEAR!");', '    playSfx("stageClear");\n    setResolutionPhase("victory");\n    setCombatPop("STAGE CLEAR!");')
+          s=s.replace('    setBoard(nextBoard);\n    await delay(swapPair ? 205 : 120);', '    setBoard(nextBoard);\n    if (swapPair) playSfx("swap");\n    await delay(swapPair ? 205 : 120);')
+          s=s.replace('      setResolutionPhase("clear");\n      await delay(175);', '      setResolutionPhase("clear");\n      playSfx(index === 0 ? "match" : "cascade");\n      await delay(175);')
+          s=s.replace('      setResolutionPhase("drop");\n      await delay(245);', '      setResolutionPhase("drop");\n      playSfx("drop");\n      await delay(245);')
+          s=s.replace('    setPlayerHp(healedHp);\n    setPlayerShield(shieldBeforeEnemy);\n    setEnemyHp(enemyAfter);', '    setPlayerHp(healedHp);\n    setPlayerShield(shieldBeforeEnemy);\n    setEnemyHp(enemyAfter);\n    if (plan.heal > 0) playSfx("heal");\n    if (plan.shield > 0) playSfx("shield");')
+          s=s.replace('      setAttackSources(attackSourceList.slice(0, 10));\n      setResolutionPhase("attack");', '      setAttackSources(attackSourceList.slice(0, 10));\n      setResolutionPhase("attack");\n      playSfx(plateBlocks ? "block" : "playerAttack");')
+          s=s.replace('    if (enemyAfter <= 0) {\n      setCombatPop("BREAK!");', '    if (enemyAfter <= 0) {\n      playSfx("enemyBreak");\n      setCombatPop("BREAK!");')
+          s=s.replace('    setDamageTaken(enemyResult.hpDamage);\n    setResolutionPhase("enemy");', '    setDamageTaken(enemyResult.hpDamage);\n    setResolutionPhase("enemy");\n    playSfx(enemyResult.hpDamage > 0 ? (effectiveIntent.kind === "pierce" ? "pierce" : "damage") : "block");')
+          s=s.replace('    if (enemyResult.hpAfter <= 0) {\n      setGameOver(true);', '    if (enemyResult.hpAfter <= 0) {\n      playSfx("gameOver");\n      setGameOver(true);')
+          s=s.replace('    if (!selected) {\n      setSelected(nextCoord);', '    if (!selected) {\n      playSfx("uiSelect");\n      setSelected(nextCoord);')
+          s=s.replace('      setSelected(null);\n      setMessage("選択解除', '      playSfx("uiSelect");\n      setSelected(null);\n      setMessage("選択解除')
+          s=s.replace('      setSelected(nextCoord);\n      setMessage("①選択を変更', '      playSfx("uiSelect");\n      setSelected(nextCoord);\n      setMessage("①選択を変更')
+          s=s.replace('    setSkillMode((value) => !value);', '    playSfx("uiConfirm");\n    setSkillMode((value) => !value);')
+          s=s.replace('    const transformed = cloneBoard(board);', '    playSfx("skill");\n    const transformed = cloneBoard(board);')
+          old='''  const enemyVisualClass = `${styles.enemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""} ${resolutionPhase === "attack" ? styles.enemyStruck : ""}`;'''
+          new='''  const enemyPixelClass = `${styles.enemyPixelSprite} ${resolutionPhase === "attack" ? styles.enemyPixelStruck : ""}`;'''
+          s=s.replace(old,new)
+          old='''        <div className={enemyVisualClass} aria-hidden="true">\n          <span className={styles.enemyAura} />\n          <span className={styles.enemyWingLeft} />\n          <span className={styles.enemyWingRight} />\n          <span className={styles.enemyAccentLeft} />\n          <span className={styles.enemyAccentRight} />\n          <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span>\n          <span className={styles.enemyFace}><i /><i /></span>\n          <span className={styles.enemyWeapon} />\n          <span className={styles.enemyBase} />\n        </div>'''
+          new='''        <EnemySprite kind={enemy.kind} className={enemyPixelClass} />'''
+          if old not in s: raise SystemExit('battle enemy markup not found')
+          s=s.replace(old,new)
+          old='''          <div className={`${styles.introEnemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""}`} aria-hidden="true">\n            <span className={styles.enemyAura} /><span className={styles.enemyWingLeft} /><span className={styles.enemyWingRight} />\n            <span className={styles.enemyAccentLeft} /><span className={styles.enemyAccentRight} />\n            <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span><span className={styles.enemyFace}><i /><i /></span><span className={styles.enemyWeapon} /><span className={styles.enemyBase} />\n          </div>'''
+          new='''          <EnemySprite kind={enemy.kind} className={styles.introPixelSprite} intro />'''
+          if old not in s: raise SystemExit('intro enemy markup not found')
+          s=s.replace(old,new)
+          s=s.replace('onClick={() => { setShowTitle(false); setStageIntro(true); setMessage("STAGE BRIEFING • 敵のルールを確認"); }}>START GAME', 'onClick={() => { primeAudio(); playSfx("uiConfirm"); setShowTitle(false); setStageIntro(true); setMessage("STAGE BRIEFING • 敵のルールを確認"); }}>START GAME')
+          s=s.replace('onClick={() => { setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START', 'onClick={() => { primeAudio(); playSfx("uiConfirm"); setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START')
+          p.write_text(s)
+
+          css=Path('app/PuzzleRPGGame.module.css')
+          c=css.read_text()
+          c += '''\n\n/* Replaceable 8-bit enemy sprite layer */\n.enemyPixelSprite {\n  width: 78px;\n  height: 78px;\n  display: block;\n  margin: auto;\n  image-rendering: pixelated;\n  image-rendering: crisp-edges;\n  filter: drop-shadow(0 5px 0 rgba(0,0,0,.28)) drop-shadow(0 0 8px rgba(161,134,255,.34));\n  transform-origin: center bottom;\n}\n.enemyPixelStruck { animation: enemyPixelHit .28s steps(2,end); }\n@keyframes enemyPixelHit {\n  0% { transform:translateX(0); filter:brightness(1) drop-shadow(0 5px 0 rgba(0,0,0,.28)); }\n  34% { transform:translateX(7px); filter:brightness(2.8) contrast(1.4) drop-shadow(0 0 10px #fff); }\n  68% { transform:translateX(-4px); }\n  100% { transform:translateX(0); }\n}\n.introPixelSprite {\n  position:relative;\n  width:min(52vw,208px);\n  height:min(52vw,208px);\n  margin:18px 0 8px;\n  image-rendering:pixelated;\n  image-rendering:crisp-edges;\n  filter:drop-shadow(0 10px 0 rgba(0,0,0,.28)) drop-shadow(0 0 18px rgba(155,127,255,.42));\n  animation:pixelIntro .42s steps(4,end) both;\n}\n@keyframes pixelIntro { from { opacity:0; transform:translateY(-10px) scale(.88); } to { opacity:1; transform:translateY(0) scale(1); } }\n@media (max-height:760px) and (orientation:portrait) {\n  .enemyPixelSprite { width:58px; height:58px; }\n  .introPixelSprite { width:min(38vw,150px); height:min(38vw,150px); margin:8px 0 3px; }\n}\n'''
+          css.write_text(c)
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit implementation
+        run: |
+          git config user.name "yz4git"
+          git config user.email "65384484+yz4git@users.noreply.github.com"
+          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css
+          git commit -m "Use 8-bit enemy sprites and chiptune SFX"
+          git push
