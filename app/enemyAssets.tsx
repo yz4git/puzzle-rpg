@@ -32,7 +32,9 @@ export function EnemySprite({
       src={pixelEnemySrc(kind)}
       alt={ENEMY_ALT[kind]}
       draggable={false}
-      decoding="async"
+      loading="eager"
+      fetchPriority="high"
+      decoding="sync"
       data-pixel-sprite="enemy"
       data-intro={intro ? "true" : "false"}
     />
