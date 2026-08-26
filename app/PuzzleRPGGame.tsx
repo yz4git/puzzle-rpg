@@ -3,7 +3,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import styles from "./PuzzleRPGGame.module.css";
 import { EnemySprite } from "./enemyAssets";
-import { playSfx, primeAudio } from "./gameAudio";
+import { playSfx, primeAudio, type GameSfx } from "./gameAudio";
 
 type Orb = "fire" | "water" | "light" | "heart" | "guard";
 type Board = Orb[][];
@@ -35,6 +35,17 @@ type MoveAnalysis = {
   bestSetupScore: number;
   setupHintCells: Set<string>;
 };
+
+type MovePreviewTone = "attack" | "block" | "heal" | "shield" | "setup" | "combo";
+type MovePreview = {
+  label: string;
+  tone: MovePreviewTone;
+  attack: number;
+  combo: number;
+  breaksPlate: boolean;
+};
+
+type PrismOpportunity = { row: number; col: number; orb: Orb; attack: number } | null;
 
 type CascadeFrame = {
   boardBefore: Board;
@@ -325,6 +336,46 @@ function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan
   };
 }
 
+
+const MATCH_SFX_BY_ORB: Record<Orb, GameSfx> = {
+  fire: "matchFire",
+  water: "matchWater",
+  light: "matchLight",
+  heart: "matchHeart",
+  guard: "matchGuard",
+};
+
+const ATTACK_SFX_BY_ORB: Partial<Record<Orb, GameSfx>> = {
+  fire: "attackFire",
+  water: "attackWater",
+  light: "attackLight",
+};
+
+function dominantAttackOrb(plan: CascadePlan): Orb | null {
+  const counts = new Map<Orb, number>();
+  for (const frame of plan.frames) {
+    for (const key of frame.matches) {
+      const [rowText, colText] = key.split(":");
+      const orb = frame.boardBefore[Number(rowText)]![Number(colText)]!;
+      if (ATTACK_PER_ORB[orb] > 0) counts.set(orb, (counts.get(orb) ?? 0) + 1);
+    }
+  }
+  let best: Orb | null = null;
+  let bestCount = 0;
+  for (const [orb, count] of counts) {
+    if (count > bestCount) { best = orb; bestCount = count; }
+  }
+  return best;
+}
+
+function enemyEffectSfx(intent: EnemyIntent): GameSfx {
+  if (intent.kind === "heavy") return "enemyHeavy";
+  if (intent.kind === "pierce") return "pierce";
+  if (intent.kind === "drain") return "enemyDrain";
+  if (intent.kind === "disrupt") return "enemyDisrupt";
+  return "enemyAttack";
+}
+
 function computeDropDistances(matches: Set<string>): Map<string, number> {
   const distances = new Map<string, number>();
   for (let col = 0; col < SIZE; col += 1) {
@@ -381,25 +432,26 @@ function countImmediateMoves(board: Board): number {
 
 function analyzeBoard(board: Board): MoveAnalysis {
   const immediateMoves = countImmediateMoves(board);
-  if (immediateMoves > 0) {
-    return { immediateMoves, bestSetupScore: 0, setupHintCells: new Set<string>() };
-  }
-
   let bestSetupScore = 0;
   const bestPairs: Array<[Coord, Coord]> = [];
+
+  // SETUP is an intentional tactical option even when a match exists. Only
+  // non-clearing swaps are ranked here so the hint never masquerades as an attack.
   for (const [a, b] of ALL_PAIRS) {
-    const score = countImmediateMoves(swapCells(board, a, b));
+    const swapped = swapCells(board, a, b);
+    if (findMatches(swapped).size > 0) continue;
+    const score = countImmediateMoves(swapped);
     if (score > bestSetupScore) {
       bestSetupScore = score;
       bestPairs.length = 0;
       bestPairs.push([a, b]);
-    } else if (score === bestSetupScore && score > 0 && bestPairs.length < 3) {
+    } else if (score === bestSetupScore && score > 0 && bestPairs.length < 2) {
       bestPairs.push([a, b]);
     }
   }
 
   const setupHintCells = new Set<string>();
-  for (const [a, b] of bestPairs.slice(0, 3)) {
+  for (const [a, b] of bestPairs) {
     setupHintCells.add(cellKey(a.row, a.col));
     setupHintCells.add(cellKey(b.row, b.col));
   }
@@ -459,6 +511,47 @@ function enemyDefinition(stage: number): EnemyDefinition {
         armor: 0,
       };
   }
+}
+
+
+function previewResolvedBoard(board: Board, queues: ColumnQueues, enemy: EnemyDefinition): MovePreview {
+  const plan = buildCascadePlan(board, queues);
+  if (plan.frames.length === 0) {
+    return { label: "SETUP", tone: "setup", attack: 0, combo: 0, breaksPlate: false };
+  }
+  const plateBlocks = enemy.kind === "bastion" && plan.attack > 0 && plan.combo === 1 && plan.largestAttackRun === 3;
+  const armorReduction = !plateBlocks && plan.attack > 0 ? Math.min(enemy.armor, plan.attack) : 0;
+  const attack = plateBlocks ? 0 : Math.max(0, plan.attack - armorReduction);
+  if (plateBlocks) return { label: "PLATE ×", tone: "block", attack: 0, combo: plan.combo, breaksPlate: false };
+  if (attack > 0) {
+    const breaksPlate = enemy.kind === "bastion";
+    const label = breaksPlate
+      ? `BREAK ${attack}`
+      : plan.combo >= 2 ? `${attack} · ${plan.combo}C` : `${attack} DMG`;
+    return { label, tone: plan.combo >= 2 ? "combo" : "attack", attack, combo: plan.combo, breaksPlate };
+  }
+  if (plan.heal > 0) return { label: `HP +${plan.heal}`, tone: "heal", attack: 0, combo: plan.combo, breaksPlate: false };
+  if (plan.shield > 0) return { label: `DEF +${plan.shield}`, tone: "shield", attack: 0, combo: plan.combo, breaksPlate: false };
+  return { label: `${plan.combo} COMBO`, tone: "combo", attack: 0, combo: plan.combo, breaksPlate: false };
+}
+
+function findPrismBreakOpportunity(board: Board, queues: ColumnQueues, enemy: EnemyDefinition): PrismOpportunity {
+  if (enemy.kind !== "bastion") return null;
+  for (let row = 0; row < SIZE; row += 1) {
+    for (let col = 0; col < SIZE; col += 1) {
+      const before = board[row]![col]!;
+      for (const orb of ORBS) {
+        if (orb === before) continue;
+        const transformed = cloneBoard(board);
+        transformed[row]![col] = orb;
+        const recycled = cloneQueues(queues);
+        recycled[col]![0] = before;
+        const preview = previewResolvedBoard(transformed, recycled, enemy);
+        if (preview.breaksPlate && preview.attack > 0) return { row, col, orb, attack: preview.attack };
+      }
+    }
+  }
+  return null;
 }
 
 function enemyIntent(stage: number, enemyTurn: number, enemy: EnemyDefinition): EnemyIntent {
@@ -581,6 +674,7 @@ export default function PuzzleRPGGame() {
   const [showTitle, setShowTitle] = useState(true);
   const [damageTaken, setDamageTaken] = useState(0);
   const [attackSources, setAttackSources] = useState<Coord[]>([]);
+  const [attackElement, setAttackElement] = useState<Orb | null>(null);
 
   const maxEnemyHp = enemyMaxHp(stage);
   const enemy = enemyDefinition(stage);
@@ -589,6 +683,7 @@ export default function PuzzleRPGGame() {
   const level = 1 + Math.floor(xp / 100);
   const xpIntoLevel = xp % 100;
   const analysis = useMemo(() => analyzeBoard(board), [board]);
+  const prismBreakOpportunity = useMemo(() => skill >= 100 ? findPrismBreakOpportunity(board, columnQueues, enemy) : null, [board, columnQueues, skill, stage]);
 
   function reset() {
     if (isResolving) return;
@@ -618,6 +713,7 @@ export default function PuzzleRPGGame() {
     setStageClear(null);
     setDamageTaken(0);
     setAttackSources([]);
+    setAttackElement(null);
   }
 
   async function finishEnemyDefeat(currentStage: number) {
@@ -651,6 +747,7 @@ export default function PuzzleRPGGame() {
 
     const startingQueues = queueOverride ?? columnQueues;
     const plan = buildCascadePlan(nextBoard, startingQueues);
+    const attackElementForTurn = dominantAttackOrb(plan);
     const isSetupTurn = plan.frames.length === 0 && !consumeSkill;
     const attackSourceList: Coord[] = [];
     for (const frame of plan.frames) {
@@ -675,7 +772,14 @@ export default function PuzzleRPGGame() {
       setClearingCells(frame.matches);
       setCombo(index + 1);
       setResolutionPhase("clear");
-      playSfx(index === 0 ? "match" : "cascade");
+      const matchedOrbTypes = Array.from(new Set(Array.from(frame.matches).map((key) => {
+        const [rowText, colText] = key.split(":");
+        return frame.boardBefore[Number(rowText)]![Number(colText)]!;
+      })));
+      matchedOrbTypes.slice(0, 2).forEach((matchedOrb, toneIndex) => {
+        window.setTimeout(() => playSfx(MATCH_SFX_BY_ORB[matchedOrb]), toneIndex * 24);
+      });
+      if (index > 0) playSfx("cascade");
       await delay(175);
 
       setClearingCells(new Set());
@@ -690,6 +794,7 @@ export default function PuzzleRPGGame() {
 
     if (plan.frames.length === 0) {
       setBoard(nextBoard);
+      if (isSetupTurn) playSfx("setup");
       setMessage(skillLabel ? `${skillLabel} • SETUP` : "SETUP • 次の形を作った");
     }
 
@@ -714,6 +819,7 @@ export default function PuzzleRPGGame() {
     setEnemyHp(enemyAfter);
     if (plan.heal > 0) playSfx("heal");
     if (plan.shield > 0) playSfx("shield");
+    if (armorReduction > 0) window.setTimeout(() => playSfx("armor"), 75);
 
     const chips: string[] = [];
     if (actualAttack > 0) chips.push(`${actualAttack} DMG`);
@@ -733,11 +839,13 @@ export default function PuzzleRPGGame() {
 
     if (actualAttack > 0 || plateBlocks) {
       setAttackSources(attackSourceList.slice(0, 10));
+      setAttackElement(attackElementForTurn);
       setResolutionPhase("attack");
-      playSfx(plateBlocks ? "block" : "playerAttack");
+      playSfx(plateBlocks ? "plateBlock" : (attackElementForTurn ? ATTACK_SFX_BY_ORB[attackElementForTurn] ?? "playerAttack" : "playerAttack"));
       setCombatPop(plateBlocks ? "PLATE BLOCK" : `${actualAttack} DMG`);
-      await delay(340);
+      await delay(440);
       setAttackSources([]);
+      setAttackElement(null);
     }
 
     if (enemyAfter <= 0) {
@@ -767,7 +875,8 @@ export default function PuzzleRPGGame() {
 
     setDamageTaken(enemyResult.hpDamage);
     setResolutionPhase("enemy");
-    playSfx(enemyResult.hpDamage > 0 ? (effectiveIntent.kind === "pierce" ? "pierce" : "damage") : "block");
+    playSfx(enemyEffectSfx(effectiveIntent));
+    if (enemyResult.hpDamage === 0) window.setTimeout(() => playSfx("block"), 70);
     setCombatPop(enemyResult.hpDamage > 0 ? `-${enemyResult.hpDamage} HP` : `BLOCK ${enemyResult.blocked}`);
     await delay(enemyResult.hpDamage > 0 ? 420 : 280);
 
@@ -845,6 +954,7 @@ export default function PuzzleRPGGame() {
   function castShift(orb: Orb) {
     if (!skillMode || !selected || skill < 100 || gameOver || isResolving || stageIntro || stageClear) return;
     playSfx("skill");
+    window.setTimeout(() => playSfx("prismRecycle"), 85);
     const transformed = cloneBoard(board);
     const before = transformed[selected.row]![selected.col]!;
     transformed[selected.row]![selected.col] = orb;
@@ -854,8 +964,26 @@ export default function PuzzleRPGGame() {
     void resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]} • NEXT↺`, undefined, recycledQueues);
   }
 
-  const setupMode = !isResolving && !stageIntro && !stageClear && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
+  const dangerousIntent = intent.kind === "heavy" || intent.kind === "pierce" || (intent.kind === "drain" && playerShield < intent.power);
+  const setupRecommended = !isResolving && !stageIntro && !stageClear && dangerousIntent && analysis.bestSetupScore > 0;
+  const setupMode = !isResolving && !stageIntro && !stageClear && analysis.bestSetupScore > 0 && (analysis.immediateMoves === 0 || setupRecommended);
   const enemyPixelClass = `${styles.enemyPixelSprite} ${resolutionPhase === "attack" ? styles.enemyPixelStruck : ""}`;
+
+  const movePreviewFor = (row: number, col: number): MovePreview | null => {
+    if (!selected || skillMode || !adjacent(selected, { row, col })) return null;
+    return previewResolvedBoard(swapCells(board, selected, { row, col }), columnQueues, enemy);
+  };
+
+  const skillPreviewFor = (orb: Orb): MovePreview | null => {
+    if (!selected) return null;
+    const before = board[selected.row]![selected.col]!;
+    if (before === orb) return null;
+    const transformed = cloneBoard(board);
+    transformed[selected.row]![selected.col] = orb;
+    const recycled = cloneQueues(columnQueues);
+    recycled[selected.col]![0] = before;
+    return previewResolvedBoard(transformed, recycled, enemy);
+  };
   const swapClassFor = (row: number, col: number): string => {
     if (!swapMotion) return "";
     const { a, b } = swapMotion;
@@ -900,7 +1028,7 @@ export default function PuzzleRPGGame() {
       </section>
 
       {resolutionPhase === "attack" ? (
-        <div className={styles.playerAttackFx} aria-hidden="true">
+        <div className={`${styles.playerAttackFx} ${attackElement ? styles[`attackFx_${attackElement}`] ?? "" : ""}`} aria-hidden="true">
           {attackSources.map((cell, index) => (
             <i
               key={`${cell.row}-${cell.col}-${index}`}
@@ -911,7 +1039,10 @@ export default function PuzzleRPGGame() {
               } as CSSProperties}
             />
           ))}
+          <strong className={styles.attackCharge}>{attackElement ? ORB_LABEL[attackElement] : "✦"}</strong>
+          <span className={styles.attackTrail} />
           <b />
+          <em className={styles.attackImpact}>HIT!</em>
         </div>
       ) : null}
       {resolutionPhase === "enemy" ? (
@@ -924,7 +1055,7 @@ export default function PuzzleRPGGame() {
       ) : null}
 
       <section className={styles.intents} aria-label="enemy intents">
-        <div className={styles.intentCard}>
+        <div className={`${styles.intentCard} ${setupRecommended ? styles.intentDanger : ""}`}>
           <div className={styles.intentTurn}>NOW</div>
           <div className={styles.intentIcon}>{intent.icon}</div>
           <div className={styles.intentBody}>
@@ -982,6 +1113,7 @@ export default function PuzzleRPGGame() {
               const key = cellKey(rowIndex, colIndex);
               const isSelected = selected?.row === rowIndex && selected?.col === colIndex;
               const isAdjacentChoice = Boolean(selected && !skillMode && !isSelected && adjacent(selected, { row: rowIndex, col: colIndex }));
+              const movePreview = isAdjacentChoice ? movePreviewFor(rowIndex, colIndex) : null;
               const setupHint = setupMode && analysis.setupHintCells.has(key);
               const isClearing = clearingCells.has(key);
               const swapClass = swapClassFor(rowIndex, colIndex);
@@ -998,6 +1130,7 @@ export default function PuzzleRPGGame() {
                   onClick={() => selectCell(rowIndex, colIndex)}
                 >
                   <span>{ORB_LABEL[orb]}</span>
+                  {movePreview ? <small className={`${styles.movePreview} ${styles[`preview_${movePreview.tone}`] ?? ""}`}>{movePreview.label}</small> : null}
                 </button>
               );
             }))}
@@ -1015,10 +1148,12 @@ export default function PuzzleRPGGame() {
 
       <div className={`${styles.ruleHint} ${setupMode ? styles.setupAlert : ""}`}>
         {selected && !skillMode
-          ? "② シアンに光る上下左右の隣接パネルを選択 • 同じパネルで解除"
-          : setupMode
-            ? `消せる手なし → 点滅枠が有力SETUP（次手 最大${analysis.bestSetupScore}候補）`
-            : `消せる交換 ${analysis.immediateMoves} • SETUP=敵威力50%+PRISM28 • ⬢×3でDEF`}
+          ? "② 隣接パネル上の予測結果を見て選択 • PLATE×は無効攻撃"
+          : setupRecommended
+            ? `SETUP RECOMMENDED • NOW ${intent.label} ${intent.power} → 金枠交換で威力50% + PRISM28`
+            : setupMode
+              ? `即消しなし → 金枠が有力SETUP（次手 最大${analysis.bestSetupScore}候補）`
+              : `消せる交換 ${analysis.immediateMoves} • SETUP=敵威力50%+PRISM28 • ⬢×3でDEF`}
       </div>
       <div className={styles.message} role="status">{message}</div>
 
@@ -1026,11 +1161,16 @@ export default function PuzzleRPGGame() {
         <section className={styles.skillPalette} aria-label="Prism Shift color selection">
           <span>{selected ? "変換色" : "1枚選択"}</span>
           <div>
-            {ORBS.map((orb) => (
-              <button key={orb} type="button" className={styles[orb]} disabled={!selected || isResolving} onClick={() => castShift(orb)}>
-                {ORB_LABEL[orb]}
-              </button>
-            ))}
+            {ORBS.map((orb) => {
+              const sameColor = Boolean(selected && board[selected.row]![selected.col] === orb);
+              const preview = skillPreviewFor(orb);
+              return (
+                <button key={orb} type="button" className={styles[orb]} disabled={!selected || isResolving || sameColor} onClick={() => castShift(orb)}>
+                  <span>{ORB_LABEL[orb]}</span>
+                  <small className={preview ? styles[`preview_${preview.tone}`] ?? "" : ""}>{sameColor ? "SAME" : preview?.label ?? "—"}</small>
+                </button>
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -1038,12 +1178,12 @@ export default function PuzzleRPGGame() {
       <section className={styles.actionBar}>
         <button
           type="button"
-          className={`${styles.skillButton} ${skill >= 100 ? styles.skillReady : ""}`}
+          className={`${styles.skillButton} ${skill >= 100 ? styles.skillReady : ""} ${prismBreakOpportunity ? styles.prismBreakReady : ""}`}
           onClick={toggleSkillMode}
           disabled={skill < 100 || gameOver || isResolving}
         >
           <span className={styles.skillTitle}>PRISM SHIFT</span>
-          <span className={styles.skillGauge}>{skill >= 100 ? (skillMode ? "CANCEL" : "READY") : `${skill}%`}</span>
+          <span className={styles.skillGauge}>{skill >= 100 ? (skillMode ? "CANCEL" : prismBreakOpportunity ? `BREAK ${prismBreakOpportunity.attack}` : "READY") : `${skill}%`}</span>
         </button>
         <button type="button" className={styles.resetButton} onClick={reset} disabled={isResolving}>
           {gameOver ? "RETRY" : "RESET"}

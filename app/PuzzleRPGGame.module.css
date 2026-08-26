@@ -821,3 +821,55 @@
 .introPixelSprite { position:relative; width:min(52vw,208px); height:min(52vw,208px); margin:18px 0 8px; image-rendering:pixelated; image-rendering:crisp-edges; filter:drop-shadow(0 10px 0 rgba(0,0,0,.28)) drop-shadow(0 0 18px rgba(155,127,255,.42)); animation:pixelIntro .42s steps(4,end) both; }
 @keyframes pixelIntro { from{opacity:0;transform:translateY(-10px) scale(.88)} to{opacity:1;transform:translateY(0) scale(1)} }
 @media (max-height:760px) and (orientation:portrait) { .enemyPixelSprite{width:58px;height:58px}.introPixelSprite{width:min(38vw,150px);height:min(38vw,150px);margin:8px 0 3px} }
+
+
+/* Tactical preview + high-density retro combat pass */
+.enemyCard { min-height:92px; grid-template-columns:90px 1fr; }
+.enemyPixelSprite { width:96px; height:90px; transform:translateX(-2px); filter:drop-shadow(0 5px 0 rgba(0,0,0,.32)) drop-shadow(0 0 10px rgba(161,134,255,.38)); }
+.introPixelSprite { width:min(58vw,232px); height:min(58vw,232px); margin:13px 0 4px; filter:drop-shadow(0 10px 0 rgba(0,0,0,.34)) drop-shadow(0 0 21px rgba(155,127,255,.42)); }
+
+.intentDanger { border-color:rgba(255,212,89,.7); box-shadow:inset 0 0 0 1px rgba(255,208,78,.16),0 0 13px rgba(255,178,55,.16); animation:intentDangerPulse .78s ease-in-out infinite alternate; }
+@keyframes intentDangerPulse { to { filter:brightness(1.16); border-color:rgba(255,228,123,.95); } }
+
+.adjacentChoice::after { display:none; }
+.movePreview { position:absolute; z-index:8; left:3px; right:3px; bottom:3px; min-height:14px; display:grid; place-items:center; padding:1px 2px; border:1px solid rgba(255,255,255,.32); border-radius:5px; background:rgba(4,8,18,.88); color:#fff; font-size:clamp(6px,1.7vw,8px); line-height:1; font-weight:1000; letter-spacing:.01em; text-shadow:0 1px 2px rgba(0,0,0,.7); box-shadow:0 2px 5px rgba(0,0,0,.32); }
+.preview_attack { color:#ffe590 !important; border-color:rgba(255,220,99,.58) !important; }
+.preview_combo { color:#fff4a8 !important; border-color:rgba(255,234,118,.75) !important; box-shadow:0 0 8px rgba(255,210,70,.3) !important; }
+.preview_block { color:#ff9aa8 !important; border-color:rgba(255,88,111,.72) !important; background:rgba(67,10,24,.9) !important; }
+.preview_heal { color:#ffb9d5 !important; border-color:rgba(255,117,179,.65) !important; }
+.preview_shield { color:#a8eeff !important; border-color:rgba(82,207,255,.68) !important; }
+.preview_setup { color:#9cf5ff !important; border-color:rgba(85,222,255,.7) !important; }
+
+.skillPalette { grid-template-columns:58px 1fr; }
+.skillPalette > div { gap:3px; }
+.skillPalette button { position:relative; min-height:38px; padding:2px; display:grid; grid-template-rows:20px 11px; place-items:center; line-height:1; }
+.skillPalette button > span { font-size:16px; }
+.skillPalette button > small { width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#fff; font-size:5.5px; font-weight:1000; text-align:center; text-shadow:0 1px 2px #000; }
+.prismBreakReady { border-color:#ffe37a !important; box-shadow:0 0 0 1px rgba(255,223,102,.25),0 0 20px rgba(255,196,55,.42) !important; }
+.prismBreakReady .skillGauge { color:#fff3a8; }
+
+/* A visible projectile now travels from the puzzle field to the enemy before impact. */
+.playerAttackFx { --attack-a:#fff19b; --attack-b:#8d6cff; --attack-glow:rgba(144,108,255,.9); z-index:18; }
+.attackFx_fire { --attack-a:#ffd06a; --attack-b:#ff4d3d; --attack-glow:rgba(255,83,49,.92); }
+.attackFx_water { --attack-a:#c9f7ff; --attack-b:#2f8fff; --attack-glow:rgba(61,167,255,.92); }
+.attackFx_light { --attack-a:#fffbd0; --attack-b:#d681ff; --attack-glow:rgba(225,151,255,.95); }
+.playerAttackFx i { background:radial-gradient(circle,#fff 0 25%,var(--attack-a) 29%,var(--attack-b) 65%,transparent 72%); box-shadow:0 0 9px #fff,0 0 18px var(--attack-glow); }
+.playerAttackFx::before { background:radial-gradient(circle,#fff 0 8%,var(--attack-a) 13%,var(--attack-b) 32%,transparent 69%); box-shadow:0 0 24px #fff,0 0 58px var(--attack-glow); animation:impactBloom .44s .28s ease-out both; }
+.attackCharge { position:absolute; z-index:4; left:50%; top:68%; width:38px; height:38px; display:grid; place-items:center; border:2px solid rgba(255,255,255,.84); border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff 0 9%,var(--attack-a) 18%,var(--attack-b) 68%); color:#fff; font-size:20px; font-style:normal; filter:drop-shadow(0 0 9px #fff) drop-shadow(0 0 18px var(--attack-glow)); animation:attackChargeFly .44s cubic-bezier(.18,.7,.12,1) both; }
+.attackTrail { position:absolute; z-index:2; left:13%; top:11%; width:64dvh; max-width:590px; height:9px; transform-origin:left center; transform:rotate(73deg); border-radius:999px; background:linear-gradient(90deg,var(--attack-b),var(--attack-a) 45%,rgba(255,255,255,.95) 70%,transparent); box-shadow:0 0 11px var(--attack-glow),0 0 24px var(--attack-glow); opacity:0; animation:attackTrailFlash .44s ease-out both; }
+.attackImpact { position:absolute; z-index:7; left:clamp(52px,14%,64px); top:clamp(70px,10%,88px); transform:translate(-50%,-50%); color:#fff; font-size:19px; font-weight:1000; font-style:italic; letter-spacing:.08em; text-shadow:0 2px 2px #000,0 0 10px #fff,0 0 22px var(--attack-glow); opacity:0; animation:attackImpactText .44s .25s ease-out both; }
+@keyframes attackChargeFly { 0%{left:50%;top:68%;transform:translate(-50%,-50%) scale(.55);opacity:0} 18%{opacity:1;transform:translate(-50%,-50%) scale(1.22)} 72%{left:17%;top:16%;transform:translate(-50%,-50%) scale(.95);opacity:1} 100%{left:13%;top:11%;transform:translate(-50%,-50%) scale(.2);opacity:0} }
+@keyframes attackTrailFlash { 0%,22%{opacity:0;clip-path:inset(0 100% 0 0)} 44%{opacity:.9;clip-path:inset(0 38% 0 0)} 76%{opacity:1;clip-path:inset(0 0 0 0)} 100%{opacity:0;clip-path:inset(0 0 0 0)} }
+@keyframes attackImpactText { 0%{opacity:0;transform:translate(-50%,-50%) scale(.45)} 38%{opacity:1;transform:translate(-50%,-50%) scale(1.25)} 100%{opacity:0;transform:translate(-50%,-78%) scale(.92)} }
+
+@media (max-height:760px) and (orientation:portrait) {
+  .enemyCard { min-height:61px; grid-template-columns:58px 1fr; }
+  .enemyPixelSprite { width:72px; height:66px; }
+  .introPixelSprite { width:min(42vw,164px); height:min(42vw,164px); margin:5px 0 2px; }
+  .movePreview { min-height:11px; font-size:5.5px; bottom:2px; }
+  .skillPalette button { min-height:33px; grid-template-rows:18px 9px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .attackCharge,.attackTrail,.attackImpact,.intentDanger { animation-duration:.001ms !important; animation-iteration-count:1 !important; }
+}
