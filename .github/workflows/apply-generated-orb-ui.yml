@@ -1,0 +1,103 @@
+name: Apply generated orb UI
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/apply-generated-orb-ui.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply generated pixel orb presentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/PuzzleRPGGame.module.css')
+          text = path.read_text()
+          marker = '/* GENERATED_PIXEL_ORBS_V1 */'
+          if marker not in text:
+              text += r'''
+
+/* GENERATED_PIXEL_ORBS_V1 */
+/* Pixel icons cropped from the approved generated 8-bit reference sheet. */
+.fire { --orb-pixel-icon: url('/assets/pixel8/orbs/fire.png'); }
+.water { --orb-pixel-icon: url('/assets/pixel8/orbs/water.png'); }
+.light { --orb-pixel-icon: url('/assets/pixel8/orbs/light.png'); }
+.heart { --orb-pixel-icon: url('/assets/pixel8/orbs/heart.png'); }
+.guard { --orb-pixel-icon: url('/assets/pixel8/orbs/guard.png'); }
+
+.tile > span,
+.nextOrb,
+.nextOrbBack,
+.titleOrbs span,
+.skillPalette button > span {
+  color: transparent !important;
+  text-shadow: none !important;
+  background-image: var(--orb-pixel-icon) !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 62% auto !important;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.tile > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-size: 0 !important;
+}
+.nextOrb,
+.nextOrbBack {
+  font-size: 0 !important;
+  background-size: 72% auto !important;
+}
+.titleOrbs span {
+  border-radius: 1px !important;
+  font-size: 0 !important;
+  background-size: 58% auto !important;
+  box-shadow: inset 0 0 0 1px #050505, 0 0 0 1px #d8d8d8 !important;
+}
+.skillPalette button > span {
+  min-height: 25px;
+  font-size: 0 !important;
+  background-size: contain !important;
+}
+
+/* Generated reference uses hard pixel blocks rather than glossy mobile gems. */
+.tile,
+.nextOrb,
+.nextOrbBack,
+.titleOrbs span,
+.skillPalette button {
+  background-image: none;
+  filter: none !important;
+}
+.tile.fire, .nextOrb.fire, .nextOrbBack.fire, .titleOrbs .fire, .skillPalette button.fire { background-color:#350505 !important; }
+.tile.water, .nextOrb.water, .nextOrbBack.water, .titleOrbs .water, .skillPalette button.water { background-color:#041a39 !important; }
+.tile.light, .nextOrb.light, .nextOrbBack.light, .titleOrbs .light, .skillPalette button.light { background-color:#3c3100 !important; }
+.tile.heart, .nextOrb.heart, .nextOrbBack.heart, .titleOrbs .heart, .skillPalette button.heart { background-color:#35051e !important; }
+.tile.guard, .nextOrb.guard, .nextOrbBack.guard, .titleOrbs .guard, .skillPalette button.guard { background-color:#042b20 !important; }
+'''
+              path.write_text(text)
+          PY
+      - run: npm ci
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit presentation update
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/PuzzleRPGGame.module.css
+          git commit -m 'Use generated 8-bit orb icons across UI'
+          git push origin HEAD:main
