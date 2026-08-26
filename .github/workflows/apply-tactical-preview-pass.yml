@@ -1,0 +1,28 @@
+name: Apply Tactical Preview Pass
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-tactical-preview-pass.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: python scripts/apply-tactical-preview-pass.py
+      - run: npm ci
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit implementation
+        run: |
+          git config user.name "yz4git"
+          git config user.email "65384484+yz4git@users.noreply.github.com"
+          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css
+          git commit -m "Add move previews and clearer retro combat feedback"
+          git push
