@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import styles from "./PuzzleRPGGame.module.css";
 import { EnemySprite } from "./enemyAssets";
 import { PIXEL_ART_ASSETS } from "./pixelArtAssets";
@@ -663,6 +663,20 @@ function newRun() {
 
 export default function PuzzleRPGGame() {
   const initial = useMemo(() => newRun(), []);
+
+  useEffect(() => {
+    const spriteSources = [
+      PIXEL_ART_ASSETS.hero,
+      ...Object.values(PIXEL_ART_ASSETS.enemies),
+      ...Object.values(PIXEL_ART_ASSETS.orbs),
+    ];
+    for (const src of spriteSources) {
+      const image = new Image();
+      image.decoding = "async";
+      image.src = src;
+    }
+  }, []);
+
   const [board, setBoard] = useState<Board>(initial.board);
   const [columnQueues, setColumnQueues] = useState<ColumnQueues>(initial.columnQueues);
   const [selected, setSelected] = useState<Coord | null>(null);
@@ -987,10 +1001,19 @@ export default function PuzzleRPGGame() {
     void resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]} • NEXT↺`, undefined, recycledQueues);
   }
 
+  function beginStage() {
+    if (!stageIntro || showTitle || stageClear || gameOver || isResolving) return;
+    primeAudio();
+    playSfx("uiConfirm");
+    setStageIntro(false);
+    setMessage("BATTLE START • INTENTを読んで一手を選ぶ");
+  }
+
   const dangerousIntent = intent.kind === "heavy" || intent.kind === "pierce" || (intent.kind === "drain" && playerShield < intent.power);
   const setupRecommended = !isResolving && !stageIntro && !stageClear && dangerousIntent && analysis.bestSetupScore > 0;
   const setupMode = !isResolving && !stageIntro && !stageClear && analysis.bestSetupScore > 0 && (analysis.immediateMoves === 0 || setupRecommended);
   const enemyPixelClass = `${styles.enemyPixelSprite} ${resolutionPhase === "attack" ? styles.enemyPixelStruck : ""}`;
+  const nextIntentAlert = nextIntent.kind !== "attack" || nextIntent.power >= Math.max(12, playerShield + 5);
 
   const movePreviewFor = (row: number, col: number): MovePreview | null => {
     if (!selected || skillMode || !adjacent(selected, { row, col })) return null;
@@ -1088,8 +1111,8 @@ export default function PuzzleRPGGame() {
           </div>
           <div className={styles.intentPower}>{intent.power}</div>
         </div>
-        <div className={`${styles.intentCard} ${styles.intentNext}`}>
-          <div className={styles.intentTurn}>NEXT</div>
+        <div className={`${styles.intentCard} ${styles.intentNext} ${nextIntentAlert ? styles.intentNextAlert : ""}`}>
+          <div className={styles.intentTurn}>{nextIntentAlert ? "NEXT !" : "NEXT"}</div>
           <div className={styles.intentIcon}>{nextIntent.icon}</div>
           <div className={styles.intentBody}>
             <strong>{nextIntent.label}</strong>
@@ -1153,7 +1176,14 @@ export default function PuzzleRPGGame() {
                   disabled={isResolving}
                   onClick={() => selectCell(rowIndex, colIndex)}
                 >
-                  <span>{ORB_LABEL[orb]}</span>
+                  <img
+                    className={styles.tileIcon}
+                    src={PIXEL_ART_ASSETS.orbs[orb]}
+                    alt=""
+                    aria-hidden="true"
+                    draggable={false}
+                    decoding="async"
+                  />
                   {movePreview ? <small className={`${styles.movePreview} ${styles[`preview_${movePreview.tone}`] ?? ""}`}>{movePreview.label}</small> : null}
                 </button>
               );
@@ -1240,13 +1270,21 @@ export default function PuzzleRPGGame() {
       ) : null}
 
       {stageIntro && !showTitle ? (
-        <div className={styles.stageIntroOverlay} role="dialog" aria-label={`Stage ${stage} briefing`}>
+        <div
+          className={styles.stageIntroOverlay}
+          role="dialog"
+          aria-label={`Stage ${stage} briefing`}
+          tabIndex={0}
+          onClick={beginStage}
+          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") beginStage(); }}
+        >
           <div className={styles.introStageLabel}>STAGE {stage}</div>
           <EnemySprite kind={enemy.kind} className={styles.introPixelSprite} intro />
           <div className={styles.introEnemyName}>{enemy.name}</div>
           <div className={styles.enemySpeech}>「{ENEMY_DIALOGUE[enemy.kind]}」</div>
           <div className={styles.tacticalHint}><strong>攻略ヒント</strong><span>{ENEMY_HINT[enemy.kind]}　※3手ごとに敵威力+1</span></div>
-          <button type="button" className={styles.battleStartButton} onClick={() => { primeAudio(); playSfx("uiConfirm"); setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START</button>
+          <div className={styles.introTapHint}>▼ 画面のどこを押しても開始 ▼</div>
+          <button type="button" className={styles.battleStartButton} onClick={(event) => { event.stopPropagation(); beginStage(); }}>▶ BATTLE START</button>
         </div>
       ) : null}
 

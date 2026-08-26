@@ -1460,3 +1460,132 @@
   background-color:#3c0903 !important;
   border-color:#ff6a24 !important;
 }
+
+
+/* Animation visibility + intro + NEXT intent pass */
+/* iOS Safari: keep transformed tiles on a stable compositor layer and render the orb as a real image. */
+.tile {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  will-change: transform;
+  isolation: isolate;
+}
+.tileIcon {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(1px);
+}
+/* All motion frames stay fully opaque. Clearing is the only animation allowed to fade a tile. */
+.swapFromLeft,.swapFromRight,.swapFromUp,.swapFromDown,
+.drop1,.drop2,.drop3,.drop4,.drop5,.drop6 {
+  opacity: 1 !important;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+@keyframes swapFromLeft { from { transform:translate3d(-108%,0,0); z-index:6; opacity:1; } to { transform:translate3d(0,0,0); z-index:6; opacity:1; } }
+@keyframes swapFromRight { from { transform:translate3d(108%,0,0); z-index:6; opacity:1; } to { transform:translate3d(0,0,0); z-index:6; opacity:1; } }
+@keyframes swapFromUp { from { transform:translate3d(0,-108%,0); z-index:6; opacity:1; } to { transform:translate3d(0,0,0); z-index:6; opacity:1; } }
+@keyframes swapFromDown { from { transform:translate3d(0,108%,0); z-index:6; opacity:1; } to { transform:translate3d(0,0,0); z-index:6; opacity:1; } }
+@keyframes drop1 { from { transform:translate3d(0,-108%,0); opacity:1; } to { transform:translate3d(0,0,0); opacity:1; } }
+@keyframes drop2 { from { transform:translate3d(0,-216%,0); opacity:1; } to { transform:translate3d(0,0,0); opacity:1; } }
+@keyframes drop3 { from { transform:translate3d(0,-324%,0); opacity:1; } to { transform:translate3d(0,0,0); opacity:1; } }
+@keyframes drop4 { from { transform:translate3d(0,-432%,0); opacity:1; } to { transform:translate3d(0,0,0); opacity:1; } }
+@keyframes drop5 { from { transform:translate3d(0,-540%,0); opacity:1; } to { transform:translate3d(0,0,0); opacity:1; } }
+@keyframes drop6 { from { transform:translate3d(0,-648%,0); opacity:1; } to { transform:translate3d(0,0,0); opacity:1; } }
+
+/* NEXT TURN is intentionally louder than NOW: it is the core planning information. */
+.intents { grid-template-columns: .9fr 1.1fr !important; gap: 5px !important; }
+.intentNext {
+  position: relative;
+  min-height: 44px !important;
+  border: 2px solid #ffe15a !important;
+  background: #0d0b02 !important;
+  box-shadow: inset 0 0 0 1px #6a5700, 3px 3px 0 #000 !important;
+}
+.intentNext .intentTurn {
+  color: #ffe15a !important;
+  font-size: 9px !important;
+  font-weight: 1000 !important;
+  text-shadow: 2px 2px 0 #000;
+}
+.intentNext .intentIcon {
+  border-radius: 0 !important;
+  border: 1px solid #ffe15a !important;
+  background: #050505 !important;
+  font-size: 14px !important;
+}
+.intentNext .intentBody strong {
+  color: #fff3a0 !important;
+  font-size: 10px !important;
+  letter-spacing: .04em !important;
+}
+.intentNext .intentBody span {
+  color: #f4f0d5 !important;
+  font-size: 7px !important;
+}
+.intentNext .intentPower {
+  color: #ffe15a !important;
+  font-size: 18px !important;
+  text-shadow: 2px 2px 0 #000;
+}
+.intentNextAlert {
+  border-color: #ff6262 !important;
+  box-shadow: inset 0 0 0 1px #7d1515, 3px 3px 0 #000 !important;
+  animation: nextIntentBlink .76s steps(2,end) infinite;
+}
+.intentNextAlert .intentTurn,
+.intentNextAlert .intentPower { color:#ff7777 !important; }
+.intentNextAlert .intentBody strong { color:#fff !important; }
+@keyframes nextIntentBlink { 50% { background:#1d0505; filter:brightness(1.16); } }
+
+/* Whole intro is tappable, while the explicit button looks unmistakably actionable. */
+.stageIntroOverlay {
+  cursor: pointer;
+  outline: none;
+}
+.introTapHint {
+  position: relative;
+  margin-top: 10px;
+  color: #ffe15a;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-shadow: 2px 2px 0 #000;
+  animation: introTapBlink .8s steps(2,end) infinite;
+}
+.battleStartButton {
+  min-height: 58px !important;
+  width: min(100%, 360px) !important;
+  margin-top: 8px !important;
+  border: 4px double #fff !important;
+  background: #050505 !important;
+  color: #fff !important;
+  font-size: 18px !important;
+  font-weight: 1000 !important;
+  letter-spacing: .1em !important;
+  box-shadow: 0 0 0 3px #000, 0 0 0 5px #ffe15a !important;
+  animation: battleStartBlink .72s steps(2,end) infinite !important;
+}
+@keyframes introTapBlink { 50% { color:#fff; } }
+@keyframes battleStartBlink { 50% { color:#ffe15a; border-color:#ffe15a !important; transform:translateY(-1px); } }
+
+@media (max-height:760px) and (orientation:portrait) {
+  .intentNext { min-height: 36px !important; }
+  .intentNext .intentBody strong { font-size: 8px !important; }
+  .intentNext .intentPower { font-size: 14px !important; }
+  .introTapHint { margin-top:5px; font-size:8px; }
+  .battleStartButton { min-height:48px !important; font-size:15px !important; margin-top:5px !important; }
+}
