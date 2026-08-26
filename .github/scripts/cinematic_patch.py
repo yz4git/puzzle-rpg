@@ -1,0 +1,336 @@
+from pathlib import Path
+
+TSX = Path("app/PuzzleRPGGame.tsx")
+CSS = Path("app/PuzzleRPGGame.module.css")
+tsx = TSX.read_text()
+css = CSS.read_text()
+
+
+def rep(src: str, old: str, new: str, label: str) -> str:
+    if old not in src:
+        raise SystemExit(f"missing patch target: {label}")
+    return src.replace(old, new, 1)
+
+
+tsx = rep(
+    tsx,
+    'type ResolutionPhase = "idle" | "swap" | "clear" | "drop" | "attack" | "enemy";\n',
+    'type ResolutionPhase = "idle" | "swap" | "clear" | "drop" | "attack" | "enemy" | "victory";\n'
+    'type SwapMotion = { a: Coord; b: Coord } | null;\n'
+    'type StageClearState = { stage: number; gold: number; xp: number } | null;\n',
+    "types",
+)
+
+tsx = rep(
+    tsx,
+    'const ENEMY_SIGIL: Record<EnemyKind, string> = {\n  warden: "◆",\n  bastion: "▣",\n  oracle: "☿",\n  null: "✧",\n  trickster: "◈",\n};\n',
+    'const ENEMY_SIGIL: Record<EnemyKind, string> = {\n  warden: "◆",\n  bastion: "▣",\n  oracle: "☿",\n  null: "✧",\n  trickster: "◈",\n};\n\n'
+    'const ENEMY_DIALOGUE: Record<EnemyKind, string> = {\n'
+    '  warden: "盤面の先まで見えている。焦って消せば、次の一手を失うぞ。",\n'
+    '  bastion: "三つ並べただけでは、この装甲は砕けない。",\n'
+    '  oracle: "傷を見せなさい。その痛みごと、私の命に変えてあげる。",\n'
+    '  null: "盾に頼るな。次の刃は、その向こう側へ届く。",\n'
+    '  trickster: "NEXTを信じる？ なら、並びを少しだけ変えてあげよう。",\n'
+    '};\n\n'
+    'const ENEMY_HINT: Record<EnemyKind, string> = {\n'
+    '  warden: "3手目の強打をNOW/NEXTで確認。先にDEFを作るか、撃破を狙う。",\n'
+    '  bastion: "単発3消し攻撃は無効。4消しか2 COMBO以上を仕込む。",\n'
+    '  oracle: "DRAIN前はHP受けを避け、DEFで吸収を止める。",\n'
+    '  null: "PIERCEはDEF無視。回復・撃破・次ターン用DEFの準備を優先。",\n'
+    '  trickster: "DISRUPT前に列別NEXTを使い切るか、シフト後の列を予測する。",\n'
+    '};\n',
+    "enemy copy",
+)
+
+tsx = rep(
+    tsx,
+    'function adjacent(a: Coord, b: Coord): boolean {\n',
+    'function computeDropDistances(matches: Set<string>): Map<string, number> {\n'
+    '  const distances = new Map<string, number>();\n'
+    '  for (let col = 0; col < SIZE; col += 1) {\n'
+    '    const survivorRows: number[] = [];\n'
+    '    let holes = 0;\n'
+    '    for (let row = 0; row < SIZE; row += 1) {\n'
+    '      if (matches.has(cellKey(row, col))) holes += 1;\n'
+    '      else survivorRows.push(row);\n'
+    '    }\n'
+    '    for (let row = 0; row < holes; row += 1) {\n'
+    '      distances.set(cellKey(row, col), Math.min(6, holes - row + 1));\n'
+    '    }\n'
+    '    survivorRows.forEach((sourceRow, index) => {\n'
+    '      const destRow = holes + index;\n'
+    '      const distance = destRow - sourceRow;\n'
+    '      if (distance > 0) distances.set(cellKey(destRow, col), Math.min(6, distance));\n'
+    '    });\n'
+    '  }\n'
+    '  return distances;\n'
+    '}\n\n'
+    'function adjacent(a: Coord, b: Coord): boolean {\n',
+    "drop helper",
+)
+
+tsx = rep(
+    tsx,
+    '  const [resultChips, setResultChips] = useState<string[]>([]);\n',
+    '  const [resultChips, setResultChips] = useState<string[]>([]);\n'
+    '  const [swapMotion, setSwapMotion] = useState<SwapMotion>(null);\n'
+    '  const [dropMotion, setDropMotion] = useState<Map<string, number>>(new Map());\n'
+    '  const [stageIntro, setStageIntro] = useState(true);\n'
+    '  const [stageClear, setStageClear] = useState<StageClearState>(null);\n',
+    "states",
+)
+
+tsx = rep(
+    tsx,
+    '    setResultChips([]);\n  }\n\n  function finishEnemyDefeat(currentStage: number) {\n    const nextStage = currentStage + 1;\n    const gainedGold = 12 + currentStage * 4;\n    const gainedXp = 28 + currentStage * 6;\n    setStage(nextStage);\n    setEnemyHp(enemyMaxHp(nextStage));\n    setEnemyTurn(0);\n    setGold((value) => value + gainedGold);\n    setXp((value) => value + gainedXp);\n    setMessage(`STAGE ${currentStage} CLEAR • 盤面/NEXT持ち越し`);\n  }\n\n  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string) {\n    if (isResolving || gameOver) return;\n',
+    '    setResultChips([]);\n'
+    '    setSwapMotion(null);\n'
+    '    setDropMotion(new Map());\n'
+    '    setStageIntro(true);\n'
+    '    setStageClear(null);\n'
+    '  }\n\n'
+    '  async function finishEnemyDefeat(currentStage: number) {\n'
+    '    const nextStage = currentStage + 1;\n'
+    '    const gainedGold = 12 + currentStage * 4;\n'
+    '    const gainedXp = 28 + currentStage * 6;\n'
+    '    setResolutionPhase("victory");\n'
+    '    setCombatPop("STAGE CLEAR!");\n'
+    '    setStageClear({ stage: currentStage, gold: gainedGold, xp: gainedXp });\n'
+    '    setGold((value) => value + gainedGold);\n'
+    '    setXp((value) => value + gainedXp);\n'
+    '    setMessage(`STAGE ${currentStage} CLEAR • 盤面/NEXT持ち越し`);\n'
+    '    await delay(1050);\n'
+    '    setStage(nextStage);\n'
+    '    setEnemyHp(enemyMaxHp(nextStage));\n'
+    '    setEnemyTurn(0);\n'
+    '    setStageClear(null);\n'
+    '    setStageIntro(true);\n'
+    '    setCombatPop("");\n'
+    '  }\n\n'
+    '  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string, swapPair?: [Coord, Coord]) {\n'
+    '    if (isResolving || gameOver || stageIntro || stageClear) return;\n',
+    "reset and stage flow",
+)
+
+tsx = rep(
+    tsx,
+    '    setResolutionPhase("swap");\n    setBoard(nextBoard);\n    await delay(120);\n',
+    '    setResolutionPhase("swap");\n'
+    '    setSwapMotion(swapPair ? { a: swapPair[0], b: swapPair[1] } : null);\n'
+    '    setBoard(nextBoard);\n'
+    '    await delay(swapPair ? 205 : 120);\n'
+    '    setSwapMotion(null);\n',
+    "swap phase",
+)
+
+tsx = rep(
+    tsx,
+    '      setClearingCells(new Set());\n      setBoard(frame.boardAfter);\n      setColumnQueues(frame.queuesAfter);\n      setResolutionPhase("drop");\n      await delay(185);\n',
+    '      setClearingCells(new Set());\n'
+    '      setDropMotion(computeDropDistances(frame.matches));\n'
+    '      setBoard(frame.boardAfter);\n'
+    '      setColumnQueues(frame.queuesAfter);\n'
+    '      setResolutionPhase("drop");\n'
+    '      await delay(245);\n'
+    '      setDropMotion(new Map());\n',
+    "drop phase",
+)
+
+tsx = rep(
+    tsx,
+    '      finishEnemyDefeat(stage);\n      setCombo(0);\n      setClearingCells(new Set());\n      setResolutionPhase("idle");\n      setIsResolving(false);\n      await delay(280);\n      setCombatPop("");\n      setResultChips([]);\n      return;\n',
+    '      await finishEnemyDefeat(stage);\n'
+    '      setCombo(0);\n'
+    '      setClearingCells(new Set());\n'
+    '      setResolutionPhase("idle");\n'
+    '      setIsResolving(false);\n'
+    '      setResultChips([]);\n'
+    '      return;\n',
+    "victory branch",
+)
+
+tsx = rep(
+    tsx,
+    '    void resolveTurn(swapCells(board, selected, nextCoord));\n',
+    '    void resolveTurn(swapCells(board, selected, nextCoord), false, undefined, [selected, nextCoord]);\n',
+    "swap call",
+)
+
+tsx = rep(
+    tsx,
+    '  function toggleSkillMode() {\n    if (gameOver || isResolving || skill < 100) return;\n',
+    '  function toggleSkillMode() {\n    if (gameOver || isResolving || stageIntro || stageClear || skill < 100) return;\n',
+    "skill guard",
+)
+
+tsx = rep(
+    tsx,
+    '    if (!skillMode || !selected || skill < 100 || gameOver || isResolving) return;\n',
+    '    if (!skillMode || !selected || skill < 100 || gameOver || isResolving || stageIntro || stageClear) return;\n',
+    "cast guard",
+)
+
+tsx = rep(
+    tsx,
+    '  const setupMode = !isResolving && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;\n  const enemyVisualClass = `${styles.enemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""} ${resolutionPhase === "attack" ? styles.enemyStruck : ""}`;\n\n  return (\n',
+    '  const setupMode = !isResolving && !stageIntro && !stageClear && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;\n'
+    '  const enemyVisualClass = `${styles.enemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""} ${resolutionPhase === "attack" ? styles.enemyStruck : ""}`;\n'
+    '  const swapClassFor = (row: number, col: number): string => {\n'
+    '    if (!swapMotion) return "";\n'
+    '    const { a, b } = swapMotion;\n'
+    '    let source: Coord | null = null;\n'
+    '    let target: Coord | null = null;\n'
+    '    if (row === a.row && col === a.col) { source = b; target = a; }\n'
+    '    else if (row === b.row && col === b.col) { source = a; target = b; }\n'
+    '    if (!source || !target) return "";\n'
+    '    if (source.col < target.col) return styles.swapFromLeft;\n'
+    '    if (source.col > target.col) return styles.swapFromRight;\n'
+    '    if (source.row < target.row) return styles.swapFromUp;\n'
+    '    return styles.swapFromDown;\n'
+    '  };\n\n'
+    '  return (\n',
+    "render helpers",
+)
+
+tsx = rep(
+    tsx,
+    '      <section className={styles.enemyCard} aria-label="enemy status">\n',
+    '      <section className={styles.enemyCard} aria-label="enemy status">\n'
+    '        <div className={styles.enemySceneGlow} aria-hidden="true" />\n',
+    "enemy scene",
+)
+
+tsx = rep(
+    tsx,
+    '      <section className={styles.intents} aria-label="enemy intents">\n',
+    '      {resolutionPhase === "attack" ? (\n'
+    '        <div className={styles.playerAttackFx} aria-hidden="true"><i /><i /><i /></div>\n'
+    '      ) : null}\n'
+    '      {resolutionPhase === "enemy" ? (\n'
+    '        <div className={`${styles.enemyAttackFx} ${styles[`enemyAttack_${intent.kind}`] ?? ""}`} aria-hidden="true"><i /><i /><i /></div>\n'
+    '      ) : null}\n\n'
+    '      <section className={styles.intents} aria-label="enemy intents">\n',
+    "attack fx",
+)
+
+tsx = rep(
+    tsx,
+    '          <div className={`${styles.board} ${resolutionPhase === "swap" ? styles.boardSwap : ""} ${resolutionPhase === "drop" ? styles.boardDrop : ""}`}>\n',
+    '          <div className={styles.board}>\n',
+    "board class",
+)
+
+tsx = rep(
+    tsx,
+    '              const isClearing = clearingCells.has(key);\n              return (\n',
+    '              const isClearing = clearingCells.has(key);\n'
+    '              const swapClass = swapClassFor(rowIndex, colIndex);\n'
+    '              const dropDistance = dropMotion.get(key) ?? 0;\n'
+    '              const dropClass = dropDistance > 0 ? styles[`drop${dropDistance}`] : "";\n'
+    '              return (\n',
+    "tile motion vars",
+)
+
+tsx = rep(
+    tsx,
+    '                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""}`}\n',
+    '                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""} ${swapClass} ${dropClass}`}\n',
+    "tile class",
+)
+
+tsx = rep(
+    tsx,
+    '      {gameOver ? (\n',
+    '      {stageIntro ? (\n'
+    '        <div className={styles.stageIntroOverlay} role="dialog" aria-label={`Stage ${stage} briefing`}>\n'
+    '          <div className={styles.introStageLabel}>STAGE {stage}</div>\n'
+    '          <div className={`${styles.introEnemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""}`} aria-hidden="true">\n'
+    '            <span className={styles.enemyAura} /><span className={styles.enemyWingLeft} /><span className={styles.enemyWingRight} />\n'
+    '            <span className={styles.enemyAccentLeft} /><span className={styles.enemyAccentRight} />\n'
+    '            <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span><span className={styles.enemyBase} />\n'
+    '          </div>\n'
+    '          <div className={styles.introEnemyName}>{enemy.name}</div>\n'
+    '          <div className={styles.enemySpeech}>「{ENEMY_DIALOGUE[enemy.kind]}」</div>\n'
+    '          <div className={styles.tacticalHint}><strong>TACTICAL HINT</strong><span>{ENEMY_HINT[enemy.kind]}</span></div>\n'
+    '          <button type="button" className={styles.battleStartButton} onClick={() => { setStageIntro(false); setMessage("BATTLE START • INTENTを読んで一手を選ぶ"); }}>BATTLE START</button>\n'
+    '        </div>\n'
+    '      ) : null}\n\n'
+    '      {stageClear ? (\n'
+    '        <div className={styles.stageClearOverlay} aria-live="assertive">\n'
+    '          <div className={styles.clearBurst} aria-hidden="true" />\n'
+    '          <div className={styles.clearStage}>STAGE {stageClear.stage}</div>\n'
+    '          <div className={styles.clearTitle}>CLEAR!</div>\n'
+    '          <div className={styles.clearRewards}><span>+{stageClear.gold} ◈</span><span>+{stageClear.xp} XP</span></div>\n'
+    '          <div className={styles.clearCarry}>BOARD + NEXT CARRIED</div>\n'
+    '        </div>\n'
+    '      ) : null}\n\n'
+    '      {gameOver ? (\n',
+    "stage overlays",
+)
+
+css += r'''
+
+/* Cinematic interaction pass */
+.enemyCard { min-height: 88px; grid-template-columns: 82px 1fr; overflow: hidden; isolation: isolate; }
+.enemySceneGlow { position:absolute; z-index:-1; left:-18px; top:-36px; width:145px; height:145px; border-radius:50%; background:radial-gradient(circle,rgba(132,101,255,.28),transparent 68%); animation:enemyScenePulse 2.4s ease-in-out infinite alternate; }
+@keyframes enemyScenePulse { to { transform:scale(1.14); opacity:.62; } }
+.enemyCard .enemyVisual { width:78px; height:72px; transform:scale(1.2); }
+
+.swapFromLeft { animation:swapFromLeft .205s cubic-bezier(.2,.8,.2,1); }
+.swapFromRight { animation:swapFromRight .205s cubic-bezier(.2,.8,.2,1); }
+.swapFromUp { animation:swapFromUp .205s cubic-bezier(.2,.8,.2,1); }
+.swapFromDown { animation:swapFromDown .205s cubic-bezier(.2,.8,.2,1); }
+@keyframes swapFromLeft { from { transform:translateX(-108%); z-index:6; } to { transform:translateX(0); z-index:6; } }
+@keyframes swapFromRight { from { transform:translateX(108%); z-index:6; } to { transform:translateX(0); z-index:6; } }
+@keyframes swapFromUp { from { transform:translateY(-108%); z-index:6; } to { transform:translateY(0); z-index:6; } }
+@keyframes swapFromDown { from { transform:translateY(108%); z-index:6; } to { transform:translateY(0); z-index:6; } }
+.drop1 { animation:drop1 .245s cubic-bezier(.12,.72,.2,1.12); } .drop2 { animation:drop2 .245s cubic-bezier(.12,.72,.2,1.12); } .drop3 { animation:drop3 .245s cubic-bezier(.12,.72,.2,1.12); } .drop4 { animation:drop4 .245s cubic-bezier(.12,.72,.2,1.12); } .drop5 { animation:drop5 .245s cubic-bezier(.12,.72,.2,1.12); } .drop6 { animation:drop6 .245s cubic-bezier(.12,.72,.2,1.12); }
+@keyframes drop1 { from { transform:translateY(-108%); } } @keyframes drop2 { from { transform:translateY(-216%); } } @keyframes drop3 { from { transform:translateY(-324%); } } @keyframes drop4 { from { transform:translateY(-432%); } } @keyframes drop5 { from { transform:translateY(-540%); } } @keyframes drop6 { from { transform:translateY(-648%); } }
+
+.clearing { overflow:visible; animation:orbBurst .175s ease-out forwards; }
+.clearing::before,.clearing::after { content:""; position:absolute; z-index:8; inset:18%; border-radius:50%; pointer-events:none; }
+.clearing::before { border:3px solid rgba(255,255,255,.95); box-shadow:0 0 13px white,0 0 25px currentColor; animation:burstRing .175s ease-out forwards; }
+.clearing::after { background:radial-gradient(circle at 50% 0,#fff 0 2px,transparent 3px),radial-gradient(circle at 100% 50%,#fff 0 2px,transparent 3px),radial-gradient(circle at 50% 100%,#fff 0 2px,transparent 3px),radial-gradient(circle at 0 50%,#fff 0 2px,transparent 3px); animation:burstBits .175s ease-out forwards; }
+@keyframes orbBurst { 0%{transform:scale(1);filter:brightness(1)} 55%{transform:scale(1.18);filter:brightness(2.4)} 100%{transform:scale(.08);filter:brightness(3);opacity:0} }
+@keyframes burstRing { from{transform:scale(.35);opacity:1} to{transform:scale(2.2);opacity:0} }
+@keyframes burstBits { from{transform:scale(.7);opacity:1} to{transform:scale(2.6) rotate(35deg);opacity:0} }
+
+.playerAttackFx,.enemyAttackFx { position:fixed; z-index:10; inset:0; pointer-events:none; overflow:hidden; }
+.playerAttackFx::before { content:""; position:absolute; left:50%; top:27%; width:9px; height:52%; transform:translate(-50%,45%); border-radius:999px; background:linear-gradient(180deg,transparent,#fff 24%,#b987ff 50%,#6ad6ff 72%,transparent); box-shadow:0 0 14px #fff,0 0 34px #8e75ff; animation:playerBeam .31s ease-out forwards; }
+.playerAttackFx i { position:absolute; left:50%; top:28%; width:7px; height:30%; transform-origin:bottom center; background:linear-gradient(180deg,transparent,rgba(255,225,112,.92)); filter:blur(1px); animation:playerSpark .31s ease-out forwards; }
+.playerAttackFx i:nth-child(1){transform:translateX(-50%) rotate(-17deg)} .playerAttackFx i:nth-child(2){transform:translateX(-50%) rotate(14deg)} .playerAttackFx i:nth-child(3){transform:translateX(-50%) rotate(3deg)}
+@keyframes playerBeam { 0%{opacity:0;transform:translate(-50%,50%) scaleY(.2)} 35%{opacity:1} 100%{opacity:0;transform:translate(-50%,-35%) scaleY(1.2)} }
+@keyframes playerSpark { from{opacity:1;height:10%} to{opacity:0;height:45%} }
+.enemyAttackFx::before { content:""; position:absolute; left:-14%; top:34%; width:135%; height:12px; border-radius:999px; background:linear-gradient(90deg,transparent,rgba(255,90,122,.25),#fff,#ff537d,transparent); box-shadow:0 0 18px #ff537d,0 0 42px rgba(255,55,110,.7); transform:rotate(-18deg) translateX(-35%); animation:enemySlash .28s ease-in forwards; }
+.enemyAttackFx::after { content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 72%,rgba(255,70,104,.32),transparent 34%); animation:damageFlash .3s ease-out forwards; }
+.enemyAttackFx i { position:absolute; left:48%; top:58%; width:5px; height:22%; background:linear-gradient(180deg,#fff,transparent); animation:enemyShard .3s ease-out forwards; }
+.enemyAttackFx i:nth-child(1){transform:rotate(32deg)} .enemyAttackFx i:nth-child(2){transform:rotate(-42deg)} .enemyAttackFx i:nth-child(3){transform:rotate(5deg)}
+.enemyAttack_pierce::before { height:6px; transform:translateX(-40%); background:linear-gradient(90deg,transparent,#fff,#b9cbff,transparent); }
+.enemyAttack_drain::after { background:radial-gradient(circle at 50% 67%,rgba(231,37,100,.5),transparent 38%); }
+.enemyAttack_disrupt::before { transform:rotate(18deg) translateX(-35%); background:linear-gradient(90deg,transparent,#54d8ff,#ffd75c,#ee6caf,transparent); }
+@keyframes enemySlash { 0%{opacity:0;transform:rotate(-18deg) translateX(-55%) scaleX(.35)} 28%{opacity:1} 100%{opacity:0;transform:rotate(-18deg) translateX(25%) scaleX(1)} }
+@keyframes damageFlash { 0%{opacity:0} 45%{opacity:1} 100%{opacity:0} }
+@keyframes enemyShard { from{opacity:1} to{opacity:0;height:42%} }
+
+.stageIntroOverlay,.stageClearOverlay { position:fixed; z-index:30; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px); overflow:hidden; background:radial-gradient(circle at 50% 32%,rgba(116,80,255,.28),transparent 28%),linear-gradient(180deg,rgba(7,10,20,.98),rgba(10,8,24,.99)); text-align:center; }
+.stageIntroOverlay::before { content:""; position:absolute; inset:-20%; background:repeating-conic-gradient(from 0deg,transparent 0 10deg,rgba(255,255,255,.025) 10deg 11deg); animation:introSpin 18s linear infinite; }
+@keyframes introSpin { to{transform:rotate(360deg)} }
+.introStageLabel { position:relative; color:#9ba8ff; font-size:12px; font-weight:950; letter-spacing:.28em; animation:introRise .42s ease both; }
+.introEnemyVisual { --enemy-a:#a76cff; --enemy-b:#3f277c; --enemy-line:rgba(218,189,255,.78); --enemy-glow:rgba(178,126,255,.5); position:relative; width:132px; height:132px; margin:26px 0 18px; display:grid; place-items:center; filter:drop-shadow(0 0 28px var(--enemy-glow)); transform:scale(2.15); animation:enemyIntro .55s cubic-bezier(.12,.8,.2,1) both; }
+.introEnemyName { position:relative; margin-top:16px; color:#fff; font-size:clamp(24px,7vw,34px); font-weight:1000; letter-spacing:.08em; text-shadow:0 0 22px rgba(160,130,255,.45); animation:introRise .48s .08s ease both; }
+.enemySpeech { position:relative; max-width:380px; margin-top:15px; color:#f0e9ff; font-size:14px; line-height:1.55; font-weight:760; animation:introRise .48s .16s ease both; }
+.tacticalHint { position:relative; width:min(100%,390px); margin-top:17px; padding:11px 13px; display:grid; gap:5px; border:1px solid rgba(255,217,104,.34); border-radius:13px; background:rgba(104,78,14,.16); animation:introRise .48s .22s ease both; }
+.tacticalHint strong { color:#ffe27a; font-size:9px; letter-spacing:.16em; } .tacticalHint span { color:#e6dfc7; font-size:11px; line-height:1.4; font-weight:760; }
+.battleStartButton { position:relative; width:min(100%,330px); min-height:52px; margin-top:22px; border:1px solid rgba(255,255,255,.3); border-radius:999px; background:linear-gradient(135deg,#8f5cff,#4e77ff); color:#fff; font-size:15px; font-weight:1000; letter-spacing:.16em; box-shadow:0 12px 34px rgba(74,81,255,.35); animation:introRise .48s .28s ease both,readyPulse 1.1s .8s ease-in-out infinite alternate; }
+@keyframes enemyIntro { from{opacity:0;transform:scale(1.3) translateY(-22px) rotate(-7deg)} to{opacity:1;transform:scale(2.15)} } @keyframes introRise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+.stageClearOverlay { background:radial-gradient(circle at 50% 45%,rgba(255,225,91,.22),transparent 30%),rgba(5,7,15,.88); backdrop-filter:blur(8px); animation:clearOverlayIn .25s ease both; }
+.clearBurst { position:absolute; width:280px; height:280px; border-radius:50%; border:2px solid rgba(255,230,126,.75); box-shadow:0 0 30px rgba(255,220,94,.45),inset 0 0 35px rgba(255,220,94,.18); animation:clearBurst 1s ease-out both; }
+.clearStage { position:relative; color:#aeb7d8; font-size:11px; font-weight:950; letter-spacing:.25em; } .clearTitle { position:relative; margin-top:5px; color:#fff5b5; font-size:clamp(48px,15vw,72px); line-height:1; font-weight:1000; font-style:italic; text-shadow:0 0 12px white,0 0 34px #ffd75c; animation:clearTitle .7s cubic-bezier(.1,.8,.2,1) both; }
+.clearRewards { position:relative; display:flex; gap:12px; margin-top:22px; } .clearRewards span { padding:7px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); font-size:13px; font-weight:900; } .clearCarry { position:relative; margin-top:14px; color:#a9b9ff; font-size:9px; font-weight:900; letter-spacing:.14em; }
+@keyframes clearOverlayIn { from{opacity:0} to{opacity:1} } @keyframes clearBurst { from{transform:scale(.2);opacity:1} to{transform:scale(2.2);opacity:0} } @keyframes clearTitle { 0%{transform:scale(.35) rotate(-8deg);opacity:0} 55%{transform:scale(1.12);opacity:1} 100%{transform:scale(1)} }
+@media (max-height:760px) and (orientation:portrait) { .enemyCard{min-height:64px;grid-template-columns:56px 1fr}.enemyCard .enemyVisual{transform:scale(.82)}.introEnemyVisual{margin-block:12px 8px;transform:scale(1.7)}.enemySpeech{margin-top:8px;font-size:12px}.tacticalHint{margin-top:9px;padding:8px 10px}.battleStartButton{margin-top:12px;min-height:46px} }
+'''
+
+TSX.write_text(tsx)
+CSS.write_text(css)
+print("cinematic patch applied")
