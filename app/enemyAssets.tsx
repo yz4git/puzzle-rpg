@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
 
 export type EnemyAssetKind = "warden" | "bastion" | "oracle" | "null" | "trickster";
 
@@ -177,7 +177,7 @@ export function EnemySprite({ kind, className, intro = false }: { kind: EnemyAss
     return <img className={className} src={asset.src} alt={asset.alt} draggable={false} style={style} />;
   }
 
-  const pixels: Array<JSX.Element> = [];
+  const pixels: Array<ReactElement> = [];
   asset.rows.forEach((row, y) => {
     [...row].forEach((token, x) => {
       if (token === TRANSPARENT) return;
