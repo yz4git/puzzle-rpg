@@ -7,13 +7,13 @@
   min-width: 320px;
   height: 100dvh;
   margin: 0 auto;
-  padding: calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 10px);
+  padding: calc(env(safe-area-inset-top) + 7px) 12px calc(env(safe-area-inset-bottom) + 8px);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 18%, rgba(116, 80, 255, 0.24), transparent 34%),
+    radial-gradient(circle at 50% 16%, rgba(116, 80, 255, 0.24), transparent 34%),
     linear-gradient(180deg, #11182d 0%, #090d19 52%, #060911 100%);
   color: #f6f7ff;
   touch-action: manipulation;
@@ -34,8 +34,11 @@
 
 .topBar,
 .enemyCard,
+.intentCard,
 .playerStrip,
+.nextStrip,
 .boardWrap,
+.ruleHint,
 .message,
 .actionBar {
   position: relative;
@@ -46,19 +49,19 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  min-height: 46px;
+  min-height: 38px;
 }
 
 .eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: 9px;
+  letter-spacing: 0.18em;
   font-weight: 800;
   color: #9daaff;
 }
 
 .stage {
-  margin-top: 2px;
-  font-size: 22px;
+  margin-top: 1px;
+  font-size: 19px;
   line-height: 1;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -66,40 +69,39 @@
 
 .resources {
   display: flex;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 11px;
   font-weight: 800;
 }
 
 .resources span {
-  padding: 6px 9px;
+  padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgba(255,255,255,.06);
 }
 
 .enemyCard {
-  min-height: 112px;
-  max-height: 15dvh;
+  min-height: 88px;
   display: grid;
-  grid-template-columns: 108px 1fr;
+  grid-template-columns: 78px 1fr;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 9px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 17px;
   background: linear-gradient(135deg, rgba(38, 29, 77, .88), rgba(15, 20, 40, .9));
-  box-shadow: 0 12px 30px rgba(0,0,0,.28);
+  box-shadow: 0 10px 26px rgba(0,0,0,.25);
 }
 
 .enemyVisual {
   position: relative;
-  width: 94px;
-  height: 82px;
+  width: 70px;
+  height: 64px;
   margin: auto;
   display: grid;
   place-items: center;
-  filter: drop-shadow(0 0 18px rgba(178, 126, 255, .4));
+  filter: drop-shadow(0 0 16px rgba(178, 126, 255, .4));
 }
 
 .enemyCore {
@@ -107,53 +109,72 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
-  border-radius: 22px;
+  width: 47px;
+  height: 47px;
+  border-radius: 16px;
   transform: rotate(45deg);
   border: 2px solid rgba(218, 189, 255, .75);
   background: linear-gradient(135deg, #a76cff, #3f277c);
   color: #fff;
-  font-size: 25px;
+  font-size: 19px;
   box-shadow: inset 0 0 18px rgba(255,255,255,.18);
 }
-
-.enemyCore::first-letter { transform: rotate(-45deg); }
 
 .enemyWingLeft,
 .enemyWingRight {
   position: absolute;
-  top: 32px;
-  width: 42px;
-  height: 22px;
+  top: 25px;
+  width: 31px;
+  height: 17px;
   border: 1px solid rgba(187, 146, 255, .55);
   background: linear-gradient(135deg, rgba(129, 78, 215, .7), rgba(45, 29, 83, .9));
 }
 
 .enemyWingLeft {
-  left: 2px;
+  left: 0;
   transform: skewY(-22deg) rotate(-12deg);
   border-radius: 18px 3px 8px 18px;
 }
 
 .enemyWingRight {
-  right: 2px;
+  right: 0;
   transform: skewY(22deg) rotate(12deg);
   border-radius: 3px 18px 18px 8px;
 }
 
 .enemyInfo { min-width: 0; }
+.enemyHeader {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
 .enemyName {
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
-  letter-spacing: .08em;
+  letter-spacing: .065em;
+}
+
+.specialTag {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 201, 103, .4);
+  border-radius: 999px;
+  color: #ffd67d;
+  background: rgba(255, 177, 72, .1);
+  font-size: 7px;
+  font-weight: 1000;
+  letter-spacing: .12em;
 }
 
 .hpTrack,
 .playerHpTrack,
+.shieldTrack,
 .xpTrack {
   overflow: hidden;
   background: rgba(0,0,0,.38);
@@ -161,13 +182,14 @@
 }
 
 .hpTrack {
-  height: 13px;
-  margin-top: 9px;
+  height: 10px;
+  margin-top: 5px;
   border-radius: 999px;
 }
 
 .enemyHpFill,
 .playerHpFill,
+.shieldFill,
 .xpFill {
   height: 100%;
   transition: width .24s ease;
@@ -179,35 +201,168 @@
 }
 
 .hpText {
-  margin-top: 4px;
+  margin-top: 2px;
   text-align: right;
   color: #d9d8e8;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
 }
 
+.passive {
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #b9bdd5;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.intentCard {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: auto 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 111, 135, .32);
+  border-radius: 13px;
+  background: linear-gradient(90deg, rgba(96, 26, 51, .52), rgba(43, 24, 55, .65));
+}
+
+.intentLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: #ff9cad;
+  font-size: 6px;
+  font-weight: 1000;
+  letter-spacing: .11em;
+}
+
+.intentIcon {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  background: rgba(255,255,255,.08);
+  font-size: 17px;
+}
+
+.intentBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.intentBody strong {
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: .08em;
+}
+
+.intentBody span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #d9c6cf;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.intentPower {
+  min-width: 31px;
+  color: #ffb0ba;
+  font-size: 18px;
+  font-weight: 1000;
+  text-align: right;
+}
+
 .playerStrip {
-  padding: 7px 10px;
+  padding: 5px 8px;
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 13px;
   background: var(--panel);
 }
 
 .playerRow,
+.shieldRow,
 .xpRow {
   display: grid;
   align-items: center;
-  gap: 7px;
-  font-size: 10px;
+  gap: 6px;
+  font-size: 9px;
   font-weight: 900;
 }
 
-.playerRow { grid-template-columns: 21px 29px 1fr; }
-.xpRow { grid-template-columns: 21px 1fr; margin-top: 5px; }
-.playerHpTrack { height: 9px; border-radius: 999px; }
+.playerRow,
+.shieldRow { grid-template-columns: 23px 27px 1fr; }
+.shieldRow { margin-top: 3px; color: #9be9ff; }
+.xpRow { grid-template-columns: 23px 1fr; margin-top: 3px; }
+.playerHpTrack,
+.shieldTrack { height: 7px; border-radius: 999px; }
 .playerHpFill { background: linear-gradient(90deg, #39e7a3, #82f5c9); }
-.xpTrack { height: 5px; border-radius: 999px; }
+.shieldFill { background: linear-gradient(90deg, #43bff4, #a2eaff); }
+.xpTrack { height: 4px; border-radius: 999px; }
 .xpFill { background: linear-gradient(90deg, #7da5ff, #d29bff); }
+
+.nextStrip {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(7, 11, 23, .76);
+}
+
+.nextLabel {
+  display: flex;
+  flex-direction: column;
+  padding-left: 3px;
+}
+
+.nextLabel span {
+  color: #b8c5ff;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .1em;
+}
+
+.nextLabel small {
+  color: #737b9b;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.nextOrbs {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.nextOrb {
+  position: relative;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(255,255,255,.15), inset 0 -2px 4px rgba(0,0,0,.18);
+  font-size: 15px;
+}
+
+.nextOrb small {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  color: rgba(255,255,255,.66);
+  font-size: 6px;
+  font-weight: 900;
+}
 
 .boardWrap {
   flex: 1 1 auto;
@@ -217,17 +372,17 @@
 }
 
 .board {
-  width: min(92vw, 46dvh, 440px);
+  width: min(94vw, 42dvh, 430px);
   aspect-ratio: 1;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   grid-template-rows: repeat(6, 1fr);
-  gap: clamp(4px, 1.2vw, 7px);
-  padding: clamp(7px, 2vw, 11px);
+  gap: clamp(3px, 1vw, 6px);
+  padding: clamp(6px, 1.7vw, 10px);
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 23px;
+  border-radius: 21px;
   background: rgba(4, 7, 15, .7);
-  box-shadow: inset 0 0 34px rgba(0,0,0,.52), 0 18px 40px rgba(0,0,0,.28);
+  box-shadow: inset 0 0 34px rgba(0,0,0,.52), 0 16px 34px rgba(0,0,0,.25);
 }
 
 .tile {
@@ -241,7 +396,7 @@
   border-radius: 22%;
   appearance: none;
   color: white;
-  font-size: clamp(23px, 8vw, 39px);
+  font-size: clamp(20px, 7vw, 36px);
   line-height: 1;
   box-shadow:
     inset 0 2px 6px rgba(255,255,255,.2),
@@ -258,6 +413,7 @@
 .leaf { background: linear-gradient(145deg, #83dc78, #25885c); }
 .light { background: linear-gradient(145deg, #f0c963, #9d6edf); }
 .heart { background: linear-gradient(145deg, #ff8bbb, #cb3d7e); }
+.guard { background: linear-gradient(145deg, #70e5ef, #2677a7); }
 .selected {
   z-index: 2;
   transform: scale(1.09);
@@ -268,13 +424,13 @@
 
 .combo {
   position: absolute;
-  top: 7px;
-  right: 11px;
-  padding: 5px 9px;
+  top: 6px;
+  right: 9px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255, 236, 117, .96);
   color: #281c39;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 1000;
   box-shadow: 0 5px 16px rgba(0,0,0,.3);
   animation: pop .28s ease;
@@ -286,27 +442,35 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+.ruleHint {
+  min-height: 14px;
+  color: #848ba8;
+  font-size: 8px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .message {
-  min-height: 25px;
+  min-height: 23px;
+  max-height: 33px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 7px;
+  padding: 2px 6px;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   border-radius: 9px;
   color: #cfd4ec;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
+  line-height: 1.25;
   text-align: center;
 }
 
 .actionBar {
   display: grid;
-  grid-template-columns: 1fr 82px;
-  gap: 8px;
-  min-height: 54px;
+  grid-template-columns: 1fr 76px;
+  gap: 7px;
+  min-height: 47px;
 }
 
 .skillButton,
@@ -322,8 +486,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 15px;
-  border-radius: 16px;
+  padding: 0 13px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #313953, #20263b);
 }
 
@@ -335,12 +499,12 @@
 }
 
 @keyframes readyPulse { to { filter: brightness(1.2); } }
-.skillTitle { font-size: 13px; letter-spacing: .09em; }
-.skillGauge { font-size: 12px; color: #dbe1ff; }
+.skillTitle { font-size: 12px; letter-spacing: .08em; }
+.skillGauge { font-size: 11px; color: #dbe1ff; }
 .resetButton {
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(255,255,255,.08);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .gameOverCard {
@@ -367,14 +531,30 @@
 
 .landscapeNotice { display: none; }
 
-@media (max-height: 720px) and (orientation: portrait) {
-  .shell { gap: 5px; padding-top: calc(env(safe-area-inset-top) + 6px); }
-  .enemyCard { min-height: 92px; grid-template-columns: 90px 1fr; }
-  .enemyVisual { transform: scale(.82); }
-  .topBar { min-height: 38px; }
-  .stage { font-size: 18px; }
-  .board { width: min(90vw, 43dvh, 370px); }
-  .actionBar { min-height: 46px; }
+@media (max-height: 760px) and (orientation: portrait) {
+  .shell { gap: 3px; padding-top: calc(env(safe-area-inset-top) + 4px); }
+  .topBar { min-height: 32px; }
+  .stage { font-size: 17px; }
+  .enemyCard { min-height: 76px; grid-template-columns: 67px 1fr; padding-block: 5px; }
+  .enemyVisual { transform: scale(.85); }
+  .intentCard { min-height: 36px; padding-block: 3px; }
+  .playerStrip { padding-block: 4px; }
+  .nextStrip { min-height: 36px; padding-block: 2px; }
+  .nextOrb { height: 28px; font-size: 13px; }
+  .board { width: min(92vw, 39dvh, 370px); }
+  .ruleHint { font-size: 7px; }
+  .message { min-height: 20px; font-size: 8px; }
+  .actionBar { min-height: 42px; }
+}
+
+@media (max-height: 670px) and (orientation: portrait) {
+  .passive,
+  .ruleHint { display: none; }
+  .enemyCard { min-height: 68px; }
+  .intentBody span { display: none; }
+  .nextStrip { min-height: 32px; }
+  .nextOrb { height: 25px; }
+  .board { width: min(90vw, 37dvh, 330px); }
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
