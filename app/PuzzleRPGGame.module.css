@@ -1352,3 +1352,111 @@
   .titleScreen { justify-content:center !important; }
   .titleScene { height:142px !important; }
 }
+
+
+/* Review pass 1-5 + heart/fire separation */
+/* 1) Keep controls attached to the puzzle instead of pinning them to the viewport bottom. */
+.actionBar {
+  margin-top: 3px !important;
+  margin-bottom: 0 !important;
+  flex: 0 0 auto !important;
+  position: relative !important;
+  bottom: auto !important;
+}
+.message { margin-bottom: 0 !important; }
+.skillPalette { margin: 2px 0 0 !important; }
+
+/* 2) Pixel projectiles visibly travel from matched cells into the enemy sprite. */
+.playerAttackFx { --hit-x: 25%; --hit-y: 18%; }
+.playerAttackFx::before {
+  left: var(--hit-x) !important;
+  top: var(--hit-y) !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  box-shadow: 12px 0 0 #ffd447, -12px 0 0 #ff7a2f, 0 12px 0 #ffd447, 0 -12px 0 #fff, 18px 12px 0 #ff4b35, -18px -12px 0 #fff !important;
+  transform: translate(-50%,-50%) scale(0) !important;
+  animation: pixelEnemyImpact .44s steps(4,end) forwards !important;
+}
+.playerAttackFx i {
+  left: var(--sx) !important;
+  top: var(--sy) !important;
+  width: 9px !important;
+  height: 9px !important;
+  border-radius: 0 !important;
+  filter: none !important;
+  background: #fff !important;
+  box-shadow: 6px 0 0 currentColor, 0 6px 0 currentColor !important;
+  animation: pixelShotToEnemy .42s steps(7,end) forwards !important;
+}
+.attackFx_fire i { color:#ff5a2e !important; background:#ffd447 !important; }
+.attackFx_water i { color:#208cff !important; background:#8ee9ff !important; }
+.attackFx_light i { color:#ffe044 !important; background:#fff7a1 !important; }
+@keyframes pixelShotToEnemy {
+  0% { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  72% { opacity:1; left:var(--hit-x); top:var(--hit-y); transform:translate(-50%,-50%) scale(1.15); }
+  100% { opacity:0; left:var(--hit-x); top:var(--hit-y); transform:translate(-50%,-50%) scale(2); }
+}
+@keyframes pixelEnemyImpact {
+  0%,58% { opacity:0; transform:translate(-50%,-50%) scale(0); }
+  62% { opacity:1; transform:translate(-50%,-50%) scale(.45); }
+  82% { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  100% { opacity:0; transform:translate(-50%,-50%) scale(1.45); }
+}
+
+/* 3) Use the upper screen instead of vertically centering the title composition. */
+.titleScreen {
+  justify-content: flex-start !important;
+  padding-top: calc(env(safe-area-inset-top) + 18px) !important;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 12px) !important;
+}
+.titleKicker { margin-top: 0 !important; }
+.titleLogo { margin-top: 5px !important; }
+.titleTagline { margin-top: 5px !important; }
+.titleScene { margin-top: 8px !important; }
+.titleOrbs { margin-top: 6px !important; }
+.titleSystems { margin-top: 6px !important; }
+.titleStartButton { margin-top: 9px !important; }
+.titleFoot { margin-top: 7px !important; }
+
+/* 4) Classic RPG-style Game Over presentation. */
+.gameOverCard {
+  position: fixed !important;
+  z-index: 60 !important;
+  inset: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px) !important;
+  border: 0 !important;
+  background: #020202 !important;
+  color: #fff !important;
+}
+.gameOverHeroWrap { width:132px; height:86px; display:grid; place-items:center; overflow:visible; }
+.gameOverHero {
+  width: 82px;
+  height: auto;
+  image-rendering: pixelated;
+  transform: rotate(86deg) translateY(8px);
+  filter: grayscale(.72) brightness(.72) sepia(.18) drop-shadow(7px 5px 0 #5d1018);
+}
+.gameOverTitle { font-size: clamp(38px,12vw,58px); font-weight:1000; letter-spacing:.08em; line-height:1; }
+.gameOverStats { width:min(100%,340px); display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.gameOverStats span { border:2px solid #eee; padding:7px 9px; background:#050505; font-size:12px; font-weight:900; text-align:center; }
+.gameOverTip { width:min(100%,340px); border:2px solid #eee; padding:9px; color:#d7d7d7; font-size:10px; line-height:1.45; text-align:center; }
+.gameOverCard button { width:min(100%,280px); min-height:48px; border:3px double #fff !important; background:#030303 !important; color:#fff !important; font-weight:1000; letter-spacing:.12em; }
+
+/* Heart is magenta/pink; fire stays red/orange. Never let the two read as the same red family. */
+.tile.heart, .nextOrb.heart, .nextOrbBack.heart, .skillPalette button.heart, .titleOrbs .heart {
+  background-color:#3b0628 !important;
+  border-color:#ff70c5 !important;
+}
+.tile.fire, .nextOrb.fire, .nextOrbBack.fire, .skillPalette button.fire, .titleOrbs .fire {
+  background-color:#3c0903 !important;
+  border-color:#ff6a24 !important;
+}

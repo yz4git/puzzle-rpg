@@ -130,9 +130,9 @@ const ENEMY_DIALOGUE: Record<EnemyKind, string> = {
 const ENEMY_HINT: Record<EnemyKind, string> = {
   warden: "3手目の強打をNOW/NEXTで確認。先にDEFを作るか、撃破を狙う。",
   bastion: "単発3消し攻撃は無効。4消しか2 COMBO以上を仕込む。",
-  oracle: "DRAIN前はHP受けを避け、DEFで吸収を止める。",
-  null: "PIERCEはDEF無視。回復・撃破・次ターン用DEFの準備を優先。",
-  trickster: "DISRUPT前に列別NEXTを使い切るか、シフト後の列を予測する。",
+  oracle: "DRAINでHPを受けると150%吸収＋DEF4削り。必ずDEFで止める。",
+  null: "PIERCEはDEF無視＋残DEF半減。直前はHP確保、直後にDEFを作り直す。",
+  trickster: "DISRUPTはNEXT右シフト＋PRISM-15。READY前後の使い時を読む。",
 };
 
 function delay(ms: number): Promise<void> {
@@ -491,21 +491,21 @@ function enemyDefinition(stage: number): EnemyDefinition {
       return {
         kind: "oracle",
         name: "BLOOD ORACLE",
-        passive: "DRAIN：HPに通ったダメージだけ敵が回復",
+        passive: "DRAIN：HP被弾で150%吸収＋DEF4を削る",
         armor: 0,
       };
     case 3:
       return {
         kind: "null",
         name: "NULL KNIGHT",
-        passive: "PIERCE：予告された貫通攻撃はSHIELDを無視",
+        passive: "PIERCE：DEF無視＋攻撃後に残DEFを半減",
         armor: 0,
       };
     case 4:
       return {
         kind: "trickster",
         name: "PRISM TRICKSTER",
-        passive: "DISRUPT：列別NEXTを右へ1列ずらす",
+        passive: "DISRUPT：NEXT右シフト＋PRISMを15削る",
         armor: 0,
       };
     default:
@@ -598,6 +598,7 @@ function disruptColumnQueues(queues: ColumnQueues): ColumnQueues {
 
 function computeEnemyAction(
   intent: EnemyIntent,
+  stage: number,
   maxEnemyHp: number,
   hpBefore: number,
   shieldBefore: number,
@@ -615,7 +616,12 @@ function computeEnemyAction(
   if (intent.kind === "pierce") {
     hpDamage = intent.power;
     hpAfter = Math.max(0, hpBefore - hpDamage);
-    summary = `${intent.label} -${hpDamage} HP`;
+    if (stage >= 4) {
+      shieldAfter = Math.floor(shieldBefore * 0.5);
+      summary = `${intent.label} -${hpDamage} HP / DEF HALF`;
+    } else {
+      summary = `${intent.label} -${hpDamage} HP`;
+    }
   } else {
     blocked = Math.min(shieldBefore, intent.power);
     hpDamage = intent.power - blocked;
@@ -623,9 +629,12 @@ function computeEnemyAction(
     hpAfter = Math.max(0, hpBefore - hpDamage);
 
     if (intent.kind === "drain") {
-      const drainHeal = Math.ceil(hpDamage * 1.25);
+      const drainHeal = Math.ceil(hpDamage * (stage >= 3 ? 1.5 : 1.25));
       enemyHpAfter = Math.min(maxEnemyHp, enemyHpBefore + drainHeal);
-      summary = hpDamage > 0 ? `${intent.label} -${hpDamage} / 敵+${drainHeal}` : `${intent.label} BLOCK`;
+      if (stage >= 3 && hpDamage > 0) shieldAfter = Math.max(0, shieldAfter - 4);
+      summary = hpDamage > 0
+        ? `${intent.label} -${hpDamage} / 敵+${drainHeal}${stage >= 3 ? " / DEF-4" : ""}`
+        : `${intent.label} BLOCK`;
     } else if (intent.kind === "disrupt") {
       queuesAfter = disruptColumnQueues(queuesBefore);
       summary = `${intent.label}${hpDamage > 0 ? ` -${hpDamage}` : ""} / NEXT SHIFT`;
@@ -877,6 +886,7 @@ export default function PuzzleRPGGame() {
       : intent;
     const enemyResult = computeEnemyAction(
       effectiveIntent,
+      stage,
       maxEnemyHp,
       healedHp,
       shieldBeforeEnemy,
@@ -895,13 +905,15 @@ export default function PuzzleRPGGame() {
     setPlayerShield(enemyResult.shieldAfter);
     setEnemyHp(enemyResult.enemyHpAfter);
     setColumnQueues(enemyResult.queuesAfter);
+    const prismTax = stage >= 5 && enemy.kind === "trickster" && effectiveIntent.kind === "disrupt" ? 15 : 0;
+    if (prismTax > 0) setSkill((value) => Math.max(0, value - prismTax));
     setEnemyTurn((value) => value + 1);
     setMessage(
       isSetupTurn
         ? `TACTICAL SETUP • PRISM +24 • ${enemyResult.summary}`
         : plan.frames.length === 0
           ? `SHIFT SETUP • ${enemyResult.summary}`
-        : `${actualAttack > 0 ? `${actualAttack} DMG • ` : ""}${enemyResult.summary}`,
+        : `${actualAttack > 0 ? `${actualAttack} DMG • ` : ""}${enemyResult.summary}${prismTax > 0 ? " • PRISM -15" : ""}`,
     );
 
     if (enemyResult.hpAfter <= 0) {
@@ -1249,9 +1261,16 @@ export default function PuzzleRPGGame() {
       ) : null}
 
       {gameOver ? (
-        <div className={styles.gameOverCard}>
-          <div>GAME OVER</div>
-          <button type="button" onClick={reset}>もう一度</button>
+        <div className={styles.gameOverCard} role="dialog" aria-label="Game Over">
+          <div className={styles.gameOverHeroWrap} aria-hidden="true">
+            <img className={styles.gameOverHero} src={PIXEL_ART_ASSETS.hero} alt="" draggable={false} />
+          </div>
+          <div className={styles.gameOverTitle}>GAME OVER</div>
+          <div className={styles.gameOverStats}>
+            <span>STAGE {stage}</span><span>LV {level}</span><span>◈ {gold}</span><span>XP {xp}</span>
+          </div>
+          <div className={styles.gameOverTip}>INTENT / DEF / PRISM を組み合わせて再挑戦</div>
+          <button type="button" onClick={reset}>▶ RETRY</button>
         </div>
       ) : null}
 
