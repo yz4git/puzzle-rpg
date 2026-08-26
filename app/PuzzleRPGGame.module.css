@@ -680,14 +680,24 @@
 @keyframes enemyScenePulse { to { transform:scale(1.14); opacity:.62; } }
 .enemyCard .enemyVisual { width:78px; height:72px; transform:scale(1.2); }
 
-.swapFromLeft { animation:swapFromLeft .205s cubic-bezier(.2,.8,.2,1); }
-.swapFromRight { animation:swapFromRight .205s cubic-bezier(.2,.8,.2,1); }
-.swapFromUp { animation:swapFromUp .205s cubic-bezier(.2,.8,.2,1); }
-.swapFromDown { animation:swapFromDown .205s cubic-bezier(.2,.8,.2,1); }
-@keyframes swapFromLeft { from { transform:translateX(-108%); z-index:6; } to { transform:translateX(0); z-index:6; } }
-@keyframes swapFromRight { from { transform:translateX(108%); z-index:6; } to { transform:translateX(0); z-index:6; } }
-@keyframes swapFromUp { from { transform:translateY(-108%); z-index:6; } to { transform:translateY(0); z-index:6; } }
-@keyframes swapFromDown { from { transform:translateY(108%); z-index:6; } to { transform:translateY(0); z-index:6; } }
+.swapToLeft,
+.swapToRight,
+.swapToUp,
+.swapToDown {
+  z-index: 6;
+  animation-duration: .205s;
+  animation-timing-function: cubic-bezier(.2,.8,.2,1);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+.swapToLeft { animation-name: swapToLeft; }
+.swapToRight { animation-name: swapToRight; }
+.swapToUp { animation-name: swapToUp; }
+.swapToDown { animation-name: swapToDown; }
+@keyframes swapToLeft { from { transform:translateX(0); } to { transform:translateX(-108%); } }
+@keyframes swapToRight { from { transform:translateX(0); } to { transform:translateX(108%); } }
+@keyframes swapToUp { from { transform:translateY(0); } to { transform:translateY(-108%); } }
+@keyframes swapToDown { from { transform:translateY(0); } to { transform:translateY(108%); } }
 .drop1 { animation:drop1 .245s cubic-bezier(.12,.72,.2,1.12); } .drop2 { animation:drop2 .245s cubic-bezier(.12,.72,.2,1.12); } .drop3 { animation:drop3 .245s cubic-bezier(.12,.72,.2,1.12); } .drop4 { animation:drop4 .245s cubic-bezier(.12,.72,.2,1.12); } .drop5 { animation:drop5 .245s cubic-bezier(.12,.72,.2,1.12); } .drop6 { animation:drop6 .245s cubic-bezier(.12,.72,.2,1.12); }
 @keyframes drop1 { from { transform:translateY(-108%); } } @keyframes drop2 { from { transform:translateY(-216%); } } @keyframes drop3 { from { transform:translateY(-324%); } } @keyframes drop4 { from { transform:translateY(-432%); } } @keyframes drop5 { from { transform:translateY(-540%); } } @keyframes drop6 { from { transform:translateY(-648%); } }
 

@@ -139,6 +139,14 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function nextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
+}
+
 function randomOrb(): Orb {
   return ORBS[Math.floor(Math.random() * ORBS.length)]!;
 }
@@ -791,11 +799,23 @@ export default function PuzzleRPGGame() {
     }
 
     setResolutionPhase("swap");
-    setSwapMotion(swapPair ? { a: swapPair[0], b: swapPair[1] } : null);
-    setBoard(nextBoard);
-    if (swapPair) playSfx("swap");
-    await delay(swapPair ? 205 : 120);
-    setSwapMotion(null);
+    if (swapPair) {
+      // Keep the pre-swap board mounted while the two original tiles physically
+      // travel to each other's cells. Only commit the logical swapped board
+      // after the movement finishes, then allow two painted frames to settle
+      // before any clear animation starts. This prevents the old tile identity
+      // from appearing to clear before the swap has visually completed.
+      setSwapMotion({ a: swapPair[0], b: swapPair[1] });
+      playSfx("swap");
+      await delay(205);
+      setSwapMotion(null);
+      setBoard(nextBoard);
+      await nextPaint();
+    } else {
+      setSwapMotion(null);
+      setBoard(nextBoard);
+      await delay(120);
+    }
 
     for (let index = 0; index < plan.frames.length; index += 1) {
       const frame = plan.frames[index]!;
@@ -1035,13 +1055,15 @@ export default function PuzzleRPGGame() {
     const { a, b } = swapMotion;
     let source: Coord | null = null;
     let target: Coord | null = null;
-    if (row === a.row && col === a.col) { source = b; target = a; }
-    else if (row === b.row && col === b.col) { source = a; target = b; }
+    // During the swap phase board still contains the pre-swap orbs, so each
+    // mounted tile moves OUT from its own cell toward the other selected cell.
+    if (row === a.row && col === a.col) { source = a; target = b; }
+    else if (row === b.row && col === b.col) { source = b; target = a; }
     if (!source || !target) return "";
-    if (source.col < target.col) return styles.swapFromLeft;
-    if (source.col > target.col) return styles.swapFromRight;
-    if (source.row < target.row) return styles.swapFromUp;
-    return styles.swapFromDown;
+    if (target.col < source.col) return styles.swapToLeft;
+    if (target.col > source.col) return styles.swapToRight;
+    if (target.row < source.row) return styles.swapToUp;
+    return styles.swapToDown;
   };
 
   return (
