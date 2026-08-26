@@ -26,6 +26,7 @@ jobs:
           git clone --depth 1 --branch main https://github.com/yz4git/sky-dancer.git /tmp/sky-dancer
           rsync -a --delete \
             --exclude='.git/' \
+            --exclude='.github/workflows/' \
             --exclude='.openai/hosting.json' \
             /tmp/sky-dancer/ ./
 
@@ -74,7 +75,6 @@ jobs:
           - React / TypeScript / Vite / Next-compatible build foundation
           - PWA / service worker foundation
           - iPhone Safari向けの既存運用・検証基盤
-          - GitHub Actions CI / WebGL audit foundation
 
           ## Project rules
 
