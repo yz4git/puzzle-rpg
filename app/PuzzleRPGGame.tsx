@@ -9,6 +9,7 @@ type Coord = { row: number; col: number };
 type ColumnQueues = Orb[][];
 type IntentKind = "attack" | "heavy" | "pierce" | "drain" | "disrupt";
 type EnemyKind = "warden" | "bastion" | "oracle" | "null" | "trickster";
+type ResolutionPhase = "idle" | "swap" | "clear" | "drop" | "attack" | "enemy";
 
 type EnemyDefinition = {
   kind: EnemyKind;
@@ -29,6 +30,39 @@ type MoveAnalysis = {
   immediateMoves: number;
   bestSetupScore: number;
   setupHintCells: Set<string>;
+};
+
+type CascadeFrame = {
+  boardBefore: Board;
+  matches: Set<string>;
+  boardAfter: Board;
+  queuesAfter: ColumnQueues;
+  attack: number;
+  heal: number;
+  shield: number;
+  largestAttackRun: number;
+};
+
+type CascadePlan = {
+  frames: CascadeFrame[];
+  finalBoard: Board;
+  finalQueues: ColumnQueues;
+  combo: number;
+  attack: number;
+  heal: number;
+  shield: number;
+  matchedCount: number;
+  largestAttackRun: number;
+};
+
+type EnemyActionResult = {
+  hpAfter: number;
+  shieldAfter: number;
+  enemyHpAfter: number;
+  queuesAfter: ColumnQueues;
+  hpDamage: number;
+  blocked: number;
+  summary: string;
 };
 
 const SIZE = 6;
@@ -60,6 +94,18 @@ const ATTACK_PER_ORB: Record<Orb, number> = {
   heart: 0,
   guard: 0,
 };
+
+const ENEMY_SIGIL: Record<EnemyKind, string> = {
+  warden: "◆",
+  bastion: "▣",
+  oracle: "☿",
+  null: "✧",
+  trickster: "◈",
+};
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 function randomOrb(): Orb {
   return ORBS[Math.floor(Math.random() * ORBS.length)]!;
@@ -189,11 +235,11 @@ function collapse(board: Board, matches: Set<string>, columnQueues: ColumnQueues
   return { board: next, columnQueues: refillColumnQueues(queues) };
 }
 
-function resolveBoard(board: Board, columnQueues: ColumnQueues) {
+function buildCascadePlan(board: Board, columnQueues: ColumnQueues): CascadePlan {
   let next = cloneBoard(board);
   let queues = cloneQueues(columnQueues);
-  let combo = 0;
-  let attack = 0;
+  const frames: CascadeFrame[] = [];
+  let weightedAttack = 0;
   let heal = 0;
   let shield = 0;
   let matchedCount = 0;
@@ -202,33 +248,58 @@ function resolveBoard(board: Board, columnQueues: ColumnQueues) {
   for (let safety = 0; safety < 12; safety += 1) {
     const matches = findMatches(next);
     if (matches.size === 0) break;
-    combo += 1;
+
+    let frameAttack = 0;
+    let frameHeal = 0;
+    let frameShield = 0;
+    const frameLargestAttackRun = maxAttackRun(next);
+    largestAttackRun = Math.max(largestAttackRun, frameLargestAttackRun);
     matchedCount += matches.size;
-    largestAttackRun = Math.max(largestAttackRun, maxAttackRun(next));
 
     for (const key of matches) {
       const [rowText, colText] = key.split(":");
       const row = Number(rowText);
       const col = Number(colText);
       const orb = next[row]![col]!;
-      if (orb === "heart") heal += 4;
-      else if (orb === "guard") shield += 6;
-      else attack += ATTACK_PER_ORB[orb];
+      if (orb === "heart") frameHeal += 4;
+      else if (orb === "guard") frameShield += 6;
+      else frameAttack += ATTACK_PER_ORB[orb];
     }
 
+    // 後段の偶発落ちコンほど攻撃寄与を弱める。NEXTを読んだ意図的な連鎖は
+    // 回復・防御・ゲージ面で十分に価値が残る。
+    const cascadeWeight = safety === 0 ? 1 : safety === 1 ? 0.72 : 0.55;
+    weightedAttack += frameAttack * cascadeWeight;
+    heal += frameHeal;
+    shield += frameShield;
+
     const collapsed = collapse(next, matches, queues);
+    frames.push({
+      boardBefore: cloneBoard(next),
+      matches: new Set(matches),
+      boardAfter: cloneBoard(collapsed.board),
+      queuesAfter: cloneQueues(collapsed.columnQueues),
+      attack: frameAttack,
+      heal: frameHeal,
+      shield: frameShield,
+      largestAttackRun: frameLargestAttackRun,
+    });
     next = collapsed.board;
     queues = collapsed.columnQueues;
   }
 
-  const comboMultiplier = 1 + Math.max(0, combo - 1) * 0.35;
+  const combo = frames.length;
+  const comboMultiplier = 1 + Math.min(0.3, Math.max(0, combo - 1) * 0.15);
+  const resourceMultiplier = 1 + Math.min(0.2, Math.max(0, combo - 1) * 0.1);
+
   return {
-    board: next,
-    columnQueues: refillColumnQueues(queues),
+    frames,
+    finalBoard: next,
+    finalQueues: refillColumnQueues(queues),
     combo,
-    attack: Math.floor(attack * comboMultiplier),
-    heal: Math.floor(heal * comboMultiplier),
-    shield: Math.floor(shield * comboMultiplier),
+    attack: Math.floor(weightedAttack * comboMultiplier),
+    heal: Math.floor(heal * resourceMultiplier),
+    shield: Math.floor(shield * resourceMultiplier),
     matchedCount,
     largestAttackRun,
   };
@@ -298,7 +369,7 @@ function enemyMaxHp(stage: number): number {
   const early = Math.min(stage - 1, 5);
   const mid = Math.max(0, Math.min(stage - 6, 5));
   const late = Math.max(0, stage - 11);
-  return 82 + early * 21 + mid * 16 + late * 21;
+  return 88 + early * 21 + mid * 16 + late * 21;
 }
 
 function enemyBaseAttack(stage: number): number {
@@ -385,6 +456,46 @@ function disruptColumnQueues(queues: ColumnQueues): ColumnQueues {
   return last ? [last, ...next] : next;
 }
 
+function computeEnemyAction(
+  intent: EnemyIntent,
+  maxEnemyHp: number,
+  hpBefore: number,
+  shieldBefore: number,
+  enemyHpBefore: number,
+  queuesBefore: ColumnQueues,
+): EnemyActionResult {
+  let hpAfter = hpBefore;
+  let shieldAfter = shieldBefore;
+  let enemyHpAfter = enemyHpBefore;
+  let queuesAfter = cloneQueues(queuesBefore);
+  let hpDamage = 0;
+  let blocked = 0;
+  let summary = "";
+
+  if (intent.kind === "pierce") {
+    hpDamage = intent.power;
+    hpAfter = Math.max(0, hpBefore - hpDamage);
+    summary = `${intent.label} -${hpDamage} HP`;
+  } else {
+    blocked = Math.min(shieldBefore, intent.power);
+    hpDamage = intent.power - blocked;
+    shieldAfter = shieldBefore - blocked;
+    hpAfter = Math.max(0, hpBefore - hpDamage);
+
+    if (intent.kind === "drain") {
+      enemyHpAfter = Math.min(maxEnemyHp, enemyHpBefore + hpDamage);
+      summary = hpDamage > 0 ? `${intent.label} -${hpDamage} / 敵+${hpDamage}` : `${intent.label} BLOCK`;
+    } else if (intent.kind === "disrupt") {
+      queuesAfter = disruptColumnQueues(queuesBefore);
+      summary = `${intent.label}${hpDamage > 0 ? ` -${hpDamage}` : ""} / NEXT SHIFT`;
+    } else {
+      summary = hpDamage > 0 ? `${intent.label} -${hpDamage}` : `${intent.label} BLOCK`;
+    }
+  }
+
+  return { hpAfter, shieldAfter, enemyHpAfter, queuesAfter, hpDamage, blocked, summary };
+}
+
 function newRun() {
   return {
     board: makeBoard(),
@@ -415,8 +526,13 @@ export default function PuzzleRPGGame() {
   const [xp, setXp] = useState(initial.xp);
   const [gold, setGold] = useState(initial.gold);
   const [combo, setCombo] = useState(0);
-  const [message, setMessage] = useState("INTENTを2手先まで読み、攻撃・防御・SETUPを選ぶ");
+  const [message, setMessage] = useState("INTENTを読み、攻撃・防御・SETUPを選ぶ");
   const [gameOver, setGameOver] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolutionPhase, setResolutionPhase] = useState<ResolutionPhase>("idle");
+  const [clearingCells, setClearingCells] = useState<Set<string>>(new Set());
+  const [combatPop, setCombatPop] = useState("");
+  const [resultChips, setResultChips] = useState<string[]>([]);
 
   const maxEnemyHp = enemyMaxHp(stage);
   const enemy = enemyDefinition(stage);
@@ -427,6 +543,7 @@ export default function PuzzleRPGGame() {
   const analysis = useMemo(() => analyzeBoard(board), [board]);
 
   function reset() {
+    if (isResolving) return;
     const next = newRun();
     setBoard(next.board);
     setColumnQueues(next.columnQueues);
@@ -441,11 +558,15 @@ export default function PuzzleRPGGame() {
     setXp(next.xp);
     setGold(next.gold);
     setCombo(0);
-    setMessage("INTENTを2手先まで読み、攻撃・防御・SETUPを選ぶ");
+    setMessage("INTENTを読み、攻撃・防御・SETUPを選ぶ");
     setGameOver(false);
+    setResolutionPhase("idle");
+    setClearingCells(new Set());
+    setCombatPop("");
+    setResultChips([]);
   }
 
-  function finishEnemyDefeat(currentStage: number, carryMessage: string) {
+  function finishEnemyDefeat(currentStage: number) {
     const nextStage = currentStage + 1;
     const gainedGold = 12 + currentStage * 4;
     const gainedXp = 28 + currentStage * 6;
@@ -454,104 +575,135 @@ export default function PuzzleRPGGame() {
     setEnemyTurn(0);
     setGold((value) => value + gainedGold);
     setXp((value) => value + gainedXp);
-    setMessage(`${carryMessage} / 撃破！ 盤面と列別NEXTを保持 → STAGE ${nextStage}`);
+    setMessage(`STAGE ${currentStage} CLEAR • 盤面/NEXT持ち越し`);
   }
 
-  function runEnemyAction(
-    hpBefore: number,
-    shieldBefore: number,
-    enemyHpBefore: number,
-    queuesBefore: ColumnQueues,
-  ) {
-    let hpAfter = hpBefore;
-    let shieldAfter = shieldBefore;
-    let enemyHpAfter = enemyHpBefore;
-    let queuesAfter = queuesBefore;
-    let summary = "";
-
-    if (intent.kind === "pierce") {
-      hpAfter = Math.max(0, hpBefore - intent.power);
-      summary = `${intent.label} -${intent.power} HP（SHIELD無視）`;
-    } else {
-      const blocked = Math.min(shieldBefore, intent.power);
-      const hpDamage = intent.power - blocked;
-      shieldAfter = shieldBefore - blocked;
-      hpAfter = Math.max(0, hpBefore - hpDamage);
-
-      if (intent.kind === "drain") {
-        enemyHpAfter = Math.min(maxEnemyHp, enemyHpBefore + hpDamage);
-        summary = `${intent.label} -${hpDamage} HP / 敵+${hpDamage}`;
-      } else if (intent.kind === "disrupt") {
-        queuesAfter = disruptColumnQueues(queuesBefore);
-        summary = `${intent.label} -${hpDamage} HP / NEXT列シフト`;
-      } else {
-        summary = `${intent.label} -${hpDamage} HP${blocked > 0 ? ` / ${blocked} BLOCK` : ""}`;
-      }
-    }
-
-    setPlayerHp(hpAfter);
-    setPlayerShield(shieldAfter);
-    setEnemyHp(enemyHpAfter);
-    setColumnQueues(queuesAfter);
-    setEnemyTurn((value) => value + 1);
-
-    return { hpAfter, summary };
-  }
-
-  function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string) {
-    const result = resolveBoard(nextBoard, columnQueues);
-    const isSetupTurn = result.matchedCount === 0;
-    setBoard(result.board);
-    setColumnQueues(result.columnQueues);
+  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string) {
+    if (isResolving || gameOver) return;
+    setIsResolving(true);
     setSelected(null);
     setSkillMode(false);
-    setCombo(result.combo);
+    setResultChips([]);
+    setCombatPop(skillLabel ?? "");
 
-    const skillGain = result.matchedCount * 4 + Math.max(0, result.combo - 1) * 8;
-    setSkill(consumeSkill ? Math.min(100, skillGain) : Math.min(100, skill + skillGain));
+    const plan = buildCascadePlan(nextBoard, columnQueues);
 
-    const healedHp = Math.min(PLAYER_MAX_HP, playerHp + result.heal);
-    const shieldBeforeEnemy = Math.min(PLAYER_MAX_SHIELD, playerShield + result.shield);
+    setResolutionPhase("swap");
+    setBoard(nextBoard);
+    await delay(120);
 
+    for (let index = 0; index < plan.frames.length; index += 1) {
+      const frame = plan.frames[index]!;
+      setBoard(frame.boardBefore);
+      setClearingCells(frame.matches);
+      setCombo(index + 1);
+      setResolutionPhase("clear");
+      await delay(175);
+
+      setClearingCells(new Set());
+      setBoard(frame.boardAfter);
+      setColumnQueues(frame.queuesAfter);
+      setResolutionPhase("drop");
+      await delay(185);
+    }
+
+    if (plan.frames.length === 0) {
+      setBoard(nextBoard);
+      setMessage(skillLabel ? `${skillLabel} • SETUP` : "SETUP • 次の形を作った");
+    }
+
+    const skillGain = Math.min(36, plan.matchedCount * 3 + Math.max(0, plan.combo - 1) * 4);
+    setSkill(consumeSkill ? skillGain : Math.min(100, skill + skillGain));
+
+    const healedHp = Math.min(PLAYER_MAX_HP, playerHp + plan.heal);
+    const shieldBeforeEnemy = Math.min(PLAYER_MAX_SHIELD, playerShield + plan.shield);
     const plateBlocks =
       enemy.kind === "bastion" &&
-      result.attack > 0 &&
-      result.combo === 1 &&
-      result.largestAttackRun === 3;
-    const armorReduction = !plateBlocks && result.attack > 0 ? Math.min(enemy.armor, result.attack) : 0;
-    const actualAttack = plateBlocks ? 0 : Math.max(0, result.attack - armorReduction);
+      plan.attack > 0 &&
+      plan.combo === 1 &&
+      plan.largestAttackRun === 3;
+    const armorReduction = !plateBlocks && plan.attack > 0 ? Math.min(enemy.armor, plan.attack) : 0;
+    const actualAttack = plateBlocks ? 0 : Math.max(0, plan.attack - armorReduction);
     const enemyAfter = Math.max(0, enemyHp - actualAttack);
 
     setPlayerHp(healedHp);
     setPlayerShield(shieldBeforeEnemy);
     setEnemyHp(enemyAfter);
 
-    const prefix = skillLabel ? `${skillLabel} / ` : "";
-    const playerSummary = isSetupTurn
-      ? `${prefix}SETUP：盤面を仕込んだ`
-      : `${prefix}${result.combo} COMBO / ${actualAttack} DMG${plateBlocks ? "（PLATE BLOCK）" : ""}${armorReduction > 0 ? `（ARMOR -${armorReduction}）` : ""}${result.heal > 0 ? ` / +${result.heal} HP` : ""}${result.shield > 0 ? ` / +${result.shield} SHIELD` : ""}`;
+    const chips: string[] = [];
+    if (actualAttack > 0) chips.push(`${actualAttack} DMG`);
+    if (plateBlocks) chips.push("PLATE BLOCK");
+    if (armorReduction > 0) chips.push(`ARMOR -${armorReduction}`);
+    if (plan.heal > 0) chips.push(`+${plan.heal} HP`);
+    if (plan.shield > 0) chips.push(`+${plan.shield} DEF`);
+    if (plan.frames.length === 0) chips.push("SETUP");
+    setResultChips(chips);
+
+    if (actualAttack > 0 || plateBlocks) {
+      setResolutionPhase("attack");
+      setCombatPop(plateBlocks ? "PLATE BLOCK" : `${actualAttack} DMG`);
+      await delay(260);
+    }
 
     if (enemyAfter <= 0) {
-      finishEnemyDefeat(stage, playerSummary);
+      setCombatPop("BREAK!");
+      await delay(250);
+      finishEnemyDefeat(stage);
+      setCombo(0);
+      setClearingCells(new Set());
+      setResolutionPhase("idle");
+      setIsResolving(false);
+      await delay(280);
+      setCombatPop("");
+      setResultChips([]);
       return;
     }
 
-    const enemyResult = runEnemyAction(healedHp, shieldBeforeEnemy, enemyAfter, result.columnQueues);
+    const enemyResult = computeEnemyAction(
+      intent,
+      maxEnemyHp,
+      healedHp,
+      shieldBeforeEnemy,
+      enemyAfter,
+      plan.finalQueues,
+    );
+
+    setResolutionPhase("enemy");
+    setCombatPop(enemyResult.hpDamage > 0 ? `-${enemyResult.hpDamage} HP` : `BLOCK ${enemyResult.blocked}`);
+    await delay(250);
+
+    setPlayerHp(enemyResult.hpAfter);
+    setPlayerShield(enemyResult.shieldAfter);
+    setEnemyHp(enemyResult.enemyHpAfter);
+    setColumnQueues(enemyResult.queuesAfter);
+    setEnemyTurn((value) => value + 1);
+    setMessage(
+      plan.frames.length === 0
+        ? `SETUP • ${enemyResult.summary}`
+        : `${actualAttack > 0 ? `${actualAttack} DMG • ` : ""}${enemyResult.summary}`,
+    );
+
     if (enemyResult.hpAfter <= 0) {
       setGameOver(true);
-      setMessage(`GAME OVER — ${playerSummary} / ${enemyResult.summary}`);
-    } else {
-      setMessage(`${playerSummary} / ${enemyResult.summary}`);
+      setMessage(`GAME OVER • ${enemyResult.summary}`);
     }
+
+    setCombo(0);
+    setClearingCells(new Set());
+    setResolutionPhase("idle");
+    setIsResolving(false);
+    await delay(330);
+    setCombatPop("");
+    setResultChips([]);
   }
 
   function selectCell(row: number, col: number) {
-    if (gameOver) return;
+    if (gameOver || isResolving) return;
     const nextCoord = { row, col };
 
     if (skillMode) {
       setSelected(nextCoord);
-      setMessage("PRISM SHIFT：変換する色を下から選択");
+      setMessage("PRISM SHIFT • 変換色を選択");
       return;
     }
 
@@ -570,25 +722,26 @@ export default function PuzzleRPGGame() {
       return;
     }
 
-    resolveTurn(swapCells(board, selected, nextCoord));
+    void resolveTurn(swapCells(board, selected, nextCoord));
   }
 
   function toggleSkillMode() {
-    if (gameOver || skill < 100) return;
+    if (gameOver || isResolving || skill < 100) return;
     setSkillMode((value) => !value);
     setSelected(null);
-    setMessage(skillMode ? "PRISM SHIFTをキャンセル" : "PRISM SHIFT：盤面の1枚を選択");
+    setMessage(skillMode ? "PRISM SHIFT CANCEL" : "PRISM SHIFT • 変換する1枚を選択");
   }
 
   function castShift(orb: Orb) {
-    if (!skillMode || !selected || skill < 100 || gameOver) return;
+    if (!skillMode || !selected || skill < 100 || gameOver || isResolving) return;
     const transformed = cloneBoard(board);
     const before = transformed[selected.row]![selected.col]!;
     transformed[selected.row]![selected.col] = orb;
-    resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]}`);
+    void resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]}`);
   }
 
-  const setupMode = analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
+  const setupMode = !isResolving && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
+  const enemyVisualClass = `${styles.enemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""} ${resolutionPhase === "attack" ? styles.enemyStruck : ""}`;
 
   return (
     <main className={styles.shell}>
@@ -604,10 +757,14 @@ export default function PuzzleRPGGame() {
       </div>
 
       <section className={styles.enemyCard} aria-label="enemy status">
-        <div className={styles.enemyVisual} aria-hidden="true">
-          <span className={styles.enemyCore}>◆</span>
+        <div className={enemyVisualClass} aria-hidden="true">
+          <span className={styles.enemyAura} />
           <span className={styles.enemyWingLeft} />
           <span className={styles.enemyWingRight} />
+          <span className={styles.enemyAccentLeft} />
+          <span className={styles.enemyAccentRight} />
+          <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span>
+          <span className={styles.enemyBase} />
         </div>
         <div className={styles.enemyInfo}>
           <div className={styles.enemyHeader}>
@@ -643,7 +800,7 @@ export default function PuzzleRPGGame() {
         </div>
       </section>
 
-      <section className={styles.playerStrip} aria-label="player status">
+      <section className={`${styles.playerStrip} ${resolutionPhase === "enemy" ? styles.playerStruck : ""}`} aria-label="player status">
         <div className={styles.playerRow}>
           <span>HP</span><strong>{playerHp}</strong>
           <div className={styles.playerHpTrack}><div className={styles.playerHpFill} style={{ width: `${playerHp}%` }} /></div>
@@ -658,58 +815,69 @@ export default function PuzzleRPGGame() {
         </div>
       </section>
 
-      <section className={styles.nextStrip} aria-label="column next puzzle orbs">
-        <div className={styles.nextHeader}>
-          <strong>COLUMN NEXT</strong>
-          <span>各列に次に落ちる2個</span>
-        </div>
-        <div className={styles.nextColumns}>
-          {columnQueues.map((queue, colIndex) => (
-            <div key={colIndex} className={styles.nextColumn}>
-              <small>{colIndex + 1}</small>
-              <div className={`${styles.nextOrb} ${styles[queue[0]!]}`}>{ORB_LABEL[queue[0]!]}</div>
-              <div className={`${styles.nextOrbBack} ${styles[queue[1]!]}`}>{ORB_LABEL[queue[1]!]}</div>
-              <span>↓</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <section className={styles.puzzleZone} aria-label="puzzle zone">
+        <section className={styles.nextStrip} aria-label="column next puzzle orbs">
+          <div className={styles.nextHeader}>
+            <strong>NEXT ↓</strong>
+            <span>各列 1st / 2nd</span>
+          </div>
+          <div className={styles.nextColumns}>
+            {columnQueues.map((queue, colIndex) => (
+              <div key={colIndex} className={styles.nextColumn} aria-label={`column ${colIndex + 1} next`}>
+                <div className={`${styles.nextOrbBack} ${styles[queue[1]!]}`}>{ORB_LABEL[queue[1]!]}</div>
+                <div className={`${styles.nextOrb} ${styles[queue[0]!]}`}>{ORB_LABEL[queue[0]!]}</div>
+                <span className={styles.dropArrow}>↓</span>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <section className={styles.boardWrap} aria-label="puzzle board">
-        <div className={styles.board}>
-          {board.map((row, rowIndex) => row.map((orb, colIndex) => {
-            const isSelected = selected?.row === rowIndex && selected?.col === colIndex;
-            const setupHint = setupMode && analysis.setupHintCells.has(cellKey(rowIndex, colIndex));
-            return (
-              <button
-                key={`${rowIndex}-${colIndex}`}
-                type="button"
-                className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""}`}
-                aria-label={`${ORB_NAME[orb]} orb row ${rowIndex + 1} column ${colIndex + 1}`}
-                aria-pressed={isSelected}
-                onClick={() => selectCell(rowIndex, colIndex)}
-              >
-                <span>{ORB_LABEL[orb]}</span>
-              </button>
-            );
-          }))}
-        </div>
-        {combo >= 2 ? <div className={styles.combo}>{combo} COMBO!</div> : null}
+        <section className={styles.boardWrap} aria-label="puzzle board">
+          <div className={`${styles.board} ${resolutionPhase === "swap" ? styles.boardSwap : ""} ${resolutionPhase === "drop" ? styles.boardDrop : ""}`}>
+            {board.map((row, rowIndex) => row.map((orb, colIndex) => {
+              const key = cellKey(rowIndex, colIndex);
+              const isSelected = selected?.row === rowIndex && selected?.col === colIndex;
+              const setupHint = setupMode && analysis.setupHintCells.has(key);
+              const isClearing = clearingCells.has(key);
+              return (
+                <button
+                  key={`${rowIndex}-${colIndex}`}
+                  type="button"
+                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""}`}
+                  aria-label={`${ORB_NAME[orb]} orb row ${rowIndex + 1} column ${colIndex + 1}`}
+                  aria-pressed={isSelected}
+                  disabled={isResolving}
+                  onClick={() => selectCell(rowIndex, colIndex)}
+                >
+                  <span>{ORB_LABEL[orb]}</span>
+                </button>
+              );
+            }))}
+          </div>
+
+          {combo >= 2 ? <div className={styles.combo} key={`combo-${combo}`}>{combo} COMBO!</div> : null}
+          {combatPop ? <div className={`${styles.combatPop} ${resolutionPhase === "enemy" ? styles.combatPopEnemy : ""}`} key={combatPop}>{combatPop}</div> : null}
+          {resultChips.length > 0 ? (
+            <div className={styles.resultChips}>
+              {resultChips.map((chip) => <span key={chip}>{chip}</span>)}
+            </div>
+          ) : null}
+        </section>
       </section>
 
       <div className={`${styles.ruleHint} ${setupMode ? styles.setupAlert : ""}`}>
         {setupMode
-          ? `今すぐ消せる手なし → 点滅枠が有力SETUP（次手候補 最大${analysis.bestSetupScore}）`
-          : `今すぐ消せる交換 ${analysis.immediateMoves}手 • 消えない交換も1ターン • ⬢×3でSHIELD`}
+          ? `消せる手なし → 点滅枠が有力SETUP（次手 最大${analysis.bestSetupScore}候補）`
+          : `消せる交換 ${analysis.immediateMoves} • 消えない交換も1ターン • ⬢×3でDEF`}
       </div>
       <div className={styles.message} role="status">{message}</div>
 
       {skillMode ? (
         <section className={styles.skillPalette} aria-label="Prism Shift color selection">
-          <span>{selected ? "変換色を選択" : "変換する1枚を選択"}</span>
+          <span>{selected ? "変換色" : "1枚選択"}</span>
           <div>
             {ORBS.map((orb) => (
-              <button key={orb} type="button" className={styles[orb]} disabled={!selected} onClick={() => castShift(orb)}>
+              <button key={orb} type="button" className={styles[orb]} disabled={!selected || isResolving} onClick={() => castShift(orb)}>
                 {ORB_LABEL[orb]}
               </button>
             ))}
@@ -722,12 +890,12 @@ export default function PuzzleRPGGame() {
           type="button"
           className={`${styles.skillButton} ${skill >= 100 ? styles.skillReady : ""}`}
           onClick={toggleSkillMode}
-          disabled={skill < 100 || gameOver}
+          disabled={skill < 100 || gameOver || isResolving}
         >
           <span className={styles.skillTitle}>PRISM SHIFT</span>
           <span className={styles.skillGauge}>{skill >= 100 ? (skillMode ? "CANCEL" : "READY") : `${skill}%`}</span>
         </button>
-        <button type="button" className={styles.resetButton} onClick={reset}>
+        <button type="button" className={styles.resetButton} onClick={reset} disabled={isResolving}>
           {gameOver ? "RETRY" : "RESET"}
         </button>
       </section>
