@@ -1,0 +1,159 @@
+/* Latest Cart Rogue mobile viewport/HUD repair, kept intact for the Sky Dancer fork.
+ * Sky Dancer changes only the accessible game label; gameplay/UI geometry remains Cart Rogue compatible.
+ */
+
+main:has(> section[aria-label="Cart Rogue game"]),
+main:has(> section[aria-label="Sky Dancer game"]) {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: var(--cart-visual-viewport-height, 100lvh) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+section[aria-label="Cart Rogue game"],
+section[aria-label="Sky Dancer game"] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+section[aria-label="Cart Rogue game"] > div:first-child,
+section[aria-label="Sky Dancer game"] > div:first-child,
+section[aria-label="Cart Rogue game"] canvas.cart-rogue-canvas,
+section[aria-label="Sky Dancer game"] canvas.cart-rogue-canvas {
+  max-height: 100% !important;
+}
+
+[aria-label="Turbo Hunt status"] {
+  top: max(5px, env(safe-area-inset-top)) !important;
+  left: 50% !important;
+  right: auto !important;
+  width: min(calc(100% - 32px), 680px) !important;
+  transform: translateX(-50%) !important;
+  grid-template-columns: minmax(104px, .68fr) minmax(250px, 1.75fr) minmax(108px, .7fr) !important;
+  gap: 5px !important;
+  align-items: start !important;
+}
+
+[aria-label="Turbo Hunt status"] > div {
+  min-height: 0 !important;
+  border-radius: 7px !important;
+  background: linear-gradient(180deg, rgba(20, 42, 54, .7), rgba(14, 28, 39, .58)) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child,
+[aria-label="Turbo Hunt status"] > div:last-child {
+  padding: 4px 7px 5px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) {
+  padding: 4px 7px 5px !important;
+  gap: 1px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child > span:first-child {
+  display: none !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child > strong {
+  margin-top: 0 !important;
+  font-size: clamp(12px, 1.55vw, 17px) !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:first-child > span:last-child {
+  margin-top: 1px !important;
+  overflow: hidden !important;
+  font-size: 7px !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child span,
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child strong,
+[aria-label="Turbo Hunt status"] > div:last-child span,
+[aria-label="Turbo Hunt status"] > div:last-child strong {
+  font-size: 7px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(n+2):not(:last-child) {
+  min-height: 11px !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+  font-size: 6.5px !important;
+  line-height: 1.05 !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2):has(> div:nth-child(5)) > div:nth-child(3) {
+  display: none !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:first-child,
+[aria-label="Turbo Hunt status"] > div:last-child > div:nth-child(2) {
+  height: 3px !important;
+}
+
+[aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:last-child {
+  font-size: 6.5px !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  [aria-label="Turbo Hunt status"] {
+    top: max(3px, env(safe-area-inset-top)) !important;
+    width: min(calc(100% - 64px), 580px) !important;
+    grid-template-columns: 82px minmax(220px, 1fr) 88px !important;
+    gap: 4px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:first-child,
+  [aria-label="Turbo Hunt status"] > div:last-child {
+    padding: 3px 5px 4px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:first-child > strong {
+    font-size: 11px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:first-child > span:last-child {
+    margin-top: 1px !important;
+    font-size: 6px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) {
+    padding: 3px 5px 3px !important;
+    gap: 1px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(2),
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:last-child {
+    display: none !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child span,
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:first-child strong,
+  [aria-label="Turbo Hunt status"] > div:last-child span,
+  [aria-label="Turbo Hunt status"] > div:last-child strong {
+    font-size: 6px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:nth-child(n+3):not(:last-child) {
+    min-height: 10px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 6px !important;
+  }
+
+  [aria-label="Turbo Hunt status"] > div:nth-child(2) > div:last-child > div:first-child,
+  [aria-label="Turbo Hunt status"] > div:last-child > div:nth-child(2) {
+    height: 2px !important;
+  }
+}

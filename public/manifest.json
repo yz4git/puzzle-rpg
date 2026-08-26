@@ -1,0 +1,24 @@
+{
+  "id": "./",
+  "name": "Puzzle RPG",
+  "short_name": "Puzzle RPG",
+  "start_url": "./",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "portrait",
+  "background_color": "#07152d",
+  "theme_color": "#07152d",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "scope": "./",
+  "description": "A portrait puzzle RPG designed for iPhone."
+}

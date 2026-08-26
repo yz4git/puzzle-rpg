@@ -1,0 +1,50 @@
+{
+  "name": "puzzle-rpg",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "install:ci": "bash scripts/install-ci.sh",
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
+    "build": "bash scripts/build-verified.sh",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "test:rules": "node --import tsx --test tests/sky-rules.test.ts tests/sky-v22.test.ts tests/sky-v26.test.ts tests/sky-v27.test.ts tests/sky-v28.test.ts tests/sky-v29.test.ts tests/sky-v30.test.ts tests/sky-v31.test.ts tests/sky-v32.test.ts tests/sky-v33.test.ts tests/sky-v34.test.ts tests/sky-v35.test.ts tests/sky-v36-v39.test.ts tests/sky-v40.test.ts tests/sky-v42.test.ts",
+    "test:pwa": "node --test tests/pwa-cache.test.mjs tests/startup-safety.test.mjs",
+    "test:pages": "npm run build:pages && node --test tests/rendered-html.test.mjs",
+    "test": "npm run test:rules && npm run test:pwa && npm run test:pages",
+    "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern out --ignore-pattern .next --ignore-pattern .vinext --ignore-pattern .wrangler --ignore-pattern .sites-runtime",
+    "validate:artifact": "bash scripts/validate-artifact.sh",
+    "build:pages": "bash scripts/build-pages.sh",
+    "verify": "npm test && npm run lint && npm run validate:artifact"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "^0.185.4",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "^0.5.26",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "react-server-dom-webpack": "^19.2.6",
+    "tailwindcss": "4.2.1",
+    "tsx": "4.22.1",
+    "typescript": "5.9.3",
+    "vinext": "0.0.50",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "type": "module",
+  "displayName": "Puzzle RPG"
+}
