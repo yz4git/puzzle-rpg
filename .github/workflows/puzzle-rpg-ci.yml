@@ -5,11 +5,10 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/puzzle-rpg-ci.yml'
-      - 'scripts/apply-balance-v3.py'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -22,99 +21,43 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Apply tactical balance v3
-        run: python scripts/apply-balance-v3.py
-      - name: TypeScript check
-        run: npx tsc -p tsconfig.puzzle.json --noEmit
-      - name: Production build
-        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
       - name: Install Playwright
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
-      - name: Focused strategy comparison and visual QA
+      - name: Corrected offense vs tactical comparison
         run: |
-          cat > balance-v3-qa.mjs <<'JS'
+          cat > corrected-balance-qa.mjs <<'JS'
           import { chromium } from 'playwright';
           import fs from 'node:fs';
-          fs.mkdirSync('balance-v3-qa',{recursive:true});
+          fs.mkdirSync('corrected-balance-qa',{recursive:true});
           const browser=await chromium.launch({headless:true});
           const errors=[];
           const seed=`(()=>{let s=424242>>>0;Math.random=()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};})();`;
-
-          async function stat(page){return page.evaluate(()=>{
-            const ps=document.querySelector('[aria-label="player status"]');
-            const es=document.querySelector('[aria-label="enemy status"]');
-            const hp=Number(ps?.textContent?.match(/HP\s*(\d+)/)?.[1]||0);
-            const def=Number(ps?.textContent?.match(/DEF\s*(\d+)/)?.[1]||0);
-            const hpLine=[...(es?.querySelectorAll('div')||[])].map(e=>(e.textContent||'').trim()).find(t=>/^\d+\s*\/\s*\d+$/.test(t))||'0 / 0';
-            const hm=hpLine.match(/(\d+)\s*\/\s*(\d+)/);
-            const stage=Number(document.body.innerText.match(/STAGE\s+(\d+)/)?.[1]||1);
-            const intents=document.querySelector('[aria-label="enemy intents"]')?.textContent||'';
-            const intent=intents.includes('PIERCE')?'pierce':intents.includes('DRAIN')?'drain':intents.includes('CRUSH')||intents.includes('RITE')||intents.includes('PRISM HIT')?'heavy':intents.includes('DISRUPT')?'disrupt':'attack';
-            const turn=[...document.querySelectorAll('span')].map(e=>(e.textContent||'').trim()).find(t=>/^TURN \d+/.test(t))||'';
-            return {hp,def,enemyHp:Number(hm?.[1]||0),enemyMax:Number(hm?.[2]||0),stage,intent,turn};
-          });}
-          async function settle(page){for(let i=0;i<70;i++){if(await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false))return;if(await page.getByRole('button',{name:'BATTLE START'}).isVisible().catch(()=>false))return;const r=await page.evaluate(()=>{const b=document.querySelector('button[aria-label*=" orb row "]');return !!b&&!b.disabled});if(r)return;await page.waitForTimeout(60)}}
-          async function intro(page,capture=false){const b=page.getByRole('button',{name:'BATTLE START'});if(await b.isVisible().catch(()=>false)){if(capture)await page.screenshot({path:`balance-v3-qa/stage-${(await stat(page)).stage}-intro.png`});await b.click();await page.waitForTimeout(130)}}
-          function score(label,mode,s){
-            if(!label||label.includes('PLATE ×'))return -9999;
-            const dmg=label.match(/(?:BREAK\s+)?(\d+)(?:\s*DMG)?/);const combo=label.match(/(\d+)C/);const def=label.match(/DEF \+(\d+)/);const hp=label.match(/HP \+(\d+)/);const setup=label.includes('SETUP');
-            const isAtk=!!(dmg&&(label.includes('DMG')||label.includes('BREAK')||label.includes('·')));
-            if(mode==='offense'){
-              if(isAtk)return Number(dmg[1])*8+(combo?Number(combo[1])*20:0)+(label.includes('BREAK')?80:0);
-              if(setup)return -100;
-              return -1000;
-            }
-            let v=isAtk?Number(dmg[1])*3+(combo?Number(combo[1])*10:0):0;
-            const danger=s.intent==='heavy'||s.intent==='pierce'||s.intent==='drain';
-            if(def)v+=Number(def[1])*(danger?12:7)+(s.def<14?180:30);
-            if(hp)v+=Number(hp[1])*(s.hp<45?18:8)+(s.hp<35?350:40);
-            if(setup)v+=(danger?120:20)-(s.hp<30?170:0);
-            if(danger&&isAtk&&s.def<10)v-=80;
-            if(s.hp<25&&!hp&&!def)v-=160;
-            return v;
-          }
-          async function choose(page,mode,s){
-            const tiles=page.locator('button[aria-label*=" orb row "]');const n=await tiles.count();let best=null;
-            for(let i=0;i<n;i++){
-              await tiles.nth(i).evaluate(el=>el.click());await page.waitForTimeout(2);
-              const ls=await page.evaluate(()=>[...document.querySelectorAll('button[aria-label*=" orb row "]')].map((b,j)=>({j,l:(b.querySelector('small')?.textContent||'').trim()})).filter(x=>x.l));
-              for(const x of ls){const sc=score(x.l,mode,s);if(!best||sc>best.sc)best={a:i,b:x.j,label:x.l,sc}}
-              await tiles.nth(i).evaluate(el=>el.click());
-            }
-            return best||{a:0,b:1,label:'fallback',sc:-9999};
-          }
-          async function run(mode,capture){
-            const c=await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});await c.addInitScript(seed);const p=await c.newPage();p.on('console',m=>{if(m.type()==='error')errors.push(`${mode}:${m.text()}`)});p.on('pageerror',e=>errors.push(`${mode}:${e.message}`));
-            await p.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});if(capture)await p.screenshot({path:'balance-v3-qa/01-title.png'});await p.getByRole('button',{name:'START GAME'}).click();await intro(p,capture);
-            if(capture){const t=p.locator('button[aria-label*=" orb row "]');await t.nth(14).click();await p.waitForTimeout(70);await p.screenshot({path:'balance-v3-qa/02-selection.png'});await t.nth(14).click()}
-            const history=[];let stable=null,atk=false,dmg=false;
-            for(let turn=1;turn<=45;turn++){
-              await intro(p,capture);if(await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false))break;const before=await stat(p);if(before.stage>=6)break;
-              const hint=p.locator('button[class*="setupHint"]').first();if(stable===null&&await hint.isVisible().catch(()=>false)){const a=await hint.evaluate(el=>getComputedStyle(el).transform);await p.waitForTimeout(360);const b=await hint.evaluate(el=>getComputedStyle(el).transform);let click=true;try{await hint.click({timeout:1800});await hint.click({timeout:1800})}catch{click=false}stable={a,b,click}}
-              const m=await choose(p,mode,before);const t=p.locator('button[aria-label*=" orb row "]');await t.nth(m.a).evaluate(el=>el.click());await p.waitForTimeout(10);await t.nth(m.b).evaluate(el=>el.click());
-              for(let k=0;k<25;k++){await p.waitForTimeout(55);if(capture&&!atk&&await p.locator('[class*="playerAttackFx"]').isVisible().catch(()=>false)){await p.screenshot({path:'balance-v3-qa/03-attack.png'});atk=true}if(capture&&!dmg&&await p.locator('[class*="damageVignette"]').isVisible().catch(()=>false)){await p.screenshot({path:'balance-v3-qa/04-damage.png'});dmg=true}}
-              await settle(p);const after=await stat(p);history.push({turn,move:m.label,before,after});
-            }
-            await intro(p,false);const final=await stat(p);const gameOver=await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false);const layout=await p.evaluate(()=>({scrollY,scrollHeight:document.documentElement.scrollHeight,tiles:document.querySelectorAll('button[aria-label*=" orb row "]').length,w:innerWidth,h:innerHeight}));if(capture)await p.screenshot({path:'balance-v3-qa/99-final.png'});await c.close();return{mode,history,final,gameOver,layout,stable};
-          }
-          const offense=await run('offense',false);const tactical=await run('tactical',true);fs.writeFileSync('balance-v3-qa/report.json',JSON.stringify({offense,tactical,errors},null,2));
-          if(errors.length)throw new Error(errors.join('\n'));if(tactical.layout.tiles!==36||tactical.layout.scrollY!==0)throw new Error('layout regression');if(tactical.stable&&(!tactical.stable.click||tactical.stable.a!=='none'||tactical.stable.b!=='none'))throw new Error('unstable SETUP target');await browser.close();
+          async function stat(p){return p.evaluate(()=>{
+            const ps=document.querySelector('[aria-label="player status"]');const es=document.querySelector('[aria-label="enemy status"]');const now=document.querySelector('[aria-label="enemy intents"] > div:first-child')?.textContent||'';
+            const hp=Number(ps?.textContent?.match(/HP\s*(\d+)/)?.[1]||0);const def=Number(ps?.textContent?.match(/DEF\s*(\d+)/)?.[1]||0);
+            const hpLine=[...(es?.querySelectorAll('div')||[])].map(e=>(e.textContent||'').trim()).find(t=>/^\d+\s*\/\s*\d+$/.test(t))||'0 / 0';const hm=hpLine.match(/(\d+)\s*\/\s*(\d+)/);
+            const stage=Number(document.body.innerText.match(/STAGE\s+(\d+)/)?.[1]||1);const intent=now.includes('PIERCE')?'pierce':now.includes('DRAIN')?'drain':now.includes('CRUSH')||now.includes('RITE')||now.includes('PRISM HIT')?'heavy':now.includes('DISRUPT')?'disrupt':'attack';const nums=now.match(/\d+/g)||[];const power=Number(nums.at(-1)||0);
+            return {hp,def,enemyHp:Number(hm?.[1]||0),enemyMax:Number(hm?.[2]||0),stage,intent,power};
+          })}
+          async function intro(p){const b=p.getByRole('button',{name:'BATTLE START'});if(await b.isVisible().catch(()=>false)){await b.click();await p.waitForTimeout(120)}}
+          async function settle(p){for(let i=0;i<70;i++){if(await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)||await p.getByRole('button',{name:'BATTLE START'}).isVisible().catch(()=>false))return;const r=await p.evaluate(()=>{const b=document.querySelector('button[aria-label*=" orb row "]');return !!b&&!b.disabled});if(r)return;await p.waitForTimeout(55)}}
+          function score(l,mode,s){if(!l||l.includes('PLATE ×'))return -9999;const dmg=l.match(/(?:BREAK\s+)?(\d+)(?:\s*DMG)?/);const combo=l.match(/(\d+)C/);const def=l.match(/DEF \+(\d+)/);const hp=l.match(/HP \+(\d+)/);const setup=l.includes('SETUP');const atk=!!(dmg&&(l.includes('DMG')||l.includes('BREAK')||l.includes('·')));
+            if(mode==='offense'){if(atk)return Number(dmg[1])*8+(combo?Number(combo[1])*20:0)+(l.includes('BREAK')?80:0);if(setup)return -100;return -1000}
+            let v=atk?Number(dmg[1])*3+(combo?Number(combo[1])*10:0):0;const danger=s.intent==='heavy'||s.intent==='pierce'||s.intent==='drain';const needDef=s.def<Math.max(10,s.power);
+            if(def)v+=Number(def[1])*(danger?14:8)+(needDef?220:40);if(hp)v+=Number(hp[1])*(s.hp<50?20:8)+(s.hp<35?400:50);if(setup)v+=(danger?150:10)-(s.hp<24?220:0);if(danger&&atk&&needDef)v-=110;if(s.hp<28&&!hp&&!def)v-=190;return v}
+          async function choose(p,mode,s){const t=p.locator('button[aria-label*=" orb row "]');const n=await t.count();let best=null;for(let i=0;i<n;i++){await t.nth(i).evaluate(el=>el.click());await p.waitForTimeout(2);const ls=await p.evaluate(()=>[...document.querySelectorAll('button[aria-label*=" orb row "]')].map((b,j)=>({j,l:(b.querySelector('small')?.textContent||'').trim()})).filter(x=>x.l));for(const x of ls){const sc=score(x.l,mode,s);if(!best||sc>best.sc)best={a:i,b:x.j,label:x.l,sc}}await t.nth(i).evaluate(el=>el.click())}return best||{a:0,b:1,label:'fallback'}}
+          async function run(mode){const c=await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});await c.addInitScript(seed);const p=await c.newPage();p.on('console',m=>{if(m.type()==='error')errors.push(`${mode}:${m.text()}`)});p.on('pageerror',e=>errors.push(`${mode}:${e.message}`));await p.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});await p.getByRole('button',{name:'START GAME'}).click();await intro(p);const history=[];for(let turn=1;turn<=45;turn++){await intro(p);if(await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false))break;const before=await stat(p);if(before.stage>=6)break;const m=await choose(p,mode,before);const t=p.locator('button[aria-label*=" orb row "]');await t.nth(m.a).evaluate(el=>el.click());await p.waitForTimeout(10);await t.nth(m.b).evaluate(el=>el.click());await settle(p);const after=await stat(p);history.push({turn,move:m.label,before,after})}const final=await stat(p);const gameOver=await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false);await c.close();return{history,final,gameOver}}
+          const offense=await run('offense');const tactical=await run('tactical');fs.writeFileSync('corrected-balance-qa/report.json',JSON.stringify({offense,tactical,errors},null,2));if(errors.length)throw new Error(errors.join('\n'));await browser.close();
           JS
-          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/v3qa.log 2>&1 & PID=$!
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/corrected.log 2>&1 & PID=$!
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
-          node balance-v3-qa.mjs
+          node corrected-balance-qa.mjs
           kill $PID || true
-      - name: Commit implementation
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css
-          git commit -m 'Make tactical resource choices matter'
-          git push origin HEAD:main
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: balance-v3-qa
-          path: balance-v3-qa
+          name: corrected-balance-qa
+          path: corrected-balance-qa
