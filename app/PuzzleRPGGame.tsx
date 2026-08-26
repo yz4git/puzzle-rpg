@@ -14,6 +14,13 @@ type IntentKind = "attack" | "heavy" | "pierce" | "drain" | "disrupt";
 type EnemyKind = "warden" | "bastion" | "oracle" | "null" | "trickster";
 type ResolutionPhase = "idle" | "swap" | "clear" | "drop" | "attack" | "enemy" | "victory";
 type SwapMotion = { a: Coord; b: Coord } | null;
+type DropSprite = {
+  id: string;
+  orb: Orb;
+  col: number;
+  fromRow: number;
+  toRow: number;
+};
 type StageClearState = { stage: number; gold: number; xp: number } | null;
 
 type EnemyDefinition = {
@@ -195,6 +202,44 @@ function makeBoard(): Board {
 
 function cellKey(row: number, col: number): string {
   return `${row}:${col}`;
+}
+
+function buildDropVisuals(frame: CascadeFrame): { sprites: DropSprite[]; hiddenCells: Set<string> } {
+  const sprites: DropSprite[] = [];
+  const hiddenCells = new Set<string>(frame.matches);
+
+  for (let col = 0; col < SIZE; col += 1) {
+    const survivorRows: number[] = [];
+    for (let row = 0; row < SIZE; row += 1) {
+      if (!frame.matches.has(cellKey(row, col))) survivorRows.push(row);
+    }
+
+    const holes = SIZE - survivorRows.length;
+    survivorRows.forEach((fromRow, index) => {
+      const toRow = holes + index;
+      if (fromRow === toRow) return;
+      hiddenCells.add(cellKey(fromRow, col));
+      sprites.push({
+        id: `survivor-${col}-${fromRow}-${toRow}`,
+        orb: frame.boardBefore[fromRow]![col]!,
+        col,
+        fromRow,
+        toRow,
+      });
+    });
+
+    for (let toRow = 0; toRow < holes; toRow += 1) {
+      sprites.push({
+        id: `incoming-${col}-${toRow}`,
+        orb: frame.boardAfter[toRow]![col]!,
+        col,
+        fromRow: toRow - holes,
+        toRow,
+      });
+    }
+  }
+
+  return { sprites, hiddenCells };
 }
 
 function findMatches(board: Board): Set<string> {
@@ -706,7 +751,8 @@ export default function PuzzleRPGGame() {
   const [combatPop, setCombatPop] = useState("");
   const [resultChips, setResultChips] = useState<string[]>([]);
   const [swapMotion, setSwapMotion] = useState<SwapMotion>(null);
-  const [dropMotion, setDropMotion] = useState<Map<string, number>>(new Map());
+  const [dropSprites, setDropSprites] = useState<DropSprite[]>([]);
+  const [dropHiddenCells, setDropHiddenCells] = useState<Set<string>>(new Set());
   const [stageIntro, setStageIntro] = useState(true);
   const [stageClear, setStageClear] = useState<StageClearState>(null);
   const [showTitle, setShowTitle] = useState(true);
@@ -747,7 +793,8 @@ export default function PuzzleRPGGame() {
     setCombatPop("");
     setResultChips([]);
     setSwapMotion(null);
-    setDropMotion(new Map());
+    setDropSprites([]);
+    setDropHiddenCells(new Set());
     setStageIntro(true);
     setStageClear(null);
     setDamageTaken(0);
@@ -833,14 +880,23 @@ export default function PuzzleRPGGame() {
       if (index > 0) playSfx("cascade");
       await delay(175);
 
+      // Do not commit the final board before the fall. Keep the cleared holes
+      // visually empty and animate the actual surviving/incoming orb identities
+      // into their destinations. Only after they land do board + NEXT advance.
+      const dropVisuals = buildDropVisuals(frame);
+      setDropHiddenCells(dropVisuals.hiddenCells);
+      setDropSprites(dropVisuals.sprites);
       setClearingCells(new Set());
-      setDropMotion(computeDropDistances(frame.matches));
-      setBoard(frame.boardAfter);
-      setColumnQueues(frame.queuesAfter);
       setResolutionPhase("drop");
+      await nextPaint();
       playSfx("drop");
       await delay(245);
-      setDropMotion(new Map());
+
+      setBoard(frame.boardAfter);
+      setColumnQueues(frame.queuesAfter);
+      setDropHiddenCells(new Set());
+      await nextPaint();
+      setDropSprites([]);
     }
 
     if (plan.frames.length === 0) {
@@ -1186,13 +1242,12 @@ export default function PuzzleRPGGame() {
               const setupHint = setupMode && analysis.setupHintCells.has(key);
               const isClearing = clearingCells.has(key);
               const swapClass = swapClassFor(rowIndex, colIndex);
-              const dropDistance = dropMotion.get(key) ?? 0;
-              const dropClass = dropDistance > 0 ? styles[`drop${dropDistance}`] : "";
+              const isDropHidden = dropHiddenCells.has(key);
               return (
                 <button
                   key={`${rowIndex}-${colIndex}`}
                   type="button"
-                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${isAdjacentChoice ? styles.adjacentChoice : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""} ${swapClass} ${dropClass}`}
+                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${isAdjacentChoice ? styles.adjacentChoice : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""} ${swapClass} ${isDropHidden ? styles.dropHidden : ""}`}
                   aria-label={`${ORB_NAME[orb]} orb row ${rowIndex + 1} column ${colIndex + 1}`}
                   aria-pressed={isSelected}
                   disabled={isResolving}
@@ -1211,6 +1266,29 @@ export default function PuzzleRPGGame() {
               );
             }))}
           </div>
+
+          {dropSprites.length > 0 ? (
+            <div className={styles.dropLayer} aria-hidden="true">
+              {dropSprites.map((sprite) => (
+                <div
+                  key={sprite.id}
+                  className={`${styles.tile} ${styles.dropSprite} ${styles[sprite.orb]}`}
+                  style={{
+                    gridColumn: sprite.col + 1,
+                    gridRow: sprite.toRow + 1,
+                    "--drop-offset": `${-(sprite.toRow - sprite.fromRow) * 108}%`,
+                  } as CSSProperties}
+                >
+                  <img
+                    className={styles.tileIcon}
+                    src={PIXEL_ART_ASSETS.orbs[sprite.orb]}
+                    alt=""
+                    draggable={false}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {combo >= 2 ? <div className={styles.combo} key={`combo-${combo}`}>{combo} COMBO!</div> : null}
           {combatPop ? <div className={`${styles.combatPop} ${resolutionPhase === "enemy" ? styles.combatPopEnemy : ""}`} key={combatPop}>{combatPop}</div> : null}

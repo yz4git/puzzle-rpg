@@ -698,8 +698,30 @@
 @keyframes swapToRight { from { transform:translateX(0); } to { transform:translateX(108%); } }
 @keyframes swapToUp { from { transform:translateY(0); } to { transform:translateY(-108%); } }
 @keyframes swapToDown { from { transform:translateY(0); } to { transform:translateY(108%); } }
-.drop1 { animation:drop1 .245s cubic-bezier(.12,.72,.2,1.12); } .drop2 { animation:drop2 .245s cubic-bezier(.12,.72,.2,1.12); } .drop3 { animation:drop3 .245s cubic-bezier(.12,.72,.2,1.12); } .drop4 { animation:drop4 .245s cubic-bezier(.12,.72,.2,1.12); } .drop5 { animation:drop5 .245s cubic-bezier(.12,.72,.2,1.12); } .drop6 { animation:drop6 .245s cubic-bezier(.12,.72,.2,1.12); }
-@keyframes drop1 { from { transform:translateY(-108%); } } @keyframes drop2 { from { transform:translateY(-216%); } } @keyframes drop3 { from { transform:translateY(-324%); } } @keyframes drop4 { from { transform:translateY(-432%); } } @keyframes drop5 { from { transform:translateY(-540%); } } @keyframes drop6 { from { transform:translateY(-648%); } }
+.dropHidden { visibility: hidden; }
+.dropLayer {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  gap: var(--board-gap);
+  padding: var(--board-pad);
+  pointer-events: none;
+  overflow: visible;
+}
+.dropSprite {
+  min-width: 0;
+  min-height: 0;
+  z-index: 7;
+  animation: dropSpriteLand .245s cubic-bezier(.12,.72,.2,1.05) both;
+  will-change: transform;
+}
+@keyframes dropSpriteLand {
+  from { transform: translateY(var(--drop-offset)); }
+  to { transform: translateY(0); }
+}
 
 .clearing { overflow:visible; animation:orbBurst .175s ease-out forwards; }
 .clearing::before,.clearing::after { content:""; position:absolute; z-index:8; inset:18%; border-radius:50%; pointer-events:none; }
