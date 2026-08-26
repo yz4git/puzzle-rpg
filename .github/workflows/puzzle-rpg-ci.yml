@@ -3,8 +3,7 @@ name: Puzzle RPG CI
 on:
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/puzzle-rpg-ci.yml'
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -13,51 +12,17 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npx tsc -p tsconfig.puzzle.json --noEmit
-      - name: Install Playwright
-        run: |
-          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
-          npx playwright install --with-deps chromium
-      - name: Corrected offense vs tactical comparison
-        run: |
-          cat > corrected-balance-qa.mjs <<'JS'
-          import { chromium } from 'playwright';
-          import fs from 'node:fs';
-          fs.mkdirSync('corrected-balance-qa',{recursive:true});
-          const browser=await chromium.launch({headless:true});
-          const errors=[];
-          const seed=`(()=>{let s=424242>>>0;Math.random=()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};})();`;
-          async function stat(p){return p.evaluate(()=>{
-            const ps=document.querySelector('[aria-label="player status"]');const es=document.querySelector('[aria-label="enemy status"]');const now=document.querySelector('[aria-label="enemy intents"] > div:first-child')?.textContent||'';
-            const hp=Number(ps?.textContent?.match(/HP\s*(\d+)/)?.[1]||0);const def=Number(ps?.textContent?.match(/DEF\s*(\d+)/)?.[1]||0);
-            const hpLine=[...(es?.querySelectorAll('div')||[])].map(e=>(e.textContent||'').trim()).find(t=>/^\d+\s*\/\s*\d+$/.test(t))||'0 / 0';const hm=hpLine.match(/(\d+)\s*\/\s*(\d+)/);
-            const stage=Number(document.body.innerText.match(/STAGE\s+(\d+)/)?.[1]||1);const intent=now.includes('PIERCE')?'pierce':now.includes('DRAIN')?'drain':now.includes('CRUSH')||now.includes('RITE')||now.includes('PRISM HIT')?'heavy':now.includes('DISRUPT')?'disrupt':'attack';const nums=now.match(/\d+/g)||[];const power=Number(nums.at(-1)||0);
-            return {hp,def,enemyHp:Number(hm?.[1]||0),enemyMax:Number(hm?.[2]||0),stage,intent,power};
-          })}
-          async function intro(p){const b=p.getByRole('button',{name:'BATTLE START'});if(await b.isVisible().catch(()=>false)){await b.click();await p.waitForTimeout(120)}}
-          async function settle(p){for(let i=0;i<70;i++){if(await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)||await p.getByRole('button',{name:'BATTLE START'}).isVisible().catch(()=>false))return;const r=await p.evaluate(()=>{const b=document.querySelector('button[aria-label*=" orb row "]');return !!b&&!b.disabled});if(r)return;await p.waitForTimeout(55)}}
-          function score(l,mode,s){if(!l||l.includes('PLATE ×'))return -9999;const dmg=l.match(/(?:BREAK\s+)?(\d+)(?:\s*DMG)?/);const combo=l.match(/(\d+)C/);const def=l.match(/DEF \+(\d+)/);const hp=l.match(/HP \+(\d+)/);const setup=l.includes('SETUP');const atk=!!(dmg&&(l.includes('DMG')||l.includes('BREAK')||l.includes('·')));
-            if(mode==='offense'){if(atk)return Number(dmg[1])*8+(combo?Number(combo[1])*20:0)+(l.includes('BREAK')?80:0);if(setup)return -100;return -1000}
-            let v=atk?Number(dmg[1])*3+(combo?Number(combo[1])*10:0):0;const danger=s.intent==='heavy'||s.intent==='pierce'||s.intent==='drain';const needDef=s.def<Math.max(10,s.power);
-            if(def)v+=Number(def[1])*(danger?14:8)+(needDef?220:40);if(hp)v+=Number(hp[1])*(s.hp<50?20:8)+(s.hp<35?400:50);if(setup)v+=(danger?150:10)-(s.hp<24?220:0);if(danger&&atk&&needDef)v-=110;if(s.hp<28&&!hp&&!def)v-=190;return v}
-          async function choose(p,mode,s){const t=p.locator('button[aria-label*=" orb row "]');const n=await t.count();let best=null;for(let i=0;i<n;i++){await t.nth(i).evaluate(el=>el.click());await p.waitForTimeout(2);const ls=await p.evaluate(()=>[...document.querySelectorAll('button[aria-label*=" orb row "]')].map((b,j)=>({j,l:(b.querySelector('small')?.textContent||'').trim()})).filter(x=>x.l));for(const x of ls){const sc=score(x.l,mode,s);if(!best||sc>best.sc)best={a:i,b:x.j,label:x.l,sc}}await t.nth(i).evaluate(el=>el.click())}return best||{a:0,b:1,label:'fallback'}}
-          async function run(mode){const c=await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});await c.addInitScript(seed);const p=await c.newPage();p.on('console',m=>{if(m.type()==='error')errors.push(`${mode}:${m.text()}`)});p.on('pageerror',e=>errors.push(`${mode}:${e.message}`));await p.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});await p.getByRole('button',{name:'START GAME'}).click();await intro(p);const history=[];for(let turn=1;turn<=45;turn++){await intro(p);if(await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false))break;const before=await stat(p);if(before.stage>=6)break;const m=await choose(p,mode,before);const t=p.locator('button[aria-label*=" orb row "]');await t.nth(m.a).evaluate(el=>el.click());await p.waitForTimeout(10);await t.nth(m.b).evaluate(el=>el.click());await settle(p);const after=await stat(p);history.push({turn,move:m.label,before,after})}const final=await stat(p);const gameOver=await p.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false);await c.close();return{history,final,gameOver}}
-          const offense=await run('offense');const tactical=await run('tactical');fs.writeFileSync('corrected-balance-qa/report.json',JSON.stringify({offense,tactical,errors},null,2));if(errors.length)throw new Error(errors.join('\n'));await browser.close();
-          JS
-          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/corrected.log 2>&1 & PID=$!
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
-          node corrected-balance-qa.mjs
-          kill $PID || true
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: corrected-balance-qa
-          path: corrected-balance-qa
+      - name: Install dependencies
+        run: npm ci
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
