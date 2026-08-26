@@ -1,0 +1,84 @@
+name: Cinematic Visual QA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cinematic-visual-qa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install browser
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start app
+        run: |
+          nohup npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/puzzle-rpg-vite.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:4173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/puzzle-rpg-vite.log
+          exit 1
+      - name: Capture cinematic flow
+        run: |
+          mkdir -p cinematic-qa
+          cat > qa.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser = await chromium.launch({headless:true});
+          const context = await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});
+          const page = await context.newPage();
+          const errors=[];
+          page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
+          page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
+          await page.screenshot({path:'cinematic-qa/01-intro.png',fullPage:true});
+          const intro = await page.locator('[class*="stageIntroOverlay"]').isVisible();
+          await page.getByRole('button',{name:'BATTLE START'}).click();
+          await page.waitForTimeout(120);
+          await page.screenshot({path:'cinematic-qa/02-battle.png',fullPage:true});
+
+          const cells = await page.locator('button[aria-label*=" orb row "]').evaluateAll(btns => btns.map(b=>b.getAttribute('aria-label')||''));
+          const board=Array.from({length:6},()=>Array(6).fill(''));
+          for(const label of cells){const m=label.match(/^(fire|water|light|heart|guard) orb row (\d+) column (\d+)$/);if(m)board[+m[2]-1][+m[3]-1]=m[1]}
+          const clone=b=>b.map(r=>[...r]);
+          const swap=(b,a,c)=>{const n=clone(b);[n[a.r][a.c],n[c.r][c.c]]=[n[c.r][c.c],n[a.r][a.c]];return n};
+          const matched=b=>{for(let r=0;r<6;r++)for(let c=0;c<4;c++)if(b[r][c]===b[r][c+1]&&b[r][c]===b[r][c+2])return true;for(let c=0;c<6;c++)for(let r=0;r<4;r++)if(b[r][c]===b[r+1][c]&&b[r][c]===b[r+2][c])return true;return false};
+          let move=null;
+          for(let r=0;r<6&&!move;r++)for(let c=0;c<6&&!move;c++)for(const d of [[0,1],[1,0]]){const rr=r+d[0],cc=c+d[1];if(rr<6&&cc<6&&matched(swap(board,{r,c},{r:rr,c:cc}))){move=[{r,c},{r:rr,c:cc}];break}}
+          move ||= [{r:0,c:0},{r:0,c:1}];
+          const a=move[0],b=move[1];
+          await page.getByRole('button',{name:`${board[a.r][a.c]} orb row ${a.r+1} column ${a.c+1}`}).click();
+          await page.getByRole('button',{name:`${board[b.r][b.c]} orb row ${b.r+1} column ${b.c+1}`}).click();
+          await page.waitForTimeout(75);
+          await page.screenshot({path:'cinematic-qa/03-swap.png',fullPage:true});
+          await page.waitForTimeout(215);
+          await page.screenshot({path:'cinematic-qa/04-clear.png',fullPage:true});
+          await page.waitForTimeout(185);
+          await page.screenshot({path:'cinematic-qa/05-drop.png',fullPage:true});
+          await page.waitForTimeout(650);
+          await page.screenshot({path:'cinematic-qa/06-after-turn.png',fullPage:true});
+          const metrics=await page.evaluate(()=>({viewport:[innerWidth,innerHeight],scroll:[document.documentElement.scrollWidth,document.documentElement.scrollHeight],introVisible:!!document.querySelector('[class*="stageIntroOverlay"]'),clearFx:!!document.querySelector('[class*="clearing"]'),buttons:[...document.querySelectorAll('button[aria-label*=" orb row "]')].length}));
+          fs.writeFileSync('cinematic-qa/report.json',JSON.stringify({intro,move,metrics,errors},null,2));
+          await browser.close();
+          EOF
+          node qa.mjs
+          cat cinematic-qa/report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cinematic-qa
+          path: cinematic-qa/
