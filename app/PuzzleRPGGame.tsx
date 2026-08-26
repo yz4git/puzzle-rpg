@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import styles from "./PuzzleRPGGame.module.css";
 
 type Orb = "fire" | "water" | "light" | "heart" | "guard";
@@ -576,6 +576,9 @@ export default function PuzzleRPGGame() {
   const [dropMotion, setDropMotion] = useState<Map<string, number>>(new Map());
   const [stageIntro, setStageIntro] = useState(true);
   const [stageClear, setStageClear] = useState<StageClearState>(null);
+  const [showTitle, setShowTitle] = useState(true);
+  const [damageTaken, setDamageTaken] = useState(0);
+  const [attackSources, setAttackSources] = useState<Coord[]>([]);
 
   const maxEnemyHp = enemyMaxHp(stage);
   const enemy = enemyDefinition(stage);
@@ -611,6 +614,8 @@ export default function PuzzleRPGGame() {
     setDropMotion(new Map());
     setStageIntro(true);
     setStageClear(null);
+    setDamageTaken(0);
+    setAttackSources([]);
   }
 
   async function finishEnemyDefeat(currentStage: number) {
@@ -624,6 +629,7 @@ export default function PuzzleRPGGame() {
     setXp((value) => value + gainedXp);
     setMessage(`STAGE ${currentStage} CLEAR • 盤面/NEXT持ち越し`);
     await delay(1050);
+    setPlayerShield((value) => Math.floor(value * 0.5));
     setStage(nextStage);
     setEnemyHp(enemyMaxHp(nextStage));
     setEnemyTurn(0);
@@ -632,15 +638,26 @@ export default function PuzzleRPGGame() {
     setCombatPop("");
   }
 
-  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string, swapPair?: [Coord, Coord]) {
-    if (isResolving || gameOver || stageIntro || stageClear) return;
+  async function resolveTurn(nextBoard: Board, consumeSkill = false, skillLabel?: string, swapPair?: [Coord, Coord], queueOverride?: ColumnQueues) {
+    if (isResolving || gameOver || showTitle || stageIntro || stageClear) return;
     setIsResolving(true);
     setSelected(null);
     setSkillMode(false);
     setResultChips([]);
     setCombatPop(skillLabel ?? "");
 
-    const plan = buildCascadePlan(nextBoard, columnQueues);
+    const startingQueues = queueOverride ?? columnQueues;
+    const plan = buildCascadePlan(nextBoard, startingQueues);
+    const isSetupTurn = plan.frames.length === 0 && !consumeSkill;
+    const attackSourceList: Coord[] = [];
+    for (const frame of plan.frames) {
+      for (const key of frame.matches) {
+        const [rowText, colText] = key.split(":");
+        const row = Number(rowText);
+        const col = Number(colText);
+        if (ATTACK_PER_ORB[frame.boardBefore[row]![col]!] > 0) attackSourceList.push({ row, col });
+      }
+    }
 
     setResolutionPhase("swap");
     setSwapMotion(swapPair ? { a: swapPair[0], b: swapPair[1] } : null);
@@ -670,7 +687,9 @@ export default function PuzzleRPGGame() {
       setMessage(skillLabel ? `${skillLabel} • SETUP` : "SETUP • 次の形を作った");
     }
 
-    const skillGain = Math.min(36, plan.matchedCount * 3 + Math.max(0, plan.combo - 1) * 4);
+    const skillGain = isSetupTurn
+      ? 28
+      : Math.min(20, plan.matchedCount * 2 + Math.max(0, plan.combo - 1) * 4);
     setSkill(consumeSkill ? skillGain : Math.min(100, skill + skillGain));
 
     const healedHp = Math.min(PLAYER_MAX_HP, playerHp + plan.heal);
@@ -694,13 +713,22 @@ export default function PuzzleRPGGame() {
     if (armorReduction > 0) chips.push(`ARMOR -${armorReduction}`);
     if (plan.heal > 0) chips.push(`+${plan.heal} HP`);
     if (plan.shield > 0) chips.push(`+${plan.shield} DEF`);
-    if (plan.frames.length === 0) chips.push("SETUP");
+    if (isSetupTurn) {
+      chips.push("TACTICAL SETUP");
+      chips.push("INTENT 50%");
+      chips.push("PRISM +28");
+    } else if (plan.frames.length === 0) {
+      chips.push("SHIFT SETUP");
+    }
+    if (consumeSkill) chips.push("NEXT RECYCLE");
     setResultChips(chips);
 
     if (actualAttack > 0 || plateBlocks) {
+      setAttackSources(attackSourceList.slice(0, 10));
       setResolutionPhase("attack");
       setCombatPop(plateBlocks ? "PLATE BLOCK" : `${actualAttack} DMG`);
-      await delay(260);
+      await delay(340);
+      setAttackSources([]);
     }
 
     if (enemyAfter <= 0) {
@@ -715,8 +743,11 @@ export default function PuzzleRPGGame() {
       return;
     }
 
+    const effectiveIntent = isSetupTurn
+      ? { ...intent, power: Math.max(1, Math.ceil(intent.power * 0.5)) }
+      : intent;
     const enemyResult = computeEnemyAction(
-      intent,
+      effectiveIntent,
       maxEnemyHp,
       healedHp,
       shieldBeforeEnemy,
@@ -724,9 +755,10 @@ export default function PuzzleRPGGame() {
       plan.finalQueues,
     );
 
+    setDamageTaken(enemyResult.hpDamage);
     setResolutionPhase("enemy");
     setCombatPop(enemyResult.hpDamage > 0 ? `-${enemyResult.hpDamage} HP` : `BLOCK ${enemyResult.blocked}`);
-    await delay(250);
+    await delay(enemyResult.hpDamage > 0 ? 420 : 280);
 
     setPlayerHp(enemyResult.hpAfter);
     setPlayerShield(enemyResult.shieldAfter);
@@ -734,8 +766,10 @@ export default function PuzzleRPGGame() {
     setColumnQueues(enemyResult.queuesAfter);
     setEnemyTurn((value) => value + 1);
     setMessage(
-      plan.frames.length === 0
-        ? `SETUP • ${enemyResult.summary}`
+      isSetupTurn
+        ? `TACTICAL SETUP • PRISM +28 • ${enemyResult.summary}`
+        : plan.frames.length === 0
+          ? `SHIFT SETUP • ${enemyResult.summary}`
         : `${actualAttack > 0 ? `${actualAttack} DMG • ` : ""}${enemyResult.summary}`,
     );
 
@@ -749,12 +783,13 @@ export default function PuzzleRPGGame() {
     setResolutionPhase("idle");
     setIsResolving(false);
     await delay(330);
+    setDamageTaken(0);
     setCombatPop("");
     setResultChips([]);
   }
 
   function selectCell(row: number, col: number) {
-    if (gameOver || isResolving) return;
+    if (gameOver || showTitle || stageIntro || stageClear || isResolving) return;
     const nextCoord = { row, col };
 
     if (skillMode) {
@@ -765,16 +800,19 @@ export default function PuzzleRPGGame() {
 
     if (!selected) {
       setSelected(nextCoord);
+      setMessage("①選択中 • ②光っている隣接パネルを選択");
       return;
     }
 
     if (selected.row === row && selected.col === col) {
       setSelected(null);
+      setMessage("選択解除 • 交換する1枚目を選択");
       return;
     }
 
     if (!adjacent(selected, nextCoord)) {
       setSelected(nextCoord);
+      setMessage("①選択を変更 • ②光っている隣接パネルを選択");
       return;
     }
 
@@ -793,7 +831,10 @@ export default function PuzzleRPGGame() {
     const transformed = cloneBoard(board);
     const before = transformed[selected.row]![selected.col]!;
     transformed[selected.row]![selected.col] = orb;
-    void resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]}`);
+    const recycledQueues = cloneQueues(columnQueues);
+    recycledQueues[selected.col]![0] = before;
+    setColumnQueues(recycledQueues);
+    void resolveTurn(transformed, true, `SHIFT ${ORB_LABEL[before]}→${ORB_LABEL[orb]} • NEXT↺`, undefined, recycledQueues);
   }
 
   const setupMode = !isResolving && !stageIntro && !stageClear && analysis.immediateMoves === 0 && analysis.bestSetupScore > 0;
@@ -813,7 +854,7 @@ export default function PuzzleRPGGame() {
   };
 
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} ${damageTaken > 0 ? styles.shellDamaged : ""}`}>
       <div className={styles.topBar}>
         <div>
           <div className={styles.eyebrow}>TACTICAL PUZZLE RPG</div>
@@ -834,6 +875,8 @@ export default function PuzzleRPGGame() {
           <span className={styles.enemyAccentLeft} />
           <span className={styles.enemyAccentRight} />
           <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span>
+          <span className={styles.enemyFace}><i /><i /></span>
+          <span className={styles.enemyWeapon} />
           <span className={styles.enemyBase} />
         </div>
         <div className={styles.enemyInfo}>
@@ -850,10 +893,27 @@ export default function PuzzleRPGGame() {
       </section>
 
       {resolutionPhase === "attack" ? (
-        <div className={styles.playerAttackFx} aria-hidden="true"><i /><i /><i /></div>
+        <div className={styles.playerAttackFx} aria-hidden="true">
+          {attackSources.map((cell, index) => (
+            <i
+              key={`${cell.row}-${cell.col}-${index}`}
+              style={{
+                "--sx": `${3 + ((cell.col + 0.5) / SIZE) * 94}%`,
+                "--sy": `${49 + ((cell.row + 0.5) / SIZE) * 43}%`,
+                "--delay": `${index * 0.025}s`,
+              } as CSSProperties}
+            />
+          ))}
+          <b />
+        </div>
       ) : null}
       {resolutionPhase === "enemy" ? (
         <div className={`${styles.enemyAttackFx} ${styles[`enemyAttack_${intent.kind}`] ?? ""}`} aria-hidden="true"><i /><i /><i /></div>
+      ) : null}
+      {damageTaken > 0 ? (
+        <div className={`${styles.damageVignette} ${intent.kind === "pierce" ? styles.damagePierce : ""}`} aria-hidden="true">
+          <span>-{damageTaken} HP</span><i /><i /><i /><i />
+        </div>
       ) : null}
 
       <section className={styles.intents} aria-label="enemy intents">
@@ -910,10 +970,11 @@ export default function PuzzleRPGGame() {
         </section>
 
         <section className={styles.boardWrap} aria-label="puzzle board">
-          <div className={styles.board}>
+          <div className={`${styles.board} ${selected && !skillMode ? styles.awaitingNeighbor : ""}`}>
             {board.map((row, rowIndex) => row.map((orb, colIndex) => {
               const key = cellKey(rowIndex, colIndex);
               const isSelected = selected?.row === rowIndex && selected?.col === colIndex;
+              const isAdjacentChoice = Boolean(selected && !skillMode && !isSelected && adjacent(selected, { row: rowIndex, col: colIndex }));
               const setupHint = setupMode && analysis.setupHintCells.has(key);
               const isClearing = clearingCells.has(key);
               const swapClass = swapClassFor(rowIndex, colIndex);
@@ -923,7 +984,7 @@ export default function PuzzleRPGGame() {
                 <button
                   key={`${rowIndex}-${colIndex}`}
                   type="button"
-                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""} ${swapClass} ${dropClass}`}
+                  className={`${styles.tile} ${styles[orb]} ${isSelected ? styles.selected : ""} ${isAdjacentChoice ? styles.adjacentChoice : ""} ${setupHint ? styles.setupHint : ""} ${isClearing ? styles.clearing : ""} ${swapClass} ${dropClass}`}
                   aria-label={`${ORB_NAME[orb]} orb row ${rowIndex + 1} column ${colIndex + 1}`}
                   aria-pressed={isSelected}
                   disabled={isResolving}
@@ -946,9 +1007,11 @@ export default function PuzzleRPGGame() {
       </section>
 
       <div className={`${styles.ruleHint} ${setupMode ? styles.setupAlert : ""}`}>
-        {setupMode
-          ? `消せる手なし → 点滅枠が有力SETUP（次手 最大${analysis.bestSetupScore}候補）`
-          : `消せる交換 ${analysis.immediateMoves} • 消えない交換も1ターン • ⬢×3でDEF`}
+        {selected && !skillMode
+          ? "② シアンに光る上下左右の隣接パネルを選択 • 同じパネルで解除"
+          : setupMode
+            ? `消せる手なし → 点滅枠が有力SETUP（次手 最大${analysis.bestSetupScore}候補）`
+            : `消せる交換 ${analysis.immediateMoves} • SETUP=敵威力50%+PRISM28 • ⬢×3でDEF`}
       </div>
       <div className={styles.message} role="status">{message}</div>
 
@@ -980,13 +1043,28 @@ export default function PuzzleRPGGame() {
         </button>
       </section>
 
-      {stageIntro ? (
+      {showTitle ? (
+        <div className={styles.titleScreen} role="dialog" aria-label="Puzzle RPG title">
+          <div className={styles.titleGrid} aria-hidden="true" />
+          <div className={styles.titleKicker}>TACTICAL PUZZLE RPG</div>
+          <div className={styles.titleLogo}><span>PUZZLE</span><strong>RPG</strong></div>
+          <div className={styles.titleTagline}>READ THE INTENT. BUILD THE BOARD. BREAK THE ENEMY.</div>
+          <div className={styles.titleOrbs} aria-hidden="true">
+            {ORBS.map((orb) => <span key={orb} className={styles[orb]}>{ORB_LABEL[orb]}</span>)}
+          </div>
+          <div className={styles.titleSystems}><span>INTENT</span><span>NEXT</span><span>TACTICAL SETUP</span></div>
+          <button type="button" className={styles.titleStartButton} onClick={() => { setShowTitle(false); setStageIntro(true); setMessage("STAGE BRIEFING • 敵のルールを確認"); }}>START GAME</button>
+          <div className={styles.titleFoot}>1 MOVE = 1 TURN</div>
+        </div>
+      ) : null}
+
+      {stageIntro && !showTitle ? (
         <div className={styles.stageIntroOverlay} role="dialog" aria-label={`Stage ${stage} briefing`}>
           <div className={styles.introStageLabel}>STAGE {stage}</div>
           <div className={`${styles.introEnemyVisual} ${styles[`enemy_${enemy.kind}`] ?? ""}`} aria-hidden="true">
             <span className={styles.enemyAura} /><span className={styles.enemyWingLeft} /><span className={styles.enemyWingRight} />
             <span className={styles.enemyAccentLeft} /><span className={styles.enemyAccentRight} />
-            <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span><span className={styles.enemyBase} />
+            <span className={styles.enemyCore}>{ENEMY_SIGIL[enemy.kind]}</span><span className={styles.enemyFace}><i /><i /></span><span className={styles.enemyWeapon} /><span className={styles.enemyBase} />
           </div>
           <div className={styles.introEnemyName}>{enemy.name}</div>
           <div className={styles.enemySpeech}>「{ENEMY_DIALOGUE[enemy.kind]}」</div>
@@ -1001,7 +1079,7 @@ export default function PuzzleRPGGame() {
           <div className={styles.clearStage}>STAGE {stageClear.stage}</div>
           <div className={styles.clearTitle}>CLEAR!</div>
           <div className={styles.clearRewards}><span>+{stageClear.gold} ◈</span><span>+{stageClear.xp} XP</span></div>
-          <div className={styles.clearCarry}>BOARD + NEXT CARRIED</div>
+          <div className={styles.clearCarry}>BOARD + NEXT CARRIED • DEF 50% CARRIED</div>
         </div>
       ) : null}
 
