@@ -5,15 +5,15 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/puzzle-rpg-ci.yml'
-      - 'scripts/apply-retro-balance.py'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,18 +24,169 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Install image tooling
-        run: python -m pip install --quiet pillow
-      - name: Apply retro and balance pass
-        run: python scripts/apply-retro-balance.py
-      - name: Puzzle RPG TypeScript check
-        run: npx tsc -p tsconfig.puzzle.json --noEmit
-      - name: Production build
-        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
-      - name: Commit implementation
+      - name: Install Playwright
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/PuzzleRPGGame.tsx app/PuzzleRPGGame.module.css public/assets/pixel8/orbs/fire.png public/assets/pixel8/orbs/water.png public/assets/pixel8/trickster.png
-          git commit -m 'Implement retro presentation and harder tactical balance'
-          git push origin HEAD:main
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Focused iPhone balance and visual QA
+        run: |
+          cat > retro-balance-qa.mjs <<'JS'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          fs.mkdirSync('retro-balance-qa',{recursive:true});
+          const browser = await chromium.launch({headless:true});
+          const errors=[];
+
+          function seedScript(seed){
+            return `(()=>{let s=${seed}>>>0;Math.random=()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};})();`;
+          }
+          function scoreLabel(label, mode, stats){
+            if(!label) return -9999;
+            if(label.includes('PLATE')) return -5000;
+            let score=0;
+            const dmg=label.match(/(?:BREAK\s+)?(\d+)(?:\s*DMG)?/);
+            const combo=label.match(/(\d+)C/);
+            const def=label.match(/DEF \+(\d+)/);
+            const hp=label.match(/HP \+(\d+)/);
+            if(dmg && (label.includes('DMG')||label.includes('BREAK')||label.includes('·'))) score+=Number(dmg[1])*(mode==='offense'?7:4);
+            if(combo) score+=Number(combo[1])*(mode==='offense'?25:15);
+            if(label.includes('BREAK')) score+=100;
+            if(mode==='offense') {
+              if(def) score+=2; if(hp) score+=2; if(label.includes('SETUP')) score-=40;
+              return score;
+            }
+            const danger=stats.intentKind;
+            const lowHp=stats.hp<=55;
+            if(def) score+=Number(def[1])*5 + ((danger==='heavy'||danger==='drain'||danger==='attack')?115:25);
+            if(hp) score+=Number(hp[1])*6 + (lowHp?190:45) + (danger==='pierce'?90:0);
+            if(label.includes('SETUP')) score+=(danger==='pierce'?200:danger==='heavy'||danger==='drain'?155:25);
+            if(lowHp && !hp && !label.includes('SETUP')) score-=35;
+            return score;
+          }
+          async function stats(page){
+            return page.evaluate(()=>{
+              const ps=document.querySelector('[aria-label="player status"]')?.textContent||'';
+              const es=document.querySelector('[aria-label="enemy status"]')?.textContent||'';
+              const intents=document.querySelector('[aria-label="enemy intents"]')?.textContent||'';
+              const body=document.body.innerText;
+              const hp=Number(ps.match(/HP\s*(\d+)/)?.[1]||0);
+              const def=Number(ps.match(/DEF\s*(\d+)/)?.[1]||0);
+              const enemyHp=Number(es.match(/(\d+)\s*\/\s*(\d+)/)?.[1]||0);
+              const enemyMax=Number(es.match(/(\d+)\s*\/\s*(\d+)/)?.[2]||0);
+              const stage=Number(body.match(/STAGE\s+(\d+)/)?.[1]||1);
+              const turnText=[...document.querySelectorAll('*')].map(e=>e.textContent?.trim()||'').find(t=>/^TURN \d+/.test(t))||'';
+              const intentKind=intents.includes('PIERCE')?'pierce':intents.includes('DRAIN')?'drain':intents.includes('CRUSH')||intents.includes('RITE')||intents.includes('PRISM HIT')?'heavy':intents.includes('DISRUPT')?'disrupt':'attack';
+              return {hp,def,enemyHp,enemyMax,stage,turnText,intentKind,body:body.slice(0,900)};
+            });
+          }
+          async function waitSettled(page){
+            for(let i=0;i<70;i++){
+              if(await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)) return;
+              if(await page.getByRole('button',{name:'BATTLE START'}).isVisible().catch(()=>false)) return;
+              const ready=await page.evaluate(()=>{const b=document.querySelector('button[aria-label*=" orb row "]');return !!b && !b.disabled;});
+              if(ready) return;
+              await page.waitForTimeout(70);
+            }
+          }
+          async function dismissIntro(page, label, capture=false){
+            const btn=page.getByRole('button',{name:'BATTLE START'});
+            if(await btn.isVisible().catch(()=>false)){
+              const s=(await stats(page)).stage;
+              if(capture) await page.screenshot({path:`retro-balance-qa/${label}-stage-${s}-intro.png`});
+              await btn.click(); await page.waitForTimeout(150);
+              if(capture) await page.screenshot({path:`retro-balance-qa/${label}-stage-${s}-battle.png`});
+            }
+          }
+          async function chooseMove(page, mode, st){
+            const count=await page.locator('button[aria-label*=" orb row "]').count();
+            let best=null;
+            for(let i=0;i<count;i++){
+              await page.locator('button[aria-label*=" orb row "]').nth(i).evaluate(el=>el.click());
+              await page.waitForTimeout(3);
+              const labels=await page.evaluate(()=>[...document.querySelectorAll('button[aria-label*=" orb row "]')].map((b,j)=>({j,label:(b.querySelector('small')?.textContent||'').trim()})).filter(x=>x.label));
+              for(const x of labels){ const score=scoreLabel(x.label,mode,st); if(!best||score>best.score) best={a:i,b:x.j,label:x.label,score}; }
+              await page.locator('button[aria-label*=" orb row "]').nth(i).evaluate(el=>el.click());
+            }
+            return best||{a:0,b:1,label:'fallback',score:-999};
+          }
+          async function runMode(mode, capture){
+            const context=await browser.newContext({viewport:{width:402,height:874},isMobile:true,hasTouch:true,deviceScaleFactor:3});
+            await context.addInitScript(seedScript(424242));
+            const page=await context.newPage();
+            page.on('console',m=>{if(m.type()==='error') errors.push(`${mode}: ${m.text()}`)});
+            page.on('pageerror',e=>errors.push(`${mode}: ${e.message}`));
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle'});
+            if(capture) await page.screenshot({path:'retro-balance-qa/01-title.png'});
+            const title=await page.evaluate(()=>({w:innerWidth,h:innerHeight,scrollHeight:document.documentElement.scrollHeight,hero:document.querySelector('img[alt="Puzzle RPG hero"]')?.getBoundingClientRect().toJSON()}));
+            await page.getByRole('button',{name:'START GAME'}).click();
+            await dismissIntro(page,mode,capture);
+            if(capture){
+              const tiles=page.locator('button[aria-label*=" orb row "]');
+              await tiles.nth(14).click(); await page.waitForTimeout(80);
+              await page.screenshot({path:'retro-balance-qa/02-selection.png'});
+              await tiles.nth(14).click();
+            }
+            let stableHintTest=null, attackCaptured=false, damageCaptured=false;
+            const history=[];
+            for(let turn=1;turn<=48;turn++){
+              await dismissIntro(page,mode,capture);
+              if(await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false)) break;
+              let st=await stats(page);
+              if(st.stage>=6) break;
+              const hint=page.locator('button[class*="setupHint"]').first();
+              if(mode==='tactical' && stableHintTest===null && await hint.isVisible().catch(()=>false)){
+                const t1=await hint.evaluate(el=>getComputedStyle(el).transform);
+                await page.waitForTimeout(420);
+                const t2=await hint.evaluate(el=>getComputedStyle(el).transform);
+                let normalClick=true;
+                try { await hint.click({timeout:2000}); await hint.click({timeout:2000}); } catch { normalClick=false; }
+                stableHintTest={transform1:t1,transform2:t2,normalClick};
+              }
+              const move=await chooseMove(page,mode,st);
+              const tile=page.locator('button[aria-label*=" orb row "]');
+              await tile.nth(move.a).evaluate(el=>el.click());
+              await page.waitForTimeout(15);
+              await tile.nth(move.b).evaluate(el=>el.click());
+              for(let k=0;k<26;k++){
+                await page.waitForTimeout(55);
+                if(capture && !attackCaptured && await page.locator('[class*="playerAttackFx"]').isVisible().catch(()=>false)){
+                  await page.screenshot({path:'retro-balance-qa/03-attack-fx.png'}); attackCaptured=true;
+                }
+                if(capture && !damageCaptured && await page.locator('[class*="damageVignette"]').isVisible().catch(()=>false)){
+                  await page.screenshot({path:'retro-balance-qa/04-damage-fx.png'}); damageCaptured=true;
+                }
+              }
+              await waitSettled(page);
+              const after=await stats(page);
+              history.push({turn,move:move.label,before:st,after});
+              if(capture && (after.stage!==st.stage || turn%8===0)) await page.screenshot({path:`retro-balance-qa/tactical-turn-${String(turn).padStart(2,'0')}.png`});
+            }
+            await dismissIntro(page,mode,capture);
+            const finalStats=await stats(page);
+            const gameOver=await page.getByText('GAME OVER',{exact:true}).isVisible().catch(()=>false);
+            const finalLayout=await page.evaluate(()=>({scrollY,scrollHeight:document.documentElement.scrollHeight,tiles:document.querySelectorAll('button[aria-label*=" orb row "]').length,innerWidth,innerHeight}));
+            if(capture) await page.screenshot({path:'retro-balance-qa/99-tactical-final.png'});
+            await context.close();
+            return {mode,title,history,finalStats,gameOver,finalLayout,stableHintTest};
+          }
+
+          const offense=await runMode('offense',false);
+          const tactical=await runMode('tactical',true);
+          const report={offense,tactical,errors};
+          fs.writeFileSync('retro-balance-qa/report.json',JSON.stringify(report,null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(tactical.finalLayout.tiles!==36 || tactical.finalLayout.scrollY!==0) throw new Error('layout regression');
+          if(tactical.stableHintTest && (!tactical.stableHintTest.normalClick || tactical.stableHintTest.transform1!=='none' || tactical.stableHintTest.transform2!=='none')) throw new Error('setup hint still moves or is unstable');
+          await browser.close();
+          JS
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/retro-qa.log 2>&1 & PID=$!
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          node retro-balance-qa.mjs
+          kill $PID || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: retro-balance-qa
+          path: retro-balance-qa
