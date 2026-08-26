@@ -1,0 +1,110 @@
+.root :global([aria-label="enemy status"]) {
+  min-height: 104px !important;
+  grid-template-columns: 108px 1fr !important;
+  padding: 6px 9px !important;
+  overflow: hidden;
+  border-radius: 3px !important;
+  border: 2px solid rgba(222, 231, 255, .28) !important;
+  background: rgba(4, 6, 12, .86) !important;
+  box-shadow: inset 0 0 0 1px #000, 0 4px 0 rgba(0,0,0,.5) !important;
+  isolation: isolate;
+}
+
+.root :global([aria-label="enemy status"])::before,
+.root :global([aria-label="enemy status"])::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.root :global([aria-label="enemy status"])::before {
+  inset: 0;
+  opacity: .42;
+  background:
+    linear-gradient(90deg, transparent 0 24%, rgba(255,255,255,.025) 24% 25%, transparent 25% 100%),
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(255,255,255,.025) 22px 23px);
+}
+
+.root :global([aria-label="enemy status"])::after {
+  left: -14px;
+  top: -45px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(117, 92, 255, .34), rgba(62, 41, 120, .1) 45%, transparent 70%);
+  animation: stageAura 1.6s steps(4, end) infinite;
+}
+
+.root :global([aria-label="enemy status"]:has([data-enemy-kind="bastion"]))::after {
+  background: radial-gradient(circle, rgba(255, 202, 80, .3), rgba(118, 75, 18, .1) 45%, transparent 70%);
+}
+.root :global([aria-label="enemy status"]:has([data-enemy-kind="oracle"]))::after {
+  background: radial-gradient(circle, rgba(255, 64, 103, .34), rgba(106, 13, 42, .1) 45%, transparent 70%);
+}
+.root :global([aria-label="enemy status"]:has([data-enemy-kind="null"]))::after {
+  background: radial-gradient(circle, rgba(188, 220, 255, .34), rgba(43, 63, 93, .1) 45%, transparent 70%);
+}
+.root :global([aria-label="enemy status"]:has([data-enemy-kind="trickster"]))::after {
+  background: radial-gradient(circle, rgba(114, 230, 255, .28), rgba(197, 82, 255, .12) 48%, transparent 70%);
+}
+
+.root :global([data-pixel-sprite="enemy"][data-intro="false"]) {
+  width: 98px !important;
+  height: 92px !important;
+  max-width: none !important;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(4px 4px 0 rgba(0,0,0,.72));
+  transform-origin: 50% 72%;
+}
+
+.root :global([data-pixel-sprite="enemy"][data-enemy-kind="warden"]) { filter: drop-shadow(0 0 5px #6f47cf) drop-shadow(4px 4px 0 #000); }
+.root :global([data-pixel-sprite="enemy"][data-enemy-kind="bastion"]) { filter: drop-shadow(0 0 4px #d8a631) drop-shadow(4px 4px 0 #000); }
+.root :global([data-pixel-sprite="enemy"][data-enemy-kind="oracle"]) { filter: drop-shadow(0 0 5px #c92956) drop-shadow(4px 4px 0 #000); }
+.root :global([data-pixel-sprite="enemy"][data-enemy-kind="null"]) { filter: drop-shadow(0 0 4px #b7d8ff) drop-shadow(4px 4px 0 #000); }
+.root :global([data-pixel-sprite="enemy"][data-enemy-kind="trickster"]) { filter: drop-shadow(0 0 4px #56dbff) drop-shadow(4px 4px 0 #000); }
+
+.root :global([class*="enemyName"]) {
+  font-size: 13px !important;
+  letter-spacing: .08em !important;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.root :global([class*="passive"]) {
+  margin-top: 3px !important;
+  color: #b9c3da !important;
+  line-height: 1.28 !important;
+}
+
+.root :global([class*="hpTrack"]) {
+  border-radius: 1px !important;
+  height: 9px !important;
+  border: 1px solid rgba(255,255,255,.24) !important;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+.root :global([aria-label="enemy intents"] > div:last-child) {
+  transform: translateZ(0);
+  border-color: rgba(255, 216, 92, .55) !important;
+}
+
+.root :global([aria-label="enemy intents"] > div:last-child strong) {
+  font-size: 9px !important;
+  color: #fff4b7 !important;
+}
+
+.root :global([aria-label="enemy intents"] > div:last-child [class*="intentPower"]) {
+  color: #ffe36f !important;
+  font-size: 16px !important;
+}
+
+@keyframes stageAura {
+  0%, 100% { transform: scale(1); opacity: .65; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@media (max-height: 760px) and (orientation: portrait) {
+  .root :global([aria-label="enemy status"]) { min-height: 84px !important; grid-template-columns: 88px 1fr !important; }
+  .root :global([data-pixel-sprite="enemy"][data-intro="false"]) { width: 82px !important; height: 76px !important; }
+}
