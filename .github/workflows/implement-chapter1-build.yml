@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Fix patch boundaries
+        run: python3 scripts/fix-chapter1-patcher.py
       - name: Apply Chapter 1 patch
         run: python3 scripts/implement-chapter1-build.py
       - name: Install dependencies
