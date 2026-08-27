@@ -42,7 +42,7 @@
   font-size: 11px;
 }
 
-/* Battle: spend the space removed from the permanent instruction banner on the enemy. */
+/* Battle: keep the enemy large even when Safari/ChatGPT browser chrome reduces dvh. */
 .root :global([class*="enemyStage"]) {
   min-height: 104px;
   grid-template-columns: 112px minmax(0, 1fr);
@@ -87,23 +87,30 @@
   border: 2px solid #fff;
 }
 
-/* iPhone 17-class portrait widths: let the 6x6 board nearly fill the usable width. */
+/* Battle board sizing is width-authoritative. Do not let reduced browser dvh shrink it. */
 .root :global([aria-label="cluster break board"]) {
   box-sizing: border-box;
-  width: min(calc(100vw - (var(--portrait-edge) * 2)), 45dvh, var(--portrait-content-max));
-  max-width: 100%;
-}
-
-.root :global([aria-label="largest current clusters"]),
-.root :global([class*="message"]),
-.root :global([class*="ruleLine"]) {
   width: min(calc(100vw - (var(--portrait-edge) * 2)), var(--portrait-content-max));
   max-width: 100%;
 }
 
-@media (min-width: 380px) and (min-height: 800px) and (orientation: portrait) {
+/* The board itself is the interaction/readout. Remove all permanent footer information. */
+.root :global(main > [aria-label="largest current clusters"]),
+.root :global(main > [role="status"]),
+.root :global(main > [class*="ruleLine"]) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
+@media (min-width: 380px) and (orientation: portrait) {
   .root :global([aria-label="cluster break board"]) {
-    width: min(calc(100vw - 14px), 45dvh, 430px);
+    width: min(calc(100vw - 14px), 430px);
   }
 
   .root :global([class*="tile"] > b) {
@@ -115,21 +122,9 @@
   }
 }
 
+/* Only the title illustration may compact on a genuinely short viewport.
+   The battle board and enemy intentionally stay full-size. */
 @media (max-height: 760px) and (orientation: portrait) {
-  .root :global([class*="enemyStage"]) {
-    min-height: 78px;
-    grid-template-columns: 88px minmax(0, 1fr);
-  }
-
-  .root :global([class*="enemySprite"]) {
-    width: 84px;
-    height: 72px;
-  }
-
-  .root :global([aria-label="cluster break board"]) {
-    width: min(calc(100vw - 14px), 40dvh, 360px);
-  }
-
   .root :global(main[aria-label="Puzzle RPG title"] > img) {
     width: min(44vw, 175px);
     height: min(27dvh, 180px);
