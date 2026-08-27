@@ -2,6 +2,7 @@
 
 export type GameSfx =
   | "uiSelect" | "uiConfirm" | "swap" | "drop"
+  | "step" | "door" | "treasure" | "battleStart" | "escape" | "techAcquire" | "levelUp"
   | "match" | "matchFire" | "matchWater" | "matchLight" | "matchHeart" | "matchGuard" | "cascade"
   | "playerAttack" | "attackFire" | "attackWater" | "attackLight"
   | "block" | "plateBlock" | "armor" | "heal" | "shield" | "setup"
@@ -17,6 +18,7 @@ export const SFX_ASSET_OVERRIDES: Partial<Record<GameSfx, string>> = {};
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noiseBuffer: AudioBuffer | null = null;
+let sfxEnabled = true;
 
 function audioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -109,6 +111,13 @@ function synth(name: GameSfx) {
   switch (name) {
     case "uiSelect": tone(760, t, 0.035, 0.045); break;
     case "uiConfirm": tone(640, t, 0.04, 0.055); tone(960, t + 0.04, 0.055, 0.05); break;
+    case "step": noise(t, 0.025, 0.018); tone(92, t, 0.028, 0.018, "triangle"); break;
+    case "door": tone(147, t, 0.055, 0.04, "triangle"); sweep(196, 98, t + 0.045, 0.11, 0.055, "square"); break;
+    case "treasure": arp([523, 659, 784, 1047, 1319, 1568], 0.048, 0.06); break;
+    case "battleStart": [196, 247, 330, 494].forEach((n, i) => tone(n, t + i * 0.055, 0.085, 0.075)); noise(t + 0.17, 0.08, 0.055); break;
+    case "escape": sweep(880, 220, t, 0.16, 0.055, "triangle"); noise(t + 0.08, 0.08, 0.035); break;
+    case "techAcquire": arp([392, 523, 659, 784, 1047, 1319], 0.07, 0.075); break;
+    case "levelUp": arp([262, 330, 392, 523, 659, 784, 1047], 0.06, 0.075); break;
     case "swap": sweep(330, 650, t, 0.08, 0.075); break;
     case "drop": sweep(220, 105, t, 0.065, 0.025, "triangle"); break;
 
@@ -152,7 +161,12 @@ export function primeAudio() {
   if (c?.state === "suspended") void c.resume();
 }
 
+export function setSfxEnabled(enabled: boolean) {
+  sfxEnabled = enabled;
+}
+
 export function playSfx(name: GameSfx) {
+  if (!sfxEnabled) return;
   const replacement = SFX_ASSET_OVERRIDES[name];
   if (replacement && typeof window !== "undefined") {
     const audio = new Audio(replacement);
