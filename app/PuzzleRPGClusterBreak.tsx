@@ -242,13 +242,20 @@ function buildOpeningCandidate(): Tile[] {
 
 function makeOpeningBoard(): Tile[] {
   let fallback = buildOpeningCandidate();
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     const candidate = attempt === 0 ? fallback : buildOpeningCandidate();
     fallback = candidate;
     const largest = largestGroups(candidate);
     const max = Math.max(...Object.values(largest));
     const counts = TYPES.map((type) => candidate.filter((tile) => tile.type === type).length);
-    if (max >= 3 && max <= 5 && counts.every((count) => count >= 3)) return candidate;
+    const hasSkipSetup = largest.skip >= 2;
+    const hasDefenseSetup = largest.heal >= 2 || largest.barrier >= 2;
+    const hasAttackSetup = largest.attack >= 2;
+    if (
+      max >= 3 && max <= 5
+      && counts.every((count) => count >= 3)
+      && hasSkipSetup && hasDefenseSetup && hasAttackSetup
+    ) return candidate;
   }
   return fallback;
 }
@@ -407,6 +414,7 @@ export default function PuzzleRPGClusterBreak() {
   const [build, setBuild] = useState<RewardId[]>([]);
   const [rewardChoices, setRewardChoices] = useState<RewardId[]>([]);
   const [rewardPicked, setRewardPicked] = useState<RewardId | null>(null);
+  const [buildOpen, setBuildOpen] = useState(false);
   const [fx, setFx] = useState<FxState | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -438,6 +446,9 @@ export default function PuzzleRPGClusterBreak() {
   const isCritical = playerHp <= 5 || (enemyDelay === 0 && incomingHpDamage >= playerHp);
   const isDanger = !isCritical && (playerHp <= 9 || (enemyDelay === 0 && incomingHpDamage >= Math.ceil(playerHp * 0.6)));
   const ownedBuildDefs = build.map(rewardDef);
+  const nextEncounter = stage < CHAPTER_LENGTH ? stageDef(stage + 1) : null;
+  const nextEncounterIntent = nextEncounter ? enemyIntent(stage + 1, 0, nextEncounter) : null;
+  const nextEncounterFollowup = nextEncounter ? enemyIntent(stage + 1, 1, nextEncounter) : null;
 
   function resetRun() {
     tileId = 1;
@@ -454,6 +465,7 @@ export default function PuzzleRPGClusterBreak() {
     setBuild([]);
     setRewardChoices([]);
     setRewardPicked(null);
+    setBuildOpen(false);
     setGameOver(false);
     setStageClear(false);
     setStageIntro(true);
@@ -485,7 +497,8 @@ export default function PuzzleRPGClusterBreak() {
     setEnemyStep(0);
     setEnemyDelay(0);
     setTurn(1);
-    setPlayerHp((hp) => Math.min(PLAYER_MAX_HP, hp + 3));
+    setPlayerHp((hp) => Math.min(PLAYER_MAX_HP, hp + 6));
+    setBuildOpen(false);
     setStageClear(false);
     setStageIntro(true);
     setRewardChoices([]);
@@ -774,12 +787,15 @@ export default function PuzzleRPGClusterBreak() {
     );
   }
 
-  const warningText = isCritical
-    ? `!! CRITICAL !! ${enemyDelay > 0 ? `FREE ${enemyDelay}` : `${intent.label} → ${incomingHpDamage} HP`}`
-    : isDanger
-      ? `! DANGER ! ${enemyDelay > 0 ? `FREE ${enemyDelay}` : `${intent.label} → ${incomingHpDamage} HP`}`
-      : "";
-  const shellClass = `${styles.shell} ${v2.gameplayRoot} ${isCritical ? styles.critical : isDanger ? styles.danger : ""}`;
+  const overlayActive = stageIntro || stageClear || gameOver || buildOpen;
+  const warningText = overlayActive
+    ? ""
+    : isCritical
+      ? `!! CRITICAL !! ${enemyDelay > 0 ? `FREE ${enemyDelay}` : `${intent.label} → ${incomingHpDamage} HP`}`
+      : isDanger
+        ? `! DANGER ! ${enemyDelay > 0 ? `FREE ${enemyDelay}` : `${intent.label} → ${incomingHpDamage} HP`}`
+        : "";
+  const shellClass = `${styles.shell} ${v2.gameplayRoot} ${!overlayActive && isCritical ? styles.critical : !overlayActive && isDanger ? styles.danger : ""}`;
 
   return (
     <main className={shellClass} data-enemy-kind={enemy.kind}>
@@ -805,7 +821,12 @@ export default function PuzzleRPGClusterBreak() {
 
       <header className={styles.topBar}>
         <div><span>CHAPTER 1 • {CHAPTER_TITLE}</span><strong>STAGE {stage}/{CHAPTER_LENGTH}{currentStage.boss ? " • BOSS" : currentStage.elite ? " • ELITE" : ""}</strong></div>
-        <div className={styles.turnBox}>TURN {String(turn).padStart(2, "0")} • BUILD {build.length}</div>
+        <button
+          type="button"
+          className={`${styles.turnBox} ${chapter.buildButton}`}
+          aria-label="Open Build Details"
+          onClick={() => setBuildOpen(true)}
+        >TURN {String(turn).padStart(2, "0")} • BUILD {build.length}</button>
       </header>
 
       <section className={`${styles.enemyStage} ${v2.feedbackHost} ${fx?.type === "attack" ? styles.targetHit : ""}`}>
@@ -938,7 +959,17 @@ export default function PuzzleRPGClusterBreak() {
               <>
                 <span>STAGE {stage}/{CHAPTER_LENGTH} CLEAR</span>
                 <strong>CHOOSE 1 BUILD</strong>
-                <p className={chapter.rewardLead}>次の戦いのルールを変える報酬</p>
+                {nextEncounter && nextEncounterIntent && nextEncounterFollowup ? (
+                  <div className={chapter.nextEncounter}>
+                    <img src={PIXEL_ART_ASSETS.enemies[nextEncounter.kind]} alt="" />
+                    <span>
+                      <small>NEXT ENCOUNTER • STAGE {stage + 1}/{CHAPTER_LENGTH}</small>
+                      <strong>{nextEncounter.name}</strong>
+                      <em>{nextEncounterIntent.label} {nextEncounterIntent.power} → {nextEncounterFollowup.label} {nextEncounterFollowup.power}</em>
+                    </span>
+                  </div>
+                ) : null}
+                <p className={chapter.rewardLead}>次の敵を見て、戦い方を変えるBUILDを1つ選ぶ</p>
                 <div className={chapter.rewardGrid}>
                   {rewardChoices.map((id) => {
                     const reward = rewardDef(id);
@@ -971,10 +1002,30 @@ export default function PuzzleRPGClusterBreak() {
                 <div className={chapter.buildSummary}>
                   {ownedBuildDefs.map((reward) => <i key={reward.id} data-tag={reward.tag}>{reward.name}</i>)}
                 </div>
-                <p>HP +3して次の敵へ</p>
+                <p>HP +6して次の敵へ</p>
                 <button type="button" onClick={nextStage}>▶ NEXT STAGE</button>
               </>
             )}
+          </div>
+        </div>
+      ) : null}
+
+      {buildOpen ? (
+        <div className={styles.overlay} role="dialog" aria-label="Build Details" onClick={() => setBuildOpen(false)}>
+          <div className={chapter.buildPanel} onClick={(event) => event.stopPropagation()}>
+            <span>RUN BUILD</span>
+            <strong>BUILD {build.length} / 12</strong>
+            {ownedBuildDefs.length > 0 ? (
+              <div className={chapter.buildList}>
+                {ownedBuildDefs.map((reward) => (
+                  <div key={reward.id} data-tag={reward.tag}>
+                    <b>{reward.icon}</b>
+                    <span><strong>{reward.name}</strong><small>{reward.description}</small></span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className={chapter.emptyBuild}>まだBUILDを取得していません。</p>}
+            <button type="button" className={chapter.closeBuild} onClick={() => setBuildOpen(false)}>× CLOSE</button>
           </div>
         </div>
       ) : null}

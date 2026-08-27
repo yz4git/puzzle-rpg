@@ -142,3 +142,98 @@
   .rewardChoice { min-height: 52px; padding: 5px 7px !important; }
   .rewardChoice > b, .acquired > b { min-height: 34px; }
 }
+
+
+.buildButton {
+  appearance: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+.buildButton:active { transform: translate(1px, 1px); }
+
+.nextEncounter {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 5px 0 3px;
+  padding: 5px 7px;
+  border: 2px solid #6f7892;
+  background: #05060b;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px #151824;
+}
+.nextEncounter img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.nextEncounter > span { display: grid; gap: 2px; min-width: 0; }
+.nextEncounter small {
+  color: #9ba3bd;
+  font: 900 6px/1 ui-monospace, monospace;
+  letter-spacing: .5px;
+}
+.nextEncounter strong {
+  color: #fff;
+  font: 1000 10px/1 ui-monospace, monospace !important;
+}
+.nextEncounter em {
+  color: #ffe56c;
+  font: 900 7px/1.2 ui-monospace, monospace;
+  font-style: normal;
+}
+
+.buildPanel {
+  width: min(92vw, 372px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: 14px 12px 12px;
+  border: 4px solid #7b8299;
+  background: #08090f;
+  color: #fff;
+  box-shadow: inset 0 0 0 2px #171924, 6px 6px 0 #000;
+  text-align: center;
+}
+.buildPanel > span {
+  color: #9ba3bd;
+  font: 900 7px/1 ui-monospace, monospace;
+  letter-spacing: 1px;
+}
+.buildPanel > strong {
+  display: block;
+  margin: 4px 0 10px;
+  font: 1000 16px/1 ui-monospace, monospace;
+}
+.buildList { display: grid; gap: 6px; width: 100%; }
+.buildList > div {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  border: 2px solid #73798d;
+  background: #0b0c12;
+  text-align: left;
+}
+.buildList > div > b {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  border: 1px solid currentColor;
+  font: 1000 9px/1 ui-monospace, monospace;
+}
+.buildList > div > span { display: grid; gap: 2px; }
+.buildList strong { font: 1000 9px/1 ui-monospace, monospace; }
+.buildList small { color: #d7dae5; font: 800 7px/1.25 ui-monospace, monospace; }
+.buildList > div[data-tag="ATK"] { border-color: #ff755f; color: #ff9c8d; }
+.buildList > div[data-tag="HEAL"] { border-color: #ff77c8; color: #ffaddd; }
+.buildList > div[data-tag="BAR"] { border-color: #6ee8ff; color: #a9f2ff; }
+.buildList > div[data-tag="SKIP"] { border-color: #ffe56c; color: #fff0a3; }
+.buildList > div[data-tag="CORE"] { border-color: #c69bff; color: #dec4ff; }
+.emptyBuild { margin: 14px 0; color: #aeb4ca; font-size: 10px; }
+.closeBuild { width: 100%; margin-top: 10px !important; }
