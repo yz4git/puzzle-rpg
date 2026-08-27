@@ -76,16 +76,17 @@ try {
 
   const attackTarget = await evaluate(cdp, `(() => {
     const b=Array.from(document.querySelectorAll('[aria-label="cluster break board"] button:not(:disabled)')).find(el => el.getAttribute('aria-label')?.startsWith('ATK panel'));
-    if(!b) return null;
+    if(!b) return false;
     const r=b.getBoundingClientRect(); const x=r.left+r.width/2, y=r.top+r.height/2;
     b.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:17,pointerType:'touch',clientX:x,clientY:y,isPrimary:true}));
-    return {x,y};
+    return true;
   })()`);
   await sleep(90);
   const attackTriggered = attackTarget ? await evaluate(cdp, `(() => {
-    const b=Array.from(document.querySelectorAll('[aria-label="cluster break board"] button')).find(el => el.getAttribute('aria-label')?.startsWith('ATK panel') && el.matches(':focus, :active')) || Array.from(document.querySelectorAll('[aria-label="cluster break board"] button')).find(el => el.getAttribute('aria-label')?.startsWith('ATK panel'));
+    const b=document.querySelector('[aria-label="cluster break board"] button[class*="previewed"]') || Array.from(document.querySelectorAll('[aria-label="cluster break board"] button')).find(el => el.getAttribute('aria-label')?.startsWith('ATK panel'));
     if(!b) return false;
-    b.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:17,pointerType:'touch',clientX:${'${attackTarget.x}'},clientY:${'${attackTarget.y}'},isPrimary:true}));
+    const r=b.getBoundingClientRect(); const x=r.left+r.width/2, y=r.top+r.height/2;
+    b.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:17,pointerType:'touch',clientX:x,clientY:y,isPrimary:true}));
     return true;
   })()`) : false;
   await sleep(120);
