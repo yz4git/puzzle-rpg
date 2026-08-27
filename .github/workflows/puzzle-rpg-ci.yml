@@ -28,8 +28,13 @@ jobs:
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
       - name: Start review server
         run: |
-          (npm run dev -- --hostname 127.0.0.1 --port 5173 > /tmp/puzzle-review.log 2>&1 &)
-          sleep 5
+          nohup npm run dev -- --hostname 127.0.0.1 --port 5173 > /tmp/puzzle-review.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/puzzle-review.log
+          exit 1
       - name: Capture preview alignment and FX stacking
         run: node scripts/preview-fx-align-review.mjs
       - name: Upload visual review
