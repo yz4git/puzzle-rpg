@@ -34,10 +34,14 @@ jobs:
           done
           cat /tmp/puzzle-rpg-server.log
           exit 1
+      - name: Extend Chrome startup allowance
+        run: sed -i 's/i<80/i<240/' scripts/chapter1-fullrun-audit.mjs
       - name: Run full Chapter 1 audit
         run: node scripts/chapter1-fullrun-audit.mjs
       - name: Upload audit
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: puzzle-rpg-chapter1-fullrun
           path: chapter1-fullrun
+          if-no-files-found: ignore
