@@ -1,0 +1,49 @@
+.root :global([class*="dropSprite"]) {
+  position: relative;
+  isolation: isolate;
+}
+
+/*
+ * iOS Safari can composite the dynamically-mounted <img> one or more frames
+ * after the drop tile frame itself. Render the orb mark as part of the drop
+ * sprite from frame zero so there is never a border-only falling tile.
+ */
+.root :global([class*="dropSprite"] img) {
+  display: none !important;
+}
+
+.root :global([class*="dropSprite"])::after {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  z-index: 3;
+  pointer-events: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  image-rendering: pixelated;
+  opacity: 1;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  filter: saturate(1.05) contrast(1.1) drop-shadow(2px 2px 0 #000);
+}
+
+.root :global([class*="dropSprite"][class*="fire"])::after {
+  background-image: url("/assets/pixel8/orbs/fire.png");
+  filter: saturate(1.22) contrast(1.16) hue-rotate(-4deg) drop-shadow(2px 2px 0 #000);
+}
+.root :global([class*="dropSprite"][class*="water"])::after {
+  background-image: url("/assets/pixel8/orbs/water.png");
+}
+.root :global([class*="dropSprite"][class*="light"])::after {
+  background-image: url("/assets/pixel8/orbs/light.png");
+}
+.root :global([class*="dropSprite"][class*="heart"])::after {
+  background-image: url("/assets/pixel8/orbs/heart.png");
+  filter: saturate(1.2) contrast(1.12) hue-rotate(7deg) brightness(1.08) drop-shadow(2px 2px 0 #000);
+}
+.root :global([class*="dropSprite"][class*="guard"])::after {
+  background-image: url("/assets/pixel8/orbs/guard.png");
+  filter: saturate(.72) contrast(1.2) brightness(1.12) drop-shadow(2px 2px 0 #000);
+}
