@@ -1,0 +1,137 @@
+.root {
+  --portrait-edge: 7px;
+  --portrait-content-max: 430px;
+}
+
+/* Title: use the full iPhone portrait canvas instead of bunching content at the top. */
+.root :global(main[aria-label="Puzzle RPG title"]) {
+  height: 100dvh;
+  min-height: 100dvh;
+  justify-content: space-evenly;
+  gap: clamp(8px, 1.55dvh, 14px);
+  padding:
+    max(18px, env(safe-area-inset-top))
+    12px
+    max(14px, env(safe-area-inset-bottom));
+}
+
+.root :global(main[aria-label="Puzzle RPG title"] [class*="titleLogo"]) {
+  margin-top: 0;
+  font-size: clamp(54px, 16.5vw, 78px);
+}
+
+.root :global(main[aria-label="Puzzle RPG title"] [class*="titleSub"]) {
+  font-size: clamp(11px, 3vw, 13px);
+}
+
+.root :global(main[aria-label="Puzzle RPG title"] > img) {
+  width: min(52vw, 205px);
+  height: min(32dvh, 225px);
+}
+
+.root :global(main[aria-label="Puzzle RPG title"] [class*="startButton"]) {
+  min-width: min(72vw, 286px);
+  min-height: 52px;
+}
+
+.root :global(main[aria-label="Puzzle RPG title"] [class*="titleRules"]) {
+  width: min(calc(100vw - 24px), var(--portrait-content-max));
+  margin-top: 0;
+  padding: 11px 12px;
+  gap: 6px;
+  font-size: 11px;
+}
+
+/* Battle: spend the space removed from the permanent instruction banner on the enemy. */
+.root :global([class*="enemyStage"]) {
+  min-height: 104px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 7px;
+  padding: 5px 7px;
+}
+
+.root :global([class*="enemySprite"]) {
+  width: 108px;
+  height: 96px;
+}
+
+.root :global([class*="enemyInfo"] > strong) {
+  font-size: 14px;
+}
+
+.root :global([class*="enemyInfo"] small) {
+  font-size: 8px;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hide the idle PRESS A CLUSTER banner completely; effect banners still appear. */
+.root :global([class*="fxBanner"]) {
+  display: none;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.root :global([class*="fxBannerActive"]) {
+  display: grid;
+  min-height: 22px;
+  min-width: 145px;
+  margin: 0 auto 2px;
+  padding: 2px 10px;
+  border: 2px solid #fff;
+}
+
+/* iPhone 17-class portrait widths: let the 6x6 board nearly fill the usable width. */
+.root :global([aria-label="cluster break board"]) {
+  box-sizing: border-box;
+  width: min(calc(100vw - (var(--portrait-edge) * 2)), 45dvh, var(--portrait-content-max));
+  max-width: 100%;
+}
+
+.root :global([aria-label="largest current clusters"]),
+.root :global([class*="message"]),
+.root :global([class*="ruleLine"]) {
+  width: min(calc(100vw - (var(--portrait-edge) * 2)), var(--portrait-content-max));
+  max-width: 100%;
+}
+
+@media (min-width: 380px) and (min-height: 800px) and (orientation: portrait) {
+  .root :global([aria-label="cluster break board"]) {
+    width: min(calc(100vw - 14px), 45dvh, 430px);
+  }
+
+  .root :global([class*="tile"] > b) {
+    font-size: clamp(24px, 7.5vw, 33px);
+  }
+
+  .root :global([class*="tile"] > span) {
+    font-size: clamp(7px, 1.9vw, 9px);
+  }
+}
+
+@media (max-height: 760px) and (orientation: portrait) {
+  .root :global([class*="enemyStage"]) {
+    min-height: 78px;
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .root :global([class*="enemySprite"]) {
+    width: 84px;
+    height: 72px;
+  }
+
+  .root :global([aria-label="cluster break board"]) {
+    width: min(calc(100vw - 14px), 40dvh, 360px);
+  }
+
+  .root :global(main[aria-label="Puzzle RPG title"] > img) {
+    width: min(44vw, 175px);
+    height: min(27dvh, 180px);
+  }
+}
