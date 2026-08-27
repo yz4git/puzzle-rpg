@@ -2,9 +2,9 @@
 
 ## Current phase
 
-Visual Reconstruction Pass in progress — high-density atlases, layered overworld
-rendering and reconstructed battle/title presentation are complete. Final targeted
-checks, GitHub main sync and existing Sites publication remain.
+Visual Reconstruction Pass complete — high-density atlases, layered overworld rendering,
+reconstructed battle/title presentation, GitHub main sync and existing Sites publication
+are complete.
 
 ## Completed
 
@@ -43,20 +43,22 @@ checks, GitHub main sync and existing Sites publication remain.
   DROP MAP/readout to the exact 6×6 board width.
 - Completed a live visual pass through title, opening dialogue, town, world map and
   a normal RPG battle; no app-origin console error was observed.
+- Passed RPG content, PWA startup-safety and production build gates.
+- Saved the reconstruction milestone to GitHub main and published Sites Version 32.
 
 ## In progress
 
-- Final targeted content/PWA gates, production checkpoint and publication.
+- None.
 
 ## Not completed
 
-- GitHub `main` and existing Sites are not yet updated with this reconstruction pass.
+- None.
 
 ## Next work
 
-1. Run the RPG content and PWA startup-safety checks.
-2. Save the reconstruction milestone and update GitHub `main`.
-3. Publish and verify the existing Sites project without changing its identity.
+1. Preserve all restore branches and the background-only Service Worker policy.
+2. Use the v2 manifest and deterministic rebuild script for future asset additions.
+3. Re-run only the checks relevant to future changes.
 
 ## Important decisions
 
