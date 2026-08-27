@@ -34,8 +34,16 @@ jobs:
           done
           cat /tmp/puzzle-rpg-server.log
           exit 1
-      - name: Extend Chrome startup allowance
-        run: sed -i 's/i<80/i<240/' scripts/chapter1-fullrun-audit.mjs
+      - name: Tune audit strategy
+        run: |
+          sed -i 's/i<80/i<240/' scripts/chapter1-fullrun-audit.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/chapter1-fullrun-audit.mjs')
+          s=p.read_text()
+          s=s.replace("if(g.type==='SKIP')return c>=2?c*4.5+9+(lethal?12:0):0.6", "if(g.type==='SKIP')return c>=2?c*10+25+(lethal?25:0):0.6")
+          p.write_text(s)
+          PY
       - name: Run full Chapter 1 audit
         run: node scripts/chapter1-fullrun-audit.mjs
       - name: Upload audit
