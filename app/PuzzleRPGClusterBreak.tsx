@@ -25,6 +25,7 @@ type FxState = { token: number; type: PanelType; count: number; rank: string; so
 type FeedbackTarget = "enemy" | "hp" | "barrier" | "free";
 type FeedbackTone = "gain" | "loss" | "special";
 type FeedbackState = { token: number; target: FeedbackTarget; text: string; tone: FeedbackTone };
+type ChapterBattleProps = { embedded?: boolean; onExit?: () => void };
 
 const SIZE = 6;
 const PLAYER_MAX_HP = 20;
@@ -413,9 +414,9 @@ function convertRandomPanelType(current: Tile[], from: PanelType, to: PanelType,
   return current.map((tile) => ids.has(tile.id) ? { ...tile, type: to } : tile);
 }
 
-export default function PuzzleRPGClusterBreak() {
-  const [showTitle, setShowTitle] = useState(true);
-  const [stageIntro, setStageIntro] = useState(false);
+export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: ChapterBattleProps = {}) {
+  const [showTitle, setShowTitle] = useState(!embedded);
+  const [stageIntro, setStageIntro] = useState(embedded);
   const [stageClear, setStageClear] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [stage, setStage] = useState(1);
@@ -854,12 +855,15 @@ export default function PuzzleRPGClusterBreak() {
 
       <header className={styles.topBar}>
         <div><span>CHAPTER 1 • {CHAPTER_TITLE}</span><strong>STAGE {stage}/{CHAPTER_LENGTH}{currentStage.boss ? " • BOSS" : currentStage.elite ? " • ELITE" : ""}</strong></div>
-        <button
-          type="button"
-          className={`${styles.turnBox} ${chapter.buildButton}`}
-          aria-label="Open Build Details"
-          onClick={() => setBuildOpen(true)}
-        >TURN {String(turn).padStart(2, "0")} • BUILD {build.length}</button>
+        <div className={chapter.headerActions}>
+          {onExit ? <button type="button" className={chapter.modeExit} onClick={onExit}>◀ MODE</button> : null}
+          <button
+            type="button"
+            className={`${styles.turnBox} ${chapter.buildButton}`}
+            aria-label="Open Build Details"
+            onClick={() => setBuildOpen(true)}
+          >TURN {String(turn).padStart(2, "0")} • BUILD {build.length}</button>
+        </div>
       </header>
 
       <section className={`${styles.enemyStage} ${v2.feedbackHost} ${fx?.type === "attack" ? styles.targetHit : ""}`}>
@@ -900,15 +904,15 @@ export default function PuzzleRPGClusterBreak() {
       </section>
 
       <section className={styles.nextStrip} aria-label="column next puzzle panels">
-        <div className={styles.nextLabel}>NEXT ↓</div>
+        <div className={styles.nextLabel}><span>NEXT DROP MAP</span><strong>列ごとに落下 ↓</strong></div>
         <div className={styles.nextColumns}>
           {queues.map((queue, col) => {
             const drops = previewDropCounts[col] ?? 0;
             return (
-              <div className={`${styles.nextColumn} ${drops > 0 ? v2.nextColumnActive : ""}`} key={col}>
+              <div className={`${styles.nextColumn} ${drops > 0 ? v2.nextColumnActive : ""}`} key={col} aria-label={`column ${col + 1}${drops ? ` receives ${drops} panels` : ""}`}>
                 <span className={`${styles.miniPanel} ${styles[queue[1]!]} ${drops >= 2 ? v2.nextIncoming : ""}`}>{PANEL_LABEL[queue[1]!]}</span>
                 <strong className={`${styles.miniPanel} ${styles[queue[0]!]} ${drops >= 1 ? v2.nextIncoming : ""}`}>{PANEL_LABEL[queue[0]!]}</strong>
-                {drops > 0 ? <i className={v2.dropCount}>↓{drops}</i> : null}
+                <span className={styles.dropGuide}><b>{col + 1}</b><i>{drops > 0 ? `▼${drops}` : "▼"}</i></span>
               </div>
             );
           })}
