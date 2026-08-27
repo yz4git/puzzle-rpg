@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { sites } from "./build/sites-vite-plugin";
@@ -11,6 +11,23 @@ const hostingConfig = existsSync(hostingConfigUrl)
   ? JSON.parse(readFileSync(hostingConfigUrl, "utf8")) as { d1?: string; r2?: string }
   : {};
 const { d1, r2 } = hostingConfig;
+
+// Every production build gets a distinct identity. A commit SHA is preferred when
+// available; the timestamp fallback also makes manual/repeated Sites publishes unique.
+const PUZZLE_RPG_BUILD_ID = (
+  process.env.GITHUB_SHA?.slice(0, 12)
+  ?? process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12)
+  ?? process.env.SITES_DEPLOYMENT_ID
+  ?? `b${Date.now().toString(36)}`
+).replace(/[^a-zA-Z0-9._-]/g, "-");
+
+// public/ is copied by Vite after this config is evaluated, so stamp the build id
+// before the asset pipeline starts. Clients fetch it with a cache-busting query.
+writeFileSync(
+  new URL("./public/build-id.json", import.meta.url),
+  `${JSON.stringify({ build: PUZZLE_RPG_BUILD_ID })}\n`,
+  "utf8",
+);
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -46,7 +63,7 @@ export default defineConfig(async () => {
 
   return {
     define: {
-      __SKY_DANCER_BUILD_ID__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 12) ?? "local"),
+      __PUZZLE_RPG_BUILD_ID__: JSON.stringify(PUZZLE_RPG_BUILD_ID),
     },
     server: {
       host: "0.0.0.0",
