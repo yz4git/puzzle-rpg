@@ -134,7 +134,7 @@ try {
   await sleep(500);
   await shot(cdp, '02-stage-intro');
 
-  await evaluate(cdp, `Array.from(document.querySelectorAll('button')).find(b => !b.textContent.includes('START GAME'))?.click()`);
+  await evaluate(cdp, `Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('BATTLE START'))?.click()`);
   await sleep(500);
   await shot(cdp, '03-battle-start');
 
