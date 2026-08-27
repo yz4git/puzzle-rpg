@@ -68,6 +68,53 @@
   overflow: hidden;
 }
 
+/* Intent hierarchy: the enemy action that will happen next is primary.
+   The following action remains readable but intentionally recedes. */
+.root :global([class*="intentRow"]) {
+  grid-template-columns: 1.14fr .86fr;
+}
+
+.root :global([class*="intentNow"]) {
+  border: 3px solid #fff2a8;
+  background: linear-gradient(90deg, rgba(117, 24, 37, .92), rgba(47, 11, 20, .94));
+  box-shadow: inset 0 0 0 1px #d94d55, 0 0 0 1px #140609;
+  padding: 4px 6px;
+}
+
+.root :global([class*="intentNow"] > span) {
+  color: #fff2a8;
+  font-weight: 1000;
+}
+
+.root :global([class*="intentNow"] > strong) {
+  font-size: 10px;
+}
+
+.root :global([class*="intentNow"] > em) {
+  font-size: 15px;
+  color: #fff;
+}
+
+.root :global([class*="intentNext"]) {
+  border: 2px solid #4f5060;
+  background: #06070c;
+  box-shadow: inset 0 0 0 1px #191b27;
+  opacity: .78;
+}
+
+.root :global([class*="intentNext"] > b) {
+  color: #a7a9b5;
+}
+
+.root :global([class*="intentNext"] > strong) {
+  font-size: 8px;
+}
+
+.root :global([class*="intentNext"] > em) {
+  font-size: 11px;
+  color: #c6c7cf;
+}
+
 /* Hide the idle PRESS A CLUSTER banner completely; effect banners still appear. */
 .root :global([class*="fxBanner"]) {
   display: none;
