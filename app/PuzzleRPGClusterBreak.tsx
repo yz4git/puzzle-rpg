@@ -104,7 +104,7 @@ const CHAPTER_ONE_STAGES: StageDef[] = [
     passive: "BLOOD NEEDLE 5 / BLOOD DRAIN 6。DRAIN成立時は追加で2HP吸収する。",
   },
   {
-    kind: "null", name: "NULL EXECUTIONER", hp: 62, powerBonus: 2, elite: true,
+    kind: "null", name: "NULL EXECUTIONER", hp: 58, powerBonus: 2, elite: true,
     quote: "盾は数えない。残る命だけを数える。",
     hint: "HP8以下ではNULL PIERCEが+2。BARでは防げないので、HEALかSKIPを優先する。",
     passive: "NULL SLASH 6 / NULL PIERCE 7。HP8以下ではEXECUTEが発動しPIERCE 9。",
