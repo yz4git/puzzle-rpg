@@ -68,51 +68,74 @@
   overflow: hidden;
 }
 
-/* Intent hierarchy: the enemy action that will happen next is primary.
+/* Intent hierarchy: the action that happens next is primary.
    The following action remains readable but intentionally recedes. */
 .root :global([class*="intentRow"]) {
-  grid-template-columns: 1.14fr .86fr;
+  grid-template-columns: 1.14fr .86fr !important;
 }
 
 .root :global([class*="intentNow"]) {
-  border: 3px solid #fff2a8;
-  background: linear-gradient(90deg, rgba(117, 24, 37, .92), rgba(47, 11, 20, .94));
-  box-shadow: inset 0 0 0 1px #d94d55, 0 0 0 1px #140609;
+  border: 3px solid #fff2a8 !important;
+  background: linear-gradient(90deg, rgba(117, 24, 37, .96), rgba(47, 11, 20, .96)) !important;
+  box-shadow: inset 0 0 0 1px #d94d55, 0 0 0 1px #140609 !important;
   padding: 4px 6px;
+  opacity: 1 !important;
 }
 
 .root :global([class*="intentNow"] > span) {
-  color: #fff2a8;
+  color: #fff2a8 !important;
   font-weight: 1000;
 }
 
+.root :global([class*="intentNow"] > b) {
+  color: #ffe063 !important;
+}
+
 .root :global([class*="intentNow"] > strong) {
-  font-size: 10px;
+  font-size: 10px !important;
+  color: #fff !important;
 }
 
 .root :global([class*="intentNow"] > em) {
-  font-size: 15px;
-  color: #fff;
+  font-size: 15px !important;
+  color: #fff !important;
 }
 
 .root :global([class*="intentNext"]) {
-  border: 2px solid #4f5060;
-  background: #06070c;
-  box-shadow: inset 0 0 0 1px #191b27;
-  opacity: .78;
+  border: 2px solid #4f5060 !important;
+  background: #06070c !important;
+  box-shadow: inset 0 0 0 1px #191b27 !important;
+  opacity: .68 !important;
 }
 
-.root :global([class*="intentNext"] > b) {
-  color: #a7a9b5;
+.root :global([class*="intentNext"] > span),
+.root :global([class*="intentNext"] > b),
+.root :global([class*="intentNext"] > small) {
+  color: #8d909d !important;
 }
 
 .root :global([class*="intentNext"] > strong) {
-  font-size: 8px;
+  font-size: 8px !important;
+  color: #b9bbc4 !important;
 }
 
 .root :global([class*="intentNext"] > em) {
-  font-size: 11px;
-  color: #c6c7cf;
+  font-size: 11px !important;
+  color: #c6c7cf !important;
+}
+
+/* Battle FX must render over the board/status UI, never underneath it. */
+.root :global([class*="energyLayer"]) {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 95 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+.root :global([class*="energyParticle"]) {
+  z-index: 1;
+  filter: drop-shadow(0 0 5px currentColor);
 }
 
 /* Hide the idle PRESS A CLUSTER banner completely; effect banners still appear. */
