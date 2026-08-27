@@ -157,11 +157,13 @@
   border: 2px solid #fff;
 }
 
-/* Battle board sizing is width-authoritative. Do not let reduced browser dvh shrink it. */
+/* Battle board sizing is width-authoritative. Do not let reduced browser dvh shrink it.
+   Clip refill tiles until they enter the board so they cannot cover the enemy/HUD. */
 .root :global([aria-label="cluster break board"]) {
   box-sizing: border-box;
   width: min(calc(100vw - (var(--portrait-edge) * 2)), var(--portrait-content-max));
   max-width: 100%;
+  overflow: hidden !important;
 }
 
 /* The board itself is the interaction/readout. Remove all permanent footer information. */
