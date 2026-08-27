@@ -12,14 +12,15 @@ const hostingConfig = existsSync(hostingConfigUrl)
   : {};
 const { d1, r2 } = hostingConfig;
 
-// Every production build gets a distinct identity. A commit SHA is preferred when
-// available; the timestamp fallback also makes manual/repeated Sites publishes unique.
-const PUZZLE_RPG_BUILD_ID = (
+// Every build gets a distinct identity, even when the exact same commit is
+// republished. Keep the source id for debugging and append a per-build stamp.
+const BUILD_SOURCE = (
   process.env.GITHUB_SHA?.slice(0, 12)
   ?? process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12)
   ?? process.env.SITES_DEPLOYMENT_ID
-  ?? `b${Date.now().toString(36)}`
+  ?? "local"
 ).replace(/[^a-zA-Z0-9._-]/g, "-");
+const PUZZLE_RPG_BUILD_ID = `${BUILD_SOURCE}-${Date.now().toString(36)}`;
 
 // public/ is copied by Vite after this config is evaluated, so stamp the build id
 // before the asset pipeline starts. Clients fetch it with a cache-busting query.
