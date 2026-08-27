@@ -26,3 +26,23 @@ jobs:
         run: npx tsc -p tsconfig.puzzle.json --noEmit
       - name: Production build
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start review server
+        if: github.event_name == 'pull_request'
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/puzzle-rpg-review.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:5173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/puzzle-rpg-review.log
+          exit 1
+      - name: Capture first-open intent and FX review
+        if: github.event_name == 'pull_request'
+        run: node scripts/iphone17-intent-fx-review.mjs
+      - name: Upload visual review
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-intent-fx-review
+          path: review-artifacts
+          if-no-files-found: error
