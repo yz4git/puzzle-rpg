@@ -11,7 +11,7 @@ This repository is `yz4git/puzzle-rpg`.
 - Save meaningful progress to GitHub frequently so work is recoverable.
 
 ## ChatGPT Sites fresh-page policy
-- Every Sites/Vite build must produce a distinct `public/build-id.json`. `vite.config.ts` stamps it automatically from the commit/deployment id, with a timestamp fallback for repeated manual publishes.
+- Every Sites/Vite build must produce a distinct `public/build-id.json`, including when the exact same commit is republished. `vite.config.ts` stamps it automatically from the commit/deployment source id plus a per-build timestamp.
 - `ServiceWorkerRegistration` must fetch `build-id.json` with a unique no-store probe and move the browser onto `?__build=<build-id>` whenever the deployed build changes. This is intentional: a newly published Site should open as a new build-specific page instead of silently reusing the previous Safari page/cache entry.
 - Register the service worker as `sw.js?build=<build-id>` with `updateViaCache: "none"`; the worker must derive its cache name from that build id, delete older `puzzle-rpg-*` caches on activation, and keep HTML navigation network-first with `cache: "no-store"`.
 - Never remove the build-specific URL redirect merely to make the public URL look cleaner. The stable public URL remains the entry point; it should automatically replace itself with the current build-specific URL.
