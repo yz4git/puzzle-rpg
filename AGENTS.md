@@ -10,6 +10,13 @@ This repository is `yz4git/puzzle-rpg`.
 - Do not modify `yz4git/sky-dancer` while working on this repository.
 - Save meaningful progress to GitHub frequently so work is recoverable.
 
+## ChatGPT Sites fresh-page policy
+- Every Sites/Vite build must produce a distinct `public/build-id.json`. `vite.config.ts` stamps it automatically from the commit/deployment id, with a timestamp fallback for repeated manual publishes.
+- `ServiceWorkerRegistration` must fetch `build-id.json` with a unique no-store probe and move the browser onto `?__build=<build-id>` whenever the deployed build changes. This is intentional: a newly published Site should open as a new build-specific page instead of silently reusing the previous Safari page/cache entry.
+- Register the service worker as `sw.js?build=<build-id>` with `updateViaCache: "none"`; the worker must derive its cache name from that build id, delete older `puzzle-rpg-*` caches on activation, and keep HTML navigation network-first with `cache: "no-store"`.
+- Never remove the build-specific URL redirect merely to make the public URL look cleaner. The stable public URL remains the entry point; it should automatically replace itself with the current build-specific URL.
+- After a Sites publish, verify the browser ends on the current `?__build=` URL before judging whether a visual/code update has propagated.
+
 ## Current core rules: Cluster Break tactical RPG
 - The active puzzle is Cluster Break: pressing a panel previews its entire orthogonally connected same-type cluster, and releasing removes that cluster.
 - A single isolated panel is always legal and removes itself.
