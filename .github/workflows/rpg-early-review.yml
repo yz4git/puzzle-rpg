@@ -1,0 +1,41 @@
+name: RPG Early Game Review
+
+on:
+  push:
+    branches:
+      - review/rpg-early-game-20260828
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Start review server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/rpg-early-review-server.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:5173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/rpg-early-review-server.log
+          exit 1
+      - name: Play early RPG and capture screens
+        run: node scripts/rpg-early-review.mjs
+      - name: Upload review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-early-game-review
+          path: rpg-early-review
+          if-no-files-found: error
