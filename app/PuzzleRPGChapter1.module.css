@@ -152,6 +152,17 @@
   text-align: center;
 }
 .buildButton:active { transform: translate(1px, 1px); }
+.headerActions { display: flex; align-items: center; gap: 3px; }
+.modeExit {
+  min-height: 23px;
+  padding: 2px 5px;
+  border: 1px solid #73798d;
+  border-radius: 0;
+  background: #09090d;
+  color: #b9bed0;
+  font: 1000 6px/1 ui-monospace, monospace;
+}
+.modeExit:active { color: #ffe56c; border-color: #ffe56c; }
 
 .nextEncounter {
   display: grid;
