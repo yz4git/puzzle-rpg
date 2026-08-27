@@ -1,0 +1,40 @@
+name: Chapter 1 Polish
+
+on:
+  push:
+    branches:
+      - feature/chapter1-polish-20260827
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/chapter1-polish-20260827
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply polish patch
+        run: python3 scripts/implement-chapter1-polish.py
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/PuzzleRPGClusterBreak.tsx app/PuzzleRPGChapter1.module.css
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Polish Chapter 1 progression and build UX"
+          git push origin HEAD:feature/chapter1-polish-20260827
