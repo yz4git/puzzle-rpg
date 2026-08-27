@@ -1,0 +1,43 @@
+name: Cluster Break v2 Visual Audit
+
+on:
+  push:
+    branches: [review/gameplay-v2-audit-20260827]
+    paths:
+      - '.github/workflows/gameplay-v2-audit.yml'
+      - 'scripts/gameplay-v2-audit.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: review/gameplay-v2-audit-20260827
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start review server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/puzzle-v2.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:5173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/puzzle-v2.log
+          exit 1
+      - name: Run v2 gameplay audit
+        run: node scripts/gameplay-v2-audit.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-gameplay-v2-audit
+          path: review-artifacts-v2
+          if-no-files-found: error
