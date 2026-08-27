@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Phase 6 complete — the first full Overworld → Encounter → Cluster Break → Overworld loop is playable. Phase 7 asset production is next.
+Phase 20 in progress — implementation, art, audio, content, browser play and balance passes are complete. Final GitHub main sync and existing Sites deployment remain.
 
 ## Completed
 
@@ -20,21 +20,28 @@ Phase 6 complete — the first full Overworld → Encounter → Cluster Break �
 - Added autosave, validated JSON export/import and a bounded battle telemetry log for the final balance pass.
 - Added nine original procedural 8bit BGM arrangements and more than twenty synthesized SE cues with MUSIC/SFX toggles.
 - Passed TypeScript and a production Sites build after the playable-loop integration.
+- Generated, normalized and integrated Hero, NPC, Field, Town, Dungeon, Enemy, Boss and UI pixel atlases.
+- Added atlas-backed world, character, enemy, boss and command rendering with nearest-neighbor scaling and safe code-drawn fallbacks.
+- Completed the 5-town / 4-training-site / 3-small-dungeon / final-dungeon content graph with 35 NPCs and complete acquisition paths for 16 techniques and 12 equipment pieces.
+- Added phase dialogue to all bosses and retained the tuned VOID HERALD, IRON TYRANT, SCARLET ORACLE, NULL EXECUTIONER and three-phase PRISM SOVEREIGN rules.
+- Added content integrity tests and a reproducible five-archetype balance runner.
+- Completed real-browser checks for NEW GAME, world/NPC/MEMO, encounter, TALK/ITEM/STATUS/RUN, SAVE EXPORT/IMPORT, Chapter Battle, final boss phases, ending and title return.
+- Fixed NPC visibility, blocked exits/chests/fixed encounters, equipment rank enforcement and compact-height title mode selection found during browser play.
 
 ## In progress
 
-- Generate and normalize the RPG sprite/tile/enemy/UI atlases using the fixed art prompt.
-- Replace the code-drawn overworld fallback with atlas-backed rendering while retaining a safe fallback.
+- Run the final TypeScript, targeted test and production build gates after the last compact-height fix.
+- Save the final milestone to GitHub `main`, then publish the existing Sites project.
 
 ## Not completed
 
-- Generated production atlases, complete story-text pass, real-browser iPhone playthrough, five-archetype balance pass, final GitHub merge and existing Sites deployment.
+- Final GitHub merge and existing Sites deployment.
 
 ## Next work
 
-1. Generate Hero/NPC, field/town/dungeon, enemy/boss and UI atlas groups.
-2. Integrate the cleaned atlases and run visual audit at 402×690 DPR3.
-3. Complete content/balance passes, then fast-forward `main` and publish the existing Sites project.
+1. Run final compile, content/PWA tests and production build.
+2. Save the production atlases and source changes to the RPG milestone branch, then fast-forward `main`.
+3. Checkpoint and deploy the existing Sites project, then verify the live startup path.
 
 ## Important decisions
 
@@ -44,8 +51,9 @@ Phase 6 complete — the first full Overworld → Encounter → Cluster Break �
 - Active play is never interrupted by a Service Worker reload or redirect.
 - BGM remains WebAudio-generated and completely original; it does not reproduce reference melodies.
 - Battle records retain only the latest 120 fights and never include personal data.
+- High-resolution generated sources are regenerable and ignored; compact production atlases and the fixed prompt are versioned.
+- Alternate resolutions grant 35% EXP and 20% GOLD so TALK routes have distinct rewards without replacing combat progression.
 
 ## Known issues
 
-- Current map art is a readable code-drawn fallback pending generated-atlas integration.
-- Full-route browser balance data has not yet been collected.
+- No app-origin browser errors are known. The remaining work is repository/deployment finalization.
