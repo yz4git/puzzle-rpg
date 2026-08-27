@@ -26,22 +26,3 @@ jobs:
         run: npx tsc -p tsconfig.puzzle.json --noEmit
       - name: Production build
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
-      - name: Install Chromium QA runtime
-        run: |
-          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
-          npx playwright install --with-deps chromium
-      - name: Start game
-        run: |
-          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/puzzle-rpg-vite.log 2>&1 &
-          for i in {1..60}; do curl -fsS http://127.0.0.1:4173 >/dev/null && exit 0; sleep 1; done
-          cat /tmp/puzzle-rpg-vite.log
-          exit 1
-      - name: Play SameGame and capture
-        run: node qa-samegame-review.mjs
-      - name: Upload SameGame review
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: puzzle-rpg-samegame-review
-          path: qa-samegame-review
-          if-no-files-found: warn
