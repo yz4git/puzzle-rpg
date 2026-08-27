@@ -26,3 +26,14 @@ jobs:
         run: npx tsc -p tsconfig.puzzle.json --noEmit
       - name: Production build
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start review server
+        run: |
+          (npm run dev -- --hostname 127.0.0.1 --port 5173 > /tmp/puzzle-review.log 2>&1 &)
+          sleep 5
+      - name: Capture preview alignment and FX stacking
+        run: node scripts/preview-fx-align-review.mjs
+      - name: Upload visual review
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-preview-fx-review
+          path: review-artifacts
