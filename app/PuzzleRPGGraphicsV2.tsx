@@ -1,22 +1,14 @@
 "use client";
 
-import PuzzleRPGEnhanced from "./PuzzleRPGEnhanced";
+import PuzzleRPGSameGame from "./PuzzleRPGSameGame";
 import skin from "./PuzzleRPGGraphicsV2.module.css";
-import enemyStage from "./EnemyStageV2.module.css";
-import orbArt from "./OrbArtV2.module.css";
-import dropSpriteFix from "./DropSpriteIconFix.module.css";
-import battleFx from "./BattleFXV2.module.css";
-import stageBackground from "./StageBackgroundV2.module.css";
 
 export default function PuzzleRPGGraphicsV2() {
   return (
-    <div
-      className={`${skin.root} ${enemyStage.root} ${orbArt.root} ${dropSpriteFix.root} ${battleFx.root} ${stageBackground.root}`}
-      data-graphics-version="2"
-    >
+    <div className={skin.root} data-graphics-version="samegame-v1">
       <div className={skin.backdropGrid} aria-hidden="true" />
       <div className={skin.scanlines} aria-hidden="true" />
-      <PuzzleRPGEnhanced />
+      <PuzzleRPGSameGame />
     </div>
   );
 }
