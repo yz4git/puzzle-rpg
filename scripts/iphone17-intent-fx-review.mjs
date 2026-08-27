@@ -74,21 +74,12 @@ try {
   })()`);
   await shot(cdp, '02-intent-hierarchy');
 
-  const attackTarget = await evaluate(cdp, `(() => {
+  const attackTriggered = await evaluate(cdp, `(() => {
     const b=Array.from(document.querySelectorAll('[aria-label="cluster break board"] button:not(:disabled)')).find(el => el.getAttribute('aria-label')?.startsWith('ATK panel'));
     if(!b) return false;
-    const r=b.getBoundingClientRect(); const x=r.left+r.width/2, y=r.top+r.height/2;
-    b.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:17,pointerType:'touch',clientX:x,clientY:y,isPrimary:true}));
+    b.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'Enter',code:'Enter'}));
     return true;
   })()`);
-  await sleep(90);
-  const attackTriggered = attackTarget ? await evaluate(cdp, `(() => {
-    const b=document.querySelector('[aria-label="cluster break board"] button[class*="previewed"]') || Array.from(document.querySelectorAll('[aria-label="cluster break board"] button')).find(el => el.getAttribute('aria-label')?.startsWith('ATK panel'));
-    if(!b) return false;
-    const r=b.getBoundingClientRect(); const x=r.left+r.width/2, y=r.top+r.height/2;
-    b.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:17,pointerType:'touch',clientX:x,clientY:y,isPrimary:true}));
-    return true;
-  })()`) : false;
   await sleep(120);
   const fx = await evaluate(cdp, `(() => {
     const layer=document.querySelector('[class*="energyLayer"]'); const main=document.querySelector('main[class*="shell"]');
