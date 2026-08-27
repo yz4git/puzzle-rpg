@@ -7,12 +7,17 @@ const githubPagesBasePath = isGitHubPagesBuild
   ? `/${process.env.GITHUB_REPOSITORY?.split("/")[1] ?? "puzzle-rpg"}`
   : "";
 
-const enemyPreloads = [
+const pixelArtPreloads = [
   "/assets/pixel8/warden.png",
   "/assets/pixel8/bastion.png",
   "/assets/pixel8/oracle.png",
   "/assets/pixel8/null-knight.png",
   "/assets/pixel8/trickster.png",
+  "/assets/pixel8/orbs/fire.png",
+  "/assets/pixel8/orbs/water.png",
+  "/assets/pixel8/orbs/light.png",
+  "/assets/pixel8/orbs/heart.png",
+  "/assets/pixel8/orbs/guard.png",
 ];
 
 export const metadata: Metadata = {
@@ -45,7 +50,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ja">
       <head>
-        {enemyPreloads.map((src) => (
+        {pixelArtPreloads.map((src) => (
           <link key={src} rel="preload" as="image" href={`${githubPagesBasePath}${src}`} />
         ))}
       </head>
