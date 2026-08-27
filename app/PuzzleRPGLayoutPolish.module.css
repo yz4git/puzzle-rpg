@@ -3,37 +3,17 @@
   --portrait-content-max: 430px;
 }
 
-/* Title: use the full iPhone portrait canvas instead of bunching content at the top. */
 .root :global(main[aria-label="Puzzle RPG title"]) {
   height: 100dvh;
   min-height: 100dvh;
   justify-content: space-evenly;
   gap: clamp(8px, 1.55dvh, 14px);
-  padding:
-    max(18px, env(safe-area-inset-top))
-    12px
-    max(14px, env(safe-area-inset-bottom));
+  padding: max(18px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
 }
-
-.root :global(main[aria-label="Puzzle RPG title"] [class*="titleLogo"]) {
-  margin-top: 0;
-  font-size: clamp(54px, 16.5vw, 78px);
-}
-
-.root :global(main[aria-label="Puzzle RPG title"] [class*="titleSub"]) {
-  font-size: clamp(11px, 3vw, 13px);
-}
-
-.root :global(main[aria-label="Puzzle RPG title"] > img) {
-  width: min(52vw, 205px);
-  height: min(32dvh, 225px);
-}
-
-.root :global(main[aria-label="Puzzle RPG title"] [class*="startButton"]) {
-  min-width: min(72vw, 286px);
-  min-height: 52px;
-}
-
+.root :global(main[aria-label="Puzzle RPG title"] [class*="titleLogo"]) { margin-top: 0; font-size: clamp(54px, 16.5vw, 78px); }
+.root :global(main[aria-label="Puzzle RPG title"] [class*="titleSub"]) { font-size: clamp(11px, 3vw, 13px); }
+.root :global(main[aria-label="Puzzle RPG title"] > img) { width: min(52vw, 205px); height: min(32dvh, 225px); }
+.root :global(main[aria-label="Puzzle RPG title"] [class*="startButton"]) { min-width: min(72vw, 286px); min-height: 52px; }
 .root :global(main[aria-label="Puzzle RPG title"] [class*="titleRules"]) {
   width: min(calc(100vw - 24px), var(--portrait-content-max));
   margin-top: 0;
@@ -42,23 +22,9 @@
   font-size: 11px;
 }
 
-/* Battle: keep the enemy large even when Safari/ChatGPT browser chrome reduces dvh. */
-.root :global([class*="enemyStage"]) {
-  min-height: 104px;
-  grid-template-columns: 112px minmax(0, 1fr);
-  gap: 7px;
-  padding: 5px 7px;
-}
-
-.root :global([class*="enemySprite"]) {
-  width: 108px;
-  height: 96px;
-}
-
-.root :global([class*="enemyInfo"] > strong) {
-  font-size: 14px;
-}
-
+.root :global([class*="enemyStage"]) { min-height: 104px; grid-template-columns: 112px minmax(0, 1fr); gap: 7px; padding: 5px 7px; }
+.root :global([class*="enemySprite"]) { width: 108px; height: 96px; }
+.root :global([class*="enemyInfo"] > strong) { font-size: 14px; }
 .root :global([class*="enemyInfo"] small) {
   font-size: 8px;
   line-height: 1.25;
@@ -68,12 +34,7 @@
   overflow: hidden;
 }
 
-/* Intent hierarchy: the action that happens next is primary.
-   The following action remains readable but intentionally recedes. */
-.root :global([class*="intentRow"]) {
-  grid-template-columns: 1.14fr .86fr !important;
-}
-
+.root :global([class*="intentRow"]) { grid-template-columns: 1.14fr .86fr !important; }
 .root :global([class*="intentNow"]) {
   border: 3px solid #fff2a8 !important;
   background: linear-gradient(90deg, rgba(117, 24, 37, .96), rgba(47, 11, 20, .96)) !important;
@@ -81,84 +42,76 @@
   padding: 4px 6px;
   opacity: 1 !important;
 }
-
-.root :global([class*="intentNow"] > span) {
-  color: #fff2a8 !important;
-  font-weight: 1000;
-}
-
-.root :global([class*="intentNow"] > b) {
-  color: #ffe063 !important;
-}
-
-.root :global([class*="intentNow"] > strong) {
-  font-size: 10px !important;
-  color: #fff !important;
-}
-
-.root :global([class*="intentNow"] > em) {
-  font-size: 15px !important;
-  color: #fff !important;
-}
-
+.root :global([class*="intentNow"] > span) { color: #fff2a8 !important; font-weight: 1000; }
+.root :global([class*="intentNow"] > b) { color: #ffe063 !important; }
+.root :global([class*="intentNow"] > strong) { font-size: 10px !important; color: #fff !important; }
+.root :global([class*="intentNow"] > em) { font-size: 15px !important; color: #fff !important; }
 .root :global([class*="intentNext"]) {
   border: 2px solid #4f5060 !important;
   background: #06070c !important;
   box-shadow: inset 0 0 0 1px #191b27 !important;
   opacity: .68 !important;
 }
-
 .root :global([class*="intentNext"] > span),
 .root :global([class*="intentNext"] > b),
-.root :global([class*="intentNext"] > small) {
-  color: #8d909d !important;
-}
+.root :global([class*="intentNext"] > small) { color: #8d909d !important; }
+.root :global([class*="intentNext"] > strong) { font-size: 8px !important; color: #b9bbc4 !important; }
+.root :global([class*="intentNext"] > em) { font-size: 11px !important; color: #c6c7cf !important; }
 
-.root :global([class*="intentNext"] > strong) {
-  font-size: 8px !important;
-  color: #b9bbc4 !important;
-}
-
-.root :global([class*="intentNext"] > em) {
-  font-size: 11px !important;
-  color: #c6c7cf !important;
-}
-
-/* Battle FX must render over the board/status UI, never underneath it. */
+/* Keep only the board clipped. Effects are allowed to cross every battle UI row. */
+.root :global(main[class*="shell"]) { overflow: visible !important; }
 .root :global([class*="energyLayer"]) {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 95 !important;
+  z-index: 9999 !important;
   overflow: visible !important;
   pointer-events: none !important;
 }
+.root :global([class*="energyParticle"]) { position: absolute !important; z-index: 10000 !important; filter: drop-shadow(0 0 5px currentColor); }
 
-.root :global([class*="energyParticle"]) {
-  z-index: 1;
-  filter: drop-shadow(0 0 5px currentColor);
+/* The six preview columns now use exactly the board's inner width and 3px gaps. */
+.root :global([aria-label="column next puzzle panels"]) {
+  box-sizing: border-box !important;
+  width: min(calc(100vw - (var(--portrait-edge) * 2)), var(--portrait-content-max)) !important;
+  max-width: 100% !important;
+  justify-self: center !important;
+  position: relative !important;
+  display: block !important;
+  min-height: 40px !important;
+  padding: 2px 3px 0 !important;
 }
-
-/* Hide the idle PRESS A CLUSTER banner completely; effect banners still appear. */
-.root :global([class*="fxBanner"]) {
-  display: none;
-  min-height: 0;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.root :global([class*="nextLabel"]) {
+  position: absolute !important;
+  z-index: 5 !important;
+  top: -7px !important;
+  left: 5px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  padding: 0 3px !important;
+  border: 0 !important;
+  background: #050509 !important;
+  font-size: 6px !important;
+  line-height: 1.2 !important;
+  color: #aaa !important;
+  pointer-events: none !important;
 }
-
-.root :global([class*="fxBannerActive"]) {
-  display: grid;
-  min-height: 22px;
-  min-width: 145px;
-  margin: 0 auto 2px;
-  padding: 2px 10px;
-  border: 2px solid #fff;
+.root :global([class*="nextColumns"]) {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 38px !important;
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 3px !important;
+  padding: 0 !important;
+  border: 0 !important;
 }
+.root :global([class*="nextColumn"]) { width: 100% !important; min-width: 0 !important; grid-template-rows: 1fr 1.15fr !important; gap: 1px !important; }
+.root :global([class*="miniPanel"]) { box-sizing: border-box !important; width: 100% !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
 
-/* Battle board sizing is width-authoritative. Do not let reduced browser dvh shrink it.
-   Clip refill tiles until they enter the board so they cannot cover the enemy/HUD. */
+.root :global([class*="fxBanner"]) { display: none; min-height: 0; min-width: 0; margin: 0; padding: 0; border: 0; }
+.root :global([class*="fxBannerActive"]) { display: grid; min-height: 22px; min-width: 145px; margin: 0 auto 2px; padding: 2px 10px; border: 2px solid #fff; }
+
 .root :global([aria-label="cluster break board"]) {
   box-sizing: border-box;
   width: min(calc(100vw - (var(--portrait-edge) * 2)), var(--portrait-content-max));
@@ -166,7 +119,6 @@
   overflow: hidden !important;
 }
 
-/* The board itself is the interaction/readout. Remove all permanent footer information. */
 .root :global(main > [aria-label="largest current clusters"]),
 .root :global(main > [role="status"]),
 .root :global(main > [class*="ruleLine"]) {
@@ -181,24 +133,12 @@
 }
 
 @media (min-width: 380px) and (orientation: portrait) {
-  .root :global([aria-label="cluster break board"]) {
-    width: min(calc(100vw - 14px), 430px);
-  }
-
-  .root :global([class*="tile"] > b) {
-    font-size: clamp(24px, 7.5vw, 33px);
-  }
-
-  .root :global([class*="tile"] > span) {
-    font-size: clamp(7px, 1.9vw, 9px);
-  }
+  .root :global([aria-label="cluster break board"]),
+  .root :global([aria-label="column next puzzle panels"]) { width: min(calc(100vw - 14px), 430px) !important; }
+  .root :global([class*="tile"] > b) { font-size: clamp(24px, 7.5vw, 33px); }
+  .root :global([class*="tile"] > span) { font-size: clamp(7px, 1.9vw, 9px); }
 }
 
-/* Only the title illustration may compact on a genuinely short viewport.
-   The battle board and enemy intentionally stay full-size. */
 @media (max-height: 760px) and (orientation: portrait) {
-  .root :global(main[aria-label="Puzzle RPG title"] > img) {
-    width: min(44vw, 175px);
-    height: min(27dvh, 180px);
-  }
+  .root :global(main[aria-label="Puzzle RPG title"] > img) { width: min(44vw, 175px); height: min(27dvh, 180px); }
 }
