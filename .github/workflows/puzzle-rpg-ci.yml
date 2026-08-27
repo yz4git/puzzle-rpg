@@ -26,3 +26,25 @@ jobs:
         run: npx tsc -p tsconfig.puzzle.json --noEmit
       - name: Production build
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start review server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/puzzle-rpg-vite.log 2>&1 &
+          echo $! > /tmp/puzzle-rpg-vite.pid
+          for i in {1..60}; do
+            curl -fsS http://127.0.0.1:5173/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/puzzle-rpg-vite.log
+          exit 1
+      - name: Capture iPhone visual playcheck
+        run: |
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME_BIN"
+          node scripts/visual-review.mjs
+      - name: Upload visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-visual-review
+          path: review-artifacts
+          if-no-files-found: warn
