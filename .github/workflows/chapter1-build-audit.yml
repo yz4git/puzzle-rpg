@@ -1,0 +1,43 @@
+name: Chapter 1 Build Audit
+
+on:
+  push:
+    branches:
+      - review/chapter1-build-audit-20260827
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start review server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/puzzle-rpg-vite.log 2>&1 &
+          for i in {1..50}; do
+            if curl -fsS http://127.0.0.1:5173 >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/puzzle-rpg-vite.log
+          exit 1
+      - name: Run Chapter 1 gameplay audit
+        run: node scripts/chapter1-audit.mjs
+      - name: Upload audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-chapter1-build-audit
+          path: review-artifacts
