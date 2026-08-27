@@ -6,7 +6,7 @@ on:
       - feature/endgame-balance-20260827
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
@@ -14,6 +14,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: feature/endgame-balance-20260827
+          fetch-depth: 0
+      - name: Commit final Stage 9 HP tuning
+        run: |
+          sed -i 's/name: "NULL EXECUTIONER", hp: 62/name: "NULL EXECUTIONER", hp: 58/' app/PuzzleRPGClusterBreak.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/PuzzleRPGClusterBreak.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m "Tune NULL EXECUTIONER endgame difficulty"
+            git push origin HEAD:feature/endgame-balance-20260827
+          fi
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
