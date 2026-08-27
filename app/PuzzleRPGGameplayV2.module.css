@@ -1,0 +1,116 @@
+.gameplayRoot {
+  --v2-pixel-white: #fff7d8;
+}
+
+.feedbackHost {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.feedback {
+  position: absolute;
+  z-index: 12000;
+  left: 50%;
+  top: 50%;
+  min-width: max-content;
+  padding: 2px 5px;
+  border: 2px solid #fff;
+  background: #040407;
+  font: 1000 12px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: .3px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: feedbackRise 720ms steps(6,end) both;
+  text-shadow: 2px 2px #000;
+}
+.feedbackGain { color: #7cffb0; box-shadow: 0 0 10px rgba(64,255,154,.55); }
+.feedbackLoss { color: #ff715d; box-shadow: 0 0 10px rgba(255,80,50,.55); }
+.feedbackSpecial { color: #ffe35f; box-shadow: 0 0 10px rgba(255,220,70,.55); }
+
+.nextColumnActive {
+  position: relative;
+  outline: 2px solid #fff2a8;
+  outline-offset: -1px;
+  z-index: 3;
+}
+.nextIncoming {
+  filter: brightness(1.65) saturate(1.2);
+  box-shadow: inset 0 0 0 1px #fff;
+}
+.dropCount {
+  position: absolute;
+  z-index: 8;
+  right: 1px;
+  bottom: -1px;
+  min-width: 14px;
+  padding: 1px 2px;
+  border: 1px solid #fff2a8;
+  background: #050509;
+  color: #fff2a8;
+  font: 1000 6px/1 ui-monospace, monospace;
+  font-style: normal;
+  text-align: center;
+  pointer-events: none;
+}
+
+.boardZoneStable {
+  position: relative;
+  padding-top: 0 !important;
+}
+.rankBanner {
+  position: absolute !important;
+  z-index: 80 !important;
+  top: 7px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+}
+
+.gameplayRoot :global([class*="clearing"]) {
+  transition: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  filter: none !important;
+  animation: pixelVanish 130ms steps(4,end) forwards !important;
+}
+.gameplayRoot :global([class*="clearing"])::after {
+  content: "";
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  background: var(--v2-pixel-white);
+  box-shadow:
+    -16px -12px var(--panel-edge), 16px -12px var(--panel-edge),
+    -18px 10px #fff, 18px 10px #fff,
+    -8px 18px var(--panel-edge), 9px 18px var(--panel-edge);
+  transform: translate(-50%,-50%);
+  animation: pixelDebris 150ms steps(4,end) forwards;
+  pointer-events: none;
+}
+
+.gameplayRoot :global([class*="energyParticle"]) {
+  margin-left: -4px;
+  margin-top: -4px;
+}
+
+@keyframes feedbackRise {
+  0% { opacity: 0; transform: translate(-50%, -20%) scale(.75); }
+  16% { opacity: 1; transform: translate(-50%, -55%) scale(1.18); }
+  70% { opacity: 1; transform: translate(-50%, -120%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -170%) scale(.9); }
+}
+@keyframes pixelVanish {
+  0% { opacity: 1; filter: brightness(3); }
+  28% { opacity: 1; filter: brightness(5) saturate(0); }
+  55% { opacity: .75; filter: brightness(2); }
+  100% { opacity: 0; filter: brightness(1); }
+}
+@keyframes pixelDebris {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(.5); }
+  30% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(2.2); }
+}

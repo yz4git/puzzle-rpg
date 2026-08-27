@@ -5,6 +5,7 @@ import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import { playSfx, primeAudio } from "./gameAudio";
 import { PIXEL_ART_ASSETS, type PixelEnemyKind } from "./pixelArtAssets";
 import styles from "./PuzzleRPGClusterBreak.module.css";
+import v2 from "./PuzzleRPGGameplayV2.module.css";
 
 type PanelType = "attack" | "heal" | "barrier" | "skip";
 type Tile = { id: number; type: PanelType; row: number; col: number };
@@ -12,7 +13,10 @@ type IntentKind = "attack" | "heavy" | "drain" | "pierce" | "disrupt";
 type Intent = { kind: IntentKind; label: string; detail: string; power: number; icon: string };
 type EnemyDef = { kind: PixelEnemyKind; name: string; quote: string; hint: string; passive: string };
 type Preview = { seedId: number; ids: Set<number>; type: PanelType; count: number };
-type FxState = { token: number; type: PanelType; count: number; rank: string };
+type FxState = { token: number; type: PanelType; count: number; rank: string; sourceX: number; sourceY: number; dx: number; dy: number };
+type FeedbackTarget = "enemy" | "hp" | "barrier" | "free";
+type FeedbackTone = "gain" | "loss" | "special";
+type FeedbackState = { token: number; target: FeedbackTarget; text: string; tone: FeedbackTone };
 
 const SIZE = 6;
 const PLAYER_MAX_HP = 20;
@@ -45,7 +49,7 @@ const ENEMIES: EnemyDef[] = [
     name: "VOID WARDEN",
     quote: "力だけでは届かぬ。時を読め。",
     hint: "SKIPを2個以上まとめて消すと、敵より多く行動できる。",
-    passive: "3回目の行動はVOID CRUSH。SKIPしても技の順番は消えない。",
+    passive: "2回目の行動はVOID CRUSH。SKIPしても技の順番は消えない。",
   },
   {
     kind: "bastion",
@@ -79,17 +83,31 @@ const ENEMIES: EnemyDef[] = [
 
 let tileId = 1;
 let fxToken = 1;
+let feedbackToken = 1;
 function nextId() {
   tileId += 1;
   return tileId;
 }
 
-function weightedType(): PanelType {
+function weightedType(suppressSkip = false): PanelType {
   const r = Math.random();
+  if (suppressSkip) {
+    if (r < 0.42) return "attack";
+    if (r < 0.69) return "heal";
+    if (r < 0.96) return "barrier";
+    return "skip";
+  }
   if (r < 0.36) return "attack";
   if (r < 0.58) return "heal";
   if (r < 0.84) return "barrier";
   return "skip";
+}
+
+function weightedNonSkipType(): PanelType {
+  const r = Math.random();
+  if (r < 0.43) return "attack";
+  if (r < 0.70) return "heal";
+  return "barrier";
 }
 
 function tileMap(tiles: Tile[]) {
@@ -136,9 +154,9 @@ function largestGroups(tiles: Tile[]): Record<PanelType, number> {
 
 function openingType(left?: PanelType, above?: PanelType): PanelType {
   const neighbors = [left, above].filter(Boolean) as PanelType[];
-  if (neighbors.length > 0 && Math.random() < 0.12) {
+  if (neighbors.length > 0 && Math.random() < 0.08) {
     const candidate = neighbors[Math.floor(Math.random() * neighbors.length)]!;
-    if (candidate !== "skip" || Math.random() < 0.28) return candidate;
+    if (candidate !== "skip" || Math.random() < 0.18) return candidate;
   }
   return weightedType();
 }
@@ -171,12 +189,12 @@ function makeOpeningBoard(): Tile[] {
   return fallback;
 }
 
-function queueType(previous?: PanelType): PanelType {
+function queueType(previous?: PanelType, suppressSkip = false): PanelType {
   if (previous) {
-    const repeatChance = previous === "skip" ? 0.05 : 0.13;
+    const repeatChance = previous === "skip" ? (suppressSkip ? 0 : 0.02) : 0.09;
     if (Math.random() < repeatChance) return previous;
   }
-  return weightedType();
+  return weightedType(suppressSkip);
 }
 
 function makeQueues(): PanelType[][] {
@@ -187,10 +205,18 @@ function makeQueues(): PanelType[][] {
   });
 }
 
-function refillQueue(queue: PanelType[]) {
+function refillQueue(queue: PanelType[], suppressSkip = false) {
   const next = [...queue];
-  while (next.length < QUEUE_DEPTH) next.push(queueType(next[next.length - 1]));
+  while (next.length < QUEUE_DEPTH) next.push(queueType(next[next.length - 1], suppressSkip));
   return next;
+}
+
+function coolSkipQueues(queues: PanelType[][]): PanelType[][] {
+  return queues.map((queue) => queue.map((type, index) => {
+    // Keep both visible NEXT panels exact. Only hidden future supply cools down.
+    if (index < 2 || type !== "skip") return type;
+    return Math.random() < 0.82 ? weightedNonSkipType() : type;
+  }));
 }
 
 function enemyForStage(stage: number): EnemyDef {
@@ -206,9 +232,9 @@ function enemyIntent(stage: number, step: number, enemy: EnemyDef): Intent {
   const tier = Math.floor((stage - 1) / 5);
   const add = tier * 2;
   if (enemy.kind === "warden") {
-    return step % 3 === 2
-      ? { kind: "heavy", label: "VOID CRUSH", detail: "重撃", power: 5 + add, icon: "!!" }
-      : { kind: "attack", label: "VOID BOLT", detail: "通常攻撃", power: 3 + add, icon: "!" };
+    return step % 3 === 1
+      ? { kind: "heavy", label: "VOID CRUSH", detail: "重撃", power: 6 + add, icon: "!!" }
+      : { kind: "attack", label: "VOID BOLT", detail: "通常攻撃", power: 4 + add, icon: "!" };
   }
   if (enemy.kind === "bastion") {
     return step % 2 === 1
@@ -217,7 +243,7 @@ function enemyIntent(stage: number, step: number, enemy: EnemyDef): Intent {
   }
   if (enemy.kind === "oracle") {
     return step % 3 === 1
-      ? { kind: "drain", label: "BLOOD DRAIN", detail: "HP被害分を吸収", power: 4 + add, icon: "+" }
+      ? { kind: "drain", label: "BLOOD DRAIN", detail: "HP被害分を吸収", power: 5 + add, icon: "+" }
       : { kind: "attack", label: "BLOOD NEEDLE", detail: "通常攻撃", power: 4 + add, icon: "!" };
   }
   if (enemy.kind === "null") {
@@ -225,7 +251,7 @@ function enemyIntent(stage: number, step: number, enemy: EnemyDef): Intent {
       ? { kind: "pierce", label: "NULL PIERCE", detail: "BARRIER無視", power: 5 + add, icon: ">>" }
       : { kind: "attack", label: "NULL SLASH", detail: "通常攻撃", power: 4 + add, icon: "!" };
   }
-  return step % 3 === 2
+  return step % 3 === 1
     ? { kind: "disrupt", label: "PRISM SHIFT", detail: "攻撃＋2枚変色", power: 5 + add, icon: "<>" }
     : { kind: "attack", label: "PRISM HIT", detail: "通常攻撃", power: 4 + add, icon: "!" };
 }
@@ -252,7 +278,7 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 }
 
-function collapseBoard(currentTiles: Tile[], currentQueues: PanelType[][], removed: Set<number>) {
+function collapseBoard(currentTiles: Tile[], currentQueues: PanelType[][], removed: Set<number>, suppressSkipRefill = false) {
   const startTiles: Tile[] = [];
   const finalTiles: Tile[] = [];
   const nextQueues = currentQueues.map((queue) => [...queue]);
@@ -271,8 +297,8 @@ function collapseBoard(currentTiles: Tile[], currentQueues: PanelType[][], remov
     const holes = SIZE - survivors.length;
     const queue = nextQueues[col]!;
     const consumed: PanelType[] = [];
-    for (let i = 0; i < holes; i += 1) consumed.push(queue.shift() ?? weightedType());
-    nextQueues[col] = refillQueue(queue);
+    for (let i = 0; i < holes; i += 1) consumed.push(queue.shift() ?? weightedType(suppressSkipRefill));
+    nextQueues[col] = refillQueue(queue, suppressSkipRefill);
 
     consumed.forEach((type, index) => {
       const id = nextId();
@@ -312,7 +338,12 @@ export default function PuzzleRPGClusterBreak() {
   const [message, setMessage] = useState("塊を押して効果を確認。離すと消去。1個でも消せる。");
   const [bestGroup, setBestGroup] = useState(1);
   const [fx, setFx] = useState<FxState | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const enemySpriteRef = useRef<HTMLImageElement | null>(null);
+  const hpRef = useRef<HTMLDivElement | null>(null);
+  const barrierRef = useRef<HTMLDivElement | null>(null);
+  const freeRef = useRef<HTMLDivElement | null>(null);
 
   const enemy = enemyForStage(stage);
   const maxEnemyHp = enemyMaxHp(stage);
@@ -320,6 +351,14 @@ export default function PuzzleRPGClusterBreak() {
   const nextIntent = enemyIntent(stage, enemyStep + 1, enemy);
   const largest = useMemo(() => largestGroups(tiles), [tiles]);
   const boardMap = useMemo(() => tileMap(tiles), [tiles]);
+  const previewDropCounts = useMemo(() => {
+    const counts = Array.from({ length: SIZE }, () => 0);
+    if (!preview) return counts;
+    for (const tile of tiles) {
+      if (tile.row >= 0 && preview.ids.has(tile.id)) counts[tile.col] += 1;
+    }
+    return counts;
+  }, [preview, tiles]);
   const incomingHpDamage = enemyDelay > 0
     ? 0
     : intent.kind === "pierce"
@@ -345,6 +384,7 @@ export default function PuzzleRPGClusterBreak() {
     setStageIntro(true);
     setPreview(null);
     setFx(null);
+    setFeedback([]);
     setMessage("STAGE 1");
   }
 
@@ -374,6 +414,7 @@ export default function PuzzleRPGClusterBreak() {
     setStageIntro(true);
     setPreview(null);
     setFx(null);
+    setFeedback([]);
     setMessage(`STAGE ${next}`);
   }
 
@@ -407,10 +448,54 @@ export default function PuzzleRPGClusterBreak() {
     void clearTile(tile);
   }
 
-  function startFx(type: PanelType, count: number) {
-    const nextFx = { token: fxToken++, type, count, rank: groupRank(count) };
+  function showFeedback(target: FeedbackTarget, text: string, tone: FeedbackTone, duration = 760) {
+    const entry: FeedbackState = { token: feedbackToken++, target, text, tone };
+    setFeedback((current) => [...current.slice(-5), entry]);
+    window.setTimeout(() => setFeedback((current) => current.filter((item) => item.token !== entry.token)), duration);
+  }
+
+  function rectCenter(element: Element | null) {
+    if (!element) return null;
+    const rect = element.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  function groupCenter(group: Tile[]) {
+    const rect = boardRef.current?.getBoundingClientRect();
+    if (!rect || group.length === 0) return { x: window.innerWidth / 2, y: window.innerHeight * 0.72 };
+    const avgCol = group.reduce((sum, tile) => sum + tile.col, 0) / group.length;
+    const avgRow = group.reduce((sum, tile) => sum + tile.row, 0) / group.length;
+    return {
+      x: rect.left + rect.width * ((avgCol + 0.5) / SIZE),
+      y: rect.top + rect.height * ((avgRow + 0.5) / SIZE),
+    };
+  }
+
+  function startFx(type: PanelType, count: number, group: Tile[]) {
+    const source = groupCenter(group);
+    const targetElement = type === "attack"
+      ? enemySpriteRef.current
+      : type === "heal"
+        ? hpRef.current
+        : type === "barrier"
+          ? barrierRef.current
+          : freeRef.current;
+    const target = rectCenter(targetElement) ?? { x: window.innerWidth / 2, y: window.innerHeight * 0.25 };
+    const nextFx: FxState = {
+      token: fxToken++, type, count, rank: groupRank(count),
+      sourceX: source.x, sourceY: source.y, dx: target.x - source.x, dy: target.y - source.y,
+    };
     setFx(nextFx);
-    window.setTimeout(() => setFx((current) => current?.token === nextFx.token ? null : current), 620);
+    window.setTimeout(() => setFx((current) => current?.token === nextFx.token ? null : current), 560);
+  }
+
+  function feedbackNodes(target: FeedbackTarget) {
+    return feedback.filter((item) => item.target === target).map((item) => (
+      <b
+        key={item.token}
+        className={`${v2.feedback} ${item.tone === "gain" ? v2.feedbackGain : item.tone === "loss" ? v2.feedbackLoss : v2.feedbackSpecial}`}
+      >{item.text}</b>
+    ));
   }
 
   async function clearTile(seed: Tile) {
@@ -427,9 +512,9 @@ export default function PuzzleRPGClusterBreak() {
     setResolving(true);
     setPreview(null);
     setClearingIds(removed);
-    startFx(currentSeed.type, count);
+    startFx(currentSeed.type, count, group);
     playSfx(count >= 8 ? "cascade" : currentSeed.type === "heal" ? "matchHeart" : currentSeed.type === "barrier" ? "matchGuard" : currentSeed.type === "skip" ? "skill" : "matchFire");
-    await delay(count >= 8 ? 230 : 150);
+    await delay(count >= 8 ? 150 : 115);
 
     let nextEnemyHp = enemyHp;
     let nextPlayerHp = playerHp;
@@ -440,6 +525,7 @@ export default function PuzzleRPGClusterBreak() {
       nextEnemyHp = Math.max(0, enemyHp - count);
       setEnemyHp(nextEnemyHp);
       setMessage(`ATK ×${count} → ${count} DAMAGE`);
+      showFeedback("enemy", `-${count}`, "loss");
       playSfx("playerAttack");
     } else if (currentSeed.type === "heal") {
       const healed = Math.min(PLAYER_MAX_HP, playerHp + count);
@@ -447,6 +533,7 @@ export default function PuzzleRPGClusterBreak() {
       nextPlayerHp = healed;
       setPlayerHp(nextPlayerHp);
       setMessage(`HEAL ×${count} → HP +${actual}`);
+      showFeedback("hp", actual > 0 ? `+${actual} HP` : "HP FULL", actual > 0 ? "gain" : "special");
       playSfx("heal");
     } else if (currentSeed.type === "barrier") {
       const shielded = Math.min(BARRIER_MAX, barrier + count);
@@ -454,21 +541,25 @@ export default function PuzzleRPGClusterBreak() {
       nextBarrier = shielded;
       setBarrier(nextBarrier);
       setMessage(`BAR ×${count} → BARRIER +${actual}`);
+      showFeedback("barrier", actual > 0 ? `+${actual} BAR` : "BAR MAX", actual > 0 ? "gain" : "special");
       playSfx("shield");
     } else {
       nextDelay += count;
       setMessage(`SKIP ×${count} → ${Math.max(0, count - 1)} FREE MOVE${count - 1 === 1 ? "" : "S"}`);
+      showFeedback("free", `+${Math.max(0, count - 1)} FREE`, "special");
       playSfx(count >= 6 ? "skill" : "setup");
     }
 
-    const { startTiles, finalTiles, nextQueues } = collapseBoard(tiles, queues, removed);
+    const coolingActive = enemyDelay > 0 || currentSeed.type === "skip";
+    const collapsed = collapseBoard(tiles, queues, removed, coolingActive);
+    const nextQueues = coolingActive ? coolSkipQueues(collapsed.nextQueues) : collapsed.nextQueues;
     setClearingIds(new Set());
-    setTiles(startTiles);
+    setTiles(collapsed.startTiles);
     setQueues(nextQueues);
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    setTiles(finalTiles);
+    setTiles(collapsed.finalTiles);
     playSfx("drop");
-    await delay(285);
+    await delay(215);
 
     if (nextEnemyHp <= 0) {
       playSfx("enemyBreak");
@@ -501,6 +592,9 @@ export default function PuzzleRPGClusterBreak() {
     nextPlayerHp = Math.max(0, nextPlayerHp - hpDamage);
     setBarrier(nextBarrier);
     setPlayerHp(nextPlayerHp);
+    if (blocked > 0) showFeedback("barrier", `-${blocked} BAR`, "loss");
+    if (hpDamage > 0) showFeedback("hp", `-${hpDamage} HP`, "loss");
+    if (currentIntent.kind !== "attack") showFeedback("enemy", currentIntent.label, "special", 900);
     setMessage((text) => `${text} • ${hpDamage > 0 ? `${currentIntent.label} -${hpDamage} HP` : `${currentIntent.label} BLOCK ${blocked}`}`);
     playSfx(currentIntent.kind === "heavy" ? "enemyHeavy" : currentIntent.kind === "drain" ? "enemyDrain" : currentIntent.kind === "pierce" ? "pierce" : currentIntent.kind === "disrupt" ? "enemyDisrupt" : "enemyAttack");
 
@@ -508,10 +602,12 @@ export default function PuzzleRPGClusterBreak() {
       const healed = Math.min(maxEnemyHp, nextEnemyHp + hpDamage);
       setEnemyHp(healed);
       nextEnemyHp = healed;
+      showFeedback("enemy", `+${hpDamage} HP`, "gain");
       setMessage((text) => `${text} • DRAIN +${hpDamage}`);
     }
     if (currentIntent.kind === "disrupt") {
       setTiles((current) => disruptBoard(current));
+      showFeedback("enemy", "SHIFT!", "special");
       setMessage((text) => `${text} • 2 PANELS SHIFT`);
     }
 
@@ -559,14 +655,7 @@ export default function PuzzleRPGClusterBreak() {
     : isDanger
       ? `! DANGER ! ${enemyDelay > 0 ? `FREE ${enemyDelay}` : `${intent.label} → ${incomingHpDamage} HP`}`
       : "";
-  const shellClass = `${styles.shell} ${isCritical ? styles.critical : isDanger ? styles.danger : ""}`;
-  const energyDelta = fx?.type === "attack"
-    ? { dx: 0, dy: -400 }
-    : fx?.type === "heal"
-      ? { dx: -128, dy: -315 }
-      : fx?.type === "barrier"
-        ? { dx: 0, dy: -315 }
-        : { dx: 128, dy: -315 };
+  const shellClass = `${styles.shell} ${v2.gameplayRoot} ${isCritical ? styles.critical : isDanger ? styles.danger : ""}`;
 
   return (
     <main className={shellClass} data-enemy-kind={enemy.kind}>
@@ -579,9 +668,11 @@ export default function PuzzleRPGClusterBreak() {
               key={index}
               className={`${styles.energyParticle} ${fx.type === "attack" ? styles.energyAttack : fx.type === "heal" ? styles.energyHeal : fx.type === "barrier" ? styles.energyBarrier : styles.energySkip}`}
               style={{
-                "--dx": `${energyDelta.dx + ((index % 3) - 1) * 18}px`,
-                "--dy": `${energyDelta.dy - Math.floor(index / 3) * 8}px`,
-                "--delay": `${index * 18}ms`,
+                left: `${fx.sourceX}px`,
+                top: `${fx.sourceY}px`,
+                "--dx": `${fx.dx + ((index % 3) - 1) * 14}px`,
+                "--dy": `${fx.dy + ((Math.floor(index / 3) % 3) - 1) * 10}px`,
+                "--delay": `${index * 14}ms`,
               } as CSSProperties}
             />
           ))}
@@ -593,8 +684,9 @@ export default function PuzzleRPGClusterBreak() {
         <div className={styles.turnBox}>TURN {String(turn).padStart(2, "0")}</div>
       </header>
 
-      <section className={`${styles.enemyStage} ${fx?.type === "attack" ? styles.targetHit : ""}`}>
-        <img className={styles.enemySprite} src={PIXEL_ART_ASSETS.enemies[enemy.kind]} alt={enemy.name} />
+      <section className={`${styles.enemyStage} ${v2.feedbackHost} ${fx?.type === "attack" ? styles.targetHit : ""}`}>
+        {feedbackNodes("enemy")}
+        <img ref={enemySpriteRef} className={styles.enemySprite} src={PIXEL_ART_ASSETS.enemies[enemy.kind]} alt={enemy.name} />
         <div className={styles.enemyInfo}>
           <strong>{enemy.name}</strong>
           <div className={styles.enemyHpTrack}><div style={{ width: `${Math.max(0, enemyHp / maxEnemyHp) * 100}%` }} /></div>
@@ -615,13 +707,16 @@ export default function PuzzleRPGClusterBreak() {
       </section>
 
       <section className={styles.playerStatus} aria-label="player status">
-        <div className={fx?.type === "heal" ? styles.targetGain : ""}>
+        <div ref={hpRef} className={`${v2.feedbackHost} ${fx?.type === "heal" ? styles.targetGain : ""}`}>
+          {feedbackNodes("hp")}
           <span>HP</span><strong>{playerHp}/{PLAYER_MAX_HP}</strong><i><u style={{ width: `${playerHp / PLAYER_MAX_HP * 100}%` }} /></i>
         </div>
-        <div className={fx?.type === "barrier" ? styles.targetGain : ""}>
+        <div ref={barrierRef} className={`${v2.feedbackHost} ${fx?.type === "barrier" ? styles.targetGain : ""}`}>
+          {feedbackNodes("barrier")}
           <span>BAR</span><strong>{barrier}/{BARRIER_MAX}</strong><i><u style={{ width: `${barrier / BARRIER_MAX * 100}%` }} /></i>
         </div>
-        <div className={`${styles.freeMoves} ${enemyDelay > 0 ? styles.freeMovesActive : ""} ${fx?.type === "skip" ? styles.targetGain : ""}`}>
+        <div ref={freeRef} className={`${styles.freeMoves} ${v2.feedbackHost} ${enemyDelay > 0 ? styles.freeMovesActive : ""} ${fx?.type === "skip" ? styles.targetGain : ""}`}>
+          {feedbackNodes("free")}
           <span>FREE</span><strong>{enemyDelay}</strong><small>{enemyDelay > 0 ? `${intent.label}は待機中` : "敵は次の手後に行動"}</small>
         </div>
       </section>
@@ -629,17 +724,21 @@ export default function PuzzleRPGClusterBreak() {
       <section className={styles.nextStrip} aria-label="column next puzzle panels">
         <div className={styles.nextLabel}>NEXT ↓</div>
         <div className={styles.nextColumns}>
-          {queues.map((queue, col) => (
-            <div className={styles.nextColumn} key={col}>
-              <span className={`${styles.miniPanel} ${styles[queue[1]!]}`}>{PANEL_LABEL[queue[1]!]}</span>
-              <strong className={`${styles.miniPanel} ${styles[queue[0]!]}`}>{PANEL_LABEL[queue[0]!]}</strong>
-            </div>
-          ))}
+          {queues.map((queue, col) => {
+            const drops = previewDropCounts[col] ?? 0;
+            return (
+              <div className={`${styles.nextColumn} ${drops > 0 ? v2.nextColumnActive : ""}`} key={col}>
+                <span className={`${styles.miniPanel} ${styles[queue[1]!]} ${drops >= 2 ? v2.nextIncoming : ""}`}>{PANEL_LABEL[queue[1]!]}</span>
+                <strong className={`${styles.miniPanel} ${styles[queue[0]!]} ${drops >= 1 ? v2.nextIncoming : ""}`}>{PANEL_LABEL[queue[0]!]}</strong>
+                {drops > 0 ? <i className={v2.dropCount}>↓{drops}</i> : null}
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      <section className={styles.boardZone}>
-        <div className={`${styles.fxBanner} ${fx ? styles.fxBannerActive : ""}`}>
+      <section className={`${styles.boardZone} ${v2.boardZoneStable}`}>
+        <div className={`${styles.fxBanner} ${v2.rankBanner} ${fx ? styles.fxBannerActive : ""}`}>
           {fx ? <><em>{fx.rank || PANEL_LABEL[fx.type]}</em>{PANEL_LABEL[fx.type]} ×{fx.count}</> : "PRESS A CLUSTER → RELEASE TO BREAK"}
         </div>
         <div className={styles.board} ref={boardRef} aria-label="cluster break board">
