@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PIXEL_ART_ASSETS } from "./pixelArtAssets";
 import { playSfx, primeAudio } from "./gameAudio";
 import PuzzleRPGClusterBreak from "./PuzzleRPGClusterBreak";
 import RPGMode from "./rpg/RPGMode";
 import { createNewSave, loadSave, saveGame } from "./rpg/save";
 import { setRpgMusic, stopRpgMusic } from "./rpg/rpgAudio";
+import { RPG_ASSETS } from "./rpg/assets";
 import type { RPGSaveData } from "./rpg/types";
 import styles from "./PuzzleRPGApp.module.css";
 
@@ -18,15 +18,16 @@ export default function PuzzleRPGApp() {
   const [activeSave, setActiveSave] = useState<RPGSaveData | null>(null);
 
   useEffect(() => {
-    setStoredSave(loadSave());
-    setRpgMusic("title", true);
+    const loaded = loadSave();
+    setStoredSave(loaded);
+    setRpgMusic("title", loaded?.settings.music ?? true);
     return () => stopRpgMusic();
   }, []);
 
   function select(next: Mode) {
     primeAudio(); playSfx("uiConfirm");
     if (next === "chapter") stopRpgMusic();
-    else if (next !== "rpg") setRpgMusic("title", true);
+    else if (next !== "rpg") setRpgMusic("title", storedSave?.settings.music ?? true);
     setMode(next);
   }
 
@@ -41,7 +42,8 @@ export default function PuzzleRPGApp() {
   }
 
   function backToTitle() {
-    setStoredSave(loadSave()); setActiveSave(null); setMode("title"); setRpgMusic("title", true);
+    const loaded = loadSave();
+    setStoredSave(loaded); setActiveSave(null); setMode("title"); setRpgMusic("title", loaded?.settings.music ?? true);
   }
 
   if (mode === "chapter") return <PuzzleRPGClusterBreak embedded onExit={backToTitle} />;
@@ -51,7 +53,7 @@ export default function PuzzleRPGApp() {
     <main className={styles.title} aria-label="Puzzle RPG mode title">
       <div className={styles.logo}>PUZZLE<br />RPG</div>
       <div className={styles.subtitle}>THE PRISM ROAD</div>
-      <img className={styles.hero} src={PIXEL_ART_ASSETS.hero} alt="8bit hero Lio" />
+      <img className={styles.hero} src={RPG_ASSETS.heroTitle} alt="8bit hero Lio" />
 
       {mode === "title" ? <div className={styles.modeGrid}>
         <button type="button" className={styles.rpgMode} onClick={() => select("rpg-choice")}>

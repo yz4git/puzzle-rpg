@@ -116,31 +116,37 @@ const list: EnemyDefinition[] = [
     id: "templeKeeper", name: "OLD TEMPLE KEEPER", portrait: "warden", tier: 2, hp: 30, exp: 28, gold: 30, boss: true,
     trait: "三手目に古い門を落とす。", intro: "『橋を渡る者よ。塊を育てる知恵を示せ』",
     intents: [hit("STONE SIGN", 3), hit("STONE SIGN", 3), heavy("OLD GATE", 7)], talk: "門番はATKの大きさを測っている。", conditionalTalk: "ATK×6を見て、橋の印を渡した。",
+    phaseDialogue: ["『小さな火を急ぐな。育てよ』", "『最後の門を、一つの塊で越えよ』"], victoryTalk: "門番は崩れ、橋を起こす古い印を差し出した。",
   },
   {
     id: "scarletOracle", name: "SCARLET ORACLE", portrait: "oracle", tier: 3, hp: 56, exp: 70, gold: 75, boss: true,
     trait: "DRAIN成立時、受けたHP被害＋2を吸収。", intro: "『その回復さえ、血に変えてあげる』",
     intents: [hit("BLOOD NEEDLE", 5), drain("BLOOD DRAIN", 6)], talk: "泉を守る理由を語ろうとしない。", conditionalTalk: "赤い泉の老人のMEMOを示すと、DRAINが弱まった。",
+    phaseDialogue: ["『奪う癒ししか、私は知らない』", "『ならば、その光で泉を守って』"], victoryTalk: "Oracleは杖を伏せ、赤い泉を世界へ返した。",
   },
   {
     id: "ironTyrant", name: "IRON TYRANT", portrait: "bastion", tier: 3, hp: 52, exp: 75, gold: 90, boss: true,
     trait: "ATK×4以下を2軽減するIRON ARMOR。", intro: "『守り切れるか。それとも先に砕くか』",
     intents: [hit("SHIELD BASH", 5), heavy("IRON CRUSH", 7)], talk: "城壁の外にいる者を守るため、門を閉ざしたと言う。", conditionalTalk: "大きなATKを見てIRON ARMORが1弱まった。",
+    phaseDialogue: ["『盾の内側にも、守る者がいる』", "『この門の先を、最後まで守れるか』"], victoryTalk: "Tyrantは盾を下ろし、北門を旅人へ開いた。",
   },
   {
     id: "voidHerald", name: "VOID HERALD", portrait: "warden", tier: 4, hp: 46, exp: 82, gold: 80, boss: true,
     trait: "VOID CRUSH命中後、SKIPを1枚封印。", intro: "『止めた時間ごと、砕いてみせる』",
     intents: [hit("VOID BOLT", 5), seal("VOID CRUSH", 7), hit("VOID BOLT", 5)], talk: "止めた時間の数を数えている。", conditionalTalk: "SKIPを2回使うと次のVOID CRUSHが遅れる。",
+    phaseDialogue: ["『盗んだ時は、必ず追いつく』", "『それでも次の一手を選ぶか』"], victoryTalk: "Heraldの環が止まり、Citadelへ続く時が動き出した。",
   },
   {
     id: "nullExecutioner", name: "NULL EXECUTIONER", portrait: "null", tier: 4, hp: 58, exp: 95, gold: 100, boss: true,
     trait: "HP8以下ではPIERCEが9へ強化。", intro: "『盾は数えない。残る命だけを数える』",
     intents: [hit("NULL SLASH", 6), pierce("NULL PIERCE", 7)], talk: "門を通す命令はPRISM SOVEREIGNだけが持つ。", conditionalTalk: "四つの修行印を示すと、最初のPIERCEを一度だけためらう。",
+    phaseDialogue: ["『盾の外側から、命を数える』", "『四つの印でも、無は埋まらない』"], victoryTalk: "Executionerは四つの印を見届け、最後の門から退いた。",
   },
   {
     id: "prismSovereign", name: "PRISM SOVEREIGN", portrait: "trickster", tier: 5, hp: 72, exp: 180, gold: 0, boss: true,
     trait: "HP50%・25%でPhaseが上がり、攻撃と変色数が強化。", intro: "『旅で得た答えを、盤面に見せて』",
     intents: [hit("PRISM RAY", 5), disrupt("PRISM COLLAPSE", 7)], talk: "倒した数ではなく、聞いた声の数を尋ねている。", conditionalTalk: "別決着の記憶に応じて最終Phaseの力が揺らぐ。",
+    phaseDialogue: ["『半分の答えでは、世界は映らない』", "『倒した者と、話した者。その両方を連れて来たのね』"], victoryTalk: "Sovereignは砕けず、旅で集めた声を映すPrismへ姿を変えた。",
   },
 ];
 

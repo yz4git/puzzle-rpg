@@ -9,7 +9,10 @@ import { ITEMS } from "./data/items";
 import { BLOCKED_TILES, isDangerTile, isRoadTile, MAPS, tileAt } from "./data/maps";
 import { npcsForMap } from "./data/npcs";
 import { TECHNIQUES } from "./data/techniques";
+import { BOSS_TECHNIQUE_REWARDS, TECHNIQUE_EQUIPMENT_REWARDS } from "./data/rewards";
 import RPGPuzzleBattle from "./RPGPuzzleBattle";
+import RPGIcon from "./RPGIcon";
+import { heroAtlasCell, npcAtlasCell, RPG_ASSETS, terrainAtlasCell } from "./assets";
 import { setRpgMusic, stopRpgMusic } from "./rpgAudio";
 import { expForNextLevel, exportSave, importSave, maxHpForLevel, saveGame } from "./save";
 import type { BattleResult, Direction, EquipmentId, ItemId, MapDefinition, NPCAction, NPCDefinition, PanelType, RPGSaveData, RPGScreen, TechniqueId, Vec2 } from "./types";
@@ -28,13 +31,6 @@ const TILE = 16;
 const VIEW_W = 15;
 const VIEW_H = 13;
 const DIR_DELTA: Record<Direction, Vec2> = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
-const BOSS_TECHNIQUE_REWARDS: Partial<Record<string, TechniqueId>> = {
-  templeKeeper: "finisher",
-  scarletOracle: "overheal",
-  ironTyrant: "lastStand",
-  voidHerald: "tempoBlade",
-  nullExecutioner: "wideBreak",
-};
 
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 function hasFlag(save: RPGSaveData, flag?: string) { return !flag || save.flags.includes(flag); }
@@ -111,14 +107,16 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [result, setResult] = useState<ResultState>(null);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
+  const [atlasVersion, setAtlasVersion] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const atlasImages = useRef<Partial<Record<"hero" | "npcs" | "field" | "town" | "dungeon" | "ui", HTMLImageElement>>>({});
   const afterDialogue = useRef<null | (() => void)>(null);
   const heldTimer = useRef<number | null>(null);
   const importRef = useRef<HTMLInputElement | null>(null);
   const saveRef = useRef(save);
 
   const map = MAPS[save.mapId] ?? MAPS.hearthVillage!;
-  const mapNpcs = useMemo(() => npcsForMap(map.id).filter((npc) => hasFlag(save, npc.requireFlag) && !hasFlag(save, npc.hideAfterFlag)), [map.id, save]);
+  const mapNpcs = useMemo(() => npcsForMap(map.id).filter((npc) => hasFlag(save, npc.requireFlag) && (!npc.hideAfterFlag || !hasFlag(save, npc.hideAfterFlag))), [map.id, save]);
   const visibleFixed = useMemo(() => map.fixedEncounters.filter((entry) => hasFlag(save, entry.requireFlag) && !save.defeatedEncounters.includes(entry.id)), [map, save]);
   const currentTile = tileAt(map, save.position.x, save.position.y);
 
@@ -304,6 +302,10 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       title = released ? "ANOTHER ANSWER" : "VICTORY";
       if (released) {
         next = { ...next, releasedEnemies: { ...next.releasedEnemies, [outcome.enemyId]: (next.releasedEnemies[outcome.enemyId] ?? 0) + 1 } };
+        const levelResult = applyLevel({ ...next, gold: next.gold + outcome.gold }, outcome.exp);
+        next = levelResult.save;
+        lines.push(`EXP +${outcome.exp} • GOLD +${outcome.gold}（討伐より少ない）`);
+        if (levelResult.levels > 0) { lines.push(`LEVEL UP! • LV ${next.level} • MAX HP ${next.maxHp}`); playSfx("levelUp"); }
         if (next.techniques.includes("gentleHand")) next = { ...next, hp: Math.min(next.maxHp, next.hp + 4) };
         if (outcome.rewardText) lines.push(outcome.rewardText);
       } else {
@@ -314,6 +316,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         const drop = ENEMIES[outcome.enemyId]?.drop;
         if (drop) { next = giveItem(next, drop); lines.push(`${ITEMS[drop].name}を手に入れた。`); }
       }
+      const enemyDefinition = ENEMIES[outcome.enemyId];
+      if (!released && enemyDefinition?.boss && enemyDefinition.victoryTalk) lines.unshift(enemyDefinition.victoryTalk);
       if (outcome.acquiredItem) { next = giveItem(next, outcome.acquiredItem); lines.push(`${ITEMS[outcome.acquiredItem].name}を手に入れた。`); }
       const scriptedTechnique = !context?.training && outcome.outcome === "victory" ? BOSS_TECHNIQUE_REWARDS[outcome.enemyId] : undefined;
       const techniqueRewards = [outcome.acquiredTechnique, scriptedTechnique].filter((id): id is TechniqueId => Boolean(id));
@@ -323,7 +327,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         lines.push(`技「${TECHNIQUES[technique].name}」を覚えた。`);
         playSfx("techAcquire");
       }
-      const equipmentReward = outcome.acquiredEquipment ?? (context?.training && outcome.acquiredTechnique === "timeTheft" ? "timeCharm" : undefined);
+      const equipmentReward = outcome.acquiredEquipment ?? (context?.training && outcome.acquiredTechnique ? TECHNIQUE_EQUIPMENT_REWARDS[outcome.acquiredTechnique] : undefined);
       if (equipmentReward && !next.equipmentOwned.includes(equipmentReward)) {
         next = { ...next, equipmentOwned: addUnique(next.equipmentOwned, equipmentReward) };
         lines.push(`${EQUIPMENT[equipmentReward].name}を手に入れた。`);
@@ -334,7 +338,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       const fixed = map.fixedEncounters.find((entry) => entry.id === context?.fixedId);
       if (fixed) next = { ...next, flags: addUnique(next.flags, fixed.defeatedFlag) };
       if (outcome.enemyId === "prismSovereign") ending = true;
-      if (next.flags.includes("void:clear") && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => next.techniques.includes(id as TechniqueId))) next = { ...next, flags: addUnique(next.flags, "gate:citadel") };
+      if (next.flags.includes("void:clear") && next.flags.includes("key:mirror") && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => next.techniques.includes(id as TechniqueId))) next = { ...next, flags: addUnique(next.flags, "gate:citadel") };
       if (next.equipment.charm === "heartSeed") next = { ...next, hp: Math.min(next.maxHp, next.hp + 1) };
       if (!lines.length) lines.push("戦いから無事に戻った。");
     }
@@ -378,6 +382,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   function equip(id: EquipmentId) {
     const definition = EQUIPMENT[id];
     const isEquipped = save.equipment[definition.slot] === id;
+    const allowedRank = save.level >= 8 ? 3 : save.level >= 4 ? 2 : 1;
+    if (!isEquipped && definition.rank > allowedRank) { setNotice(`LVが足りない • 装備RANK ${definition.rank}`); return; }
     commit((current) => {
       const equipment = { ...current.equipment, [definition.slot]: isEquipped ? null : id };
       const maxHp = maxHpForLevel(current.level) + (equipment.armor === "travellerCoat" ? 2 : 0);
@@ -404,6 +410,25 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   useEffect(() => {
     saveRef.current = save;
   }, [save]);
+
+  useEffect(() => {
+    let active = true;
+    const sources = {
+      hero: RPG_ASSETS.hero,
+      npcs: RPG_ASSETS.npcs,
+      field: RPG_ASSETS.field,
+      town: RPG_ASSETS.town,
+      dungeon: RPG_ASSETS.dungeon,
+      ui: RPG_ASSETS.ui,
+    } as const;
+    for (const [key, src] of Object.entries(sources) as Array<[keyof typeof sources, string]>) {
+      const image = new window.Image();
+      image.onload = () => { if (active) setAtlasVersion((version) => version + 1); };
+      image.src = src;
+      atlasImages.current[key] = image;
+    }
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     setSfxEnabled(save.settings.sfx);
@@ -440,26 +465,53 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     const cameraY = clamp(save.position.y - Math.floor(VIEW_H / 2), 0, Math.max(0, map.height - VIEW_H));
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
-      drawTile(context, tileAt(map, worldX, worldY), viewX * TILE, viewY * TILE, worldX, worldY);
+      const code = tileAt(map, worldX, worldY);
+      const cell = terrainAtlasCell(map, code, worldX, worldY);
+      const atlas = atlasImages.current[cell.atlas];
+      if (atlas?.complete && atlas.naturalWidth) context.drawImage(atlas, cell.col * TILE, cell.row * TILE, TILE, TILE, viewX * TILE, viewY * TILE, TILE, TILE);
+      else drawTile(context, code, viewX * TILE, viewY * TILE, worldX, worldY);
     }
-    for (const portal of map.portals) {
+    map.portals.forEach((portal, portalIndex) => {
       const x = (portal.x - cameraX) * TILE, y = (portal.y - cameraY) * TILE;
-      if (x < -TILE || y < -TILE || x >= VIEW_W * TILE || y >= VIEW_H * TILE) continue;
-      context.fillStyle = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? "#55515d" : "#ffe060";
-      context.fillRect(x + 3, y + 4, 10, 9); context.fillStyle = "#11111a"; context.fillRect(x + 6, y + 8, 4, 5);
-    }
+      if (x < -TILE || y < -TILE || x >= VIEW_W * TILE || y >= VIEW_H * TILE) return;
+      const atlas = atlasImages.current.field;
+      if (atlas?.complete && atlas.naturalWidth) {
+        context.globalAlpha = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? .42 : 1;
+        context.drawImage(atlas, (portalIndex % 10) * TILE, 9 * TILE, TILE, TILE, x, y, TILE, TILE);
+        context.globalAlpha = 1;
+      } else {
+        context.fillStyle = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? "#55515d" : "#ffe060";
+        context.fillRect(x + 3, y + 4, 10, 9); context.fillStyle = "#11111a"; context.fillRect(x + 6, y + 8, 4, 5);
+      }
+    });
     for (const chest of map.chests) if (!save.openedChests.includes(chest.id)) {
       const x = (chest.x - cameraX) * TILE, y = (chest.y - cameraY) * TILE;
-      context.fillStyle = "#2b160d"; context.fillRect(x + 3, y + 5, 10, 8); context.fillStyle = "#e0a53e"; context.fillRect(x + 4, y + 6, 8, 2); context.fillRect(x + 7, y + 9, 2, 3);
+      const atlas = atlasImages.current.ui;
+      if (atlas?.complete && atlas.naturalWidth) context.drawImage(atlas, 3 * TILE, 3 * TILE, TILE, TILE, x, y, TILE, TILE);
+      else { context.fillStyle = "#2b160d"; context.fillRect(x + 3, y + 5, 10, 8); context.fillStyle = "#e0a53e"; context.fillRect(x + 4, y + 6, 8, 2); context.fillRect(x + 7, y + 9, 2, 3); }
     }
+    const npcAtlas = atlasImages.current.npcs;
     const npcColors = ["#e0644d", "#5db8c8", "#d7b454", "#9d68c9"];
-    mapNpcs.forEach((npc) => drawPerson(context, (npc.x - cameraX) * TILE, (npc.y - cameraY) * TILE, npcColors[npc.palette % npcColors.length]!, "down", 0));
+    mapNpcs.forEach((npc) => {
+      const x = (npc.x - cameraX) * TILE, y = (npc.y - cameraY) * TILE;
+      if (npcAtlas?.complete && npcAtlas.naturalWidth) {
+        const cell = npcAtlasCell(npc.sprite);
+        context.filter = npc.palette ? `hue-rotate(${npc.palette * 72}deg)` : "none";
+        context.drawImage(npcAtlas, cell.col * TILE, cell.row * TILE, TILE, TILE, x, y, TILE, TILE);
+        context.filter = "none";
+      } else drawPerson(context, x, y, npcColors[npc.palette % npcColors.length]!, "down", 0);
+    });
     visibleFixed.forEach((entry) => {
       const x = (entry.x - cameraX) * TILE, y = (entry.y - cameraY) * TILE;
       context.fillStyle = "#08080d"; context.fillRect(x + 2, y + 2, 12, 12); context.fillStyle = "#ff4f64"; context.fillRect(x + 5, y + 4, 6, 7); context.fillStyle = "#fff7d8"; context.fillRect(x + 6, y + 5, 1, 1); context.fillRect(x + 9, y + 5, 1, 1);
     });
-    drawPerson(context, (save.position.x - cameraX) * TILE, (save.position.y - cameraY) * TILE, "#f0c85a", save.direction, walkFrame, true);
-  }, [map, mapNpcs, save, visibleFixed, walkFrame]);
+    const heroAtlas = atlasImages.current.hero;
+    const heroX = (save.position.x - cameraX) * TILE, heroY = (save.position.y - cameraY) * TILE;
+    if (heroAtlas?.complete && heroAtlas.naturalWidth) {
+      const cell = heroAtlasCell(save.direction, walkFrame);
+      context.drawImage(heroAtlas, cell.col * TILE, cell.row * TILE, TILE, TILE, heroX, heroY, TILE, TILE);
+    } else drawPerson(context, heroX, heroY, "#f0c85a", save.direction, walkFrame, true);
+  }, [atlasVersion, map, mapNpcs, save, visibleFixed, walkFrame]);
 
   useEffect(() => () => { stopHold(); stopRpgMusic(); setSfxEnabled(true); }, []);
 
@@ -475,11 +527,11 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       <header className={styles.hud}>
         <div><span>RPG MODE</span><strong>{map.name}</strong></div>
         <div><span>LV {save.level}</span><strong>HP {save.hp}/{save.maxHp}</strong></div>
-        <div><span>GOLD</span><strong>{save.gold}</strong></div>
+        <div><span><RPGIcon name="gold" size={10} /> GOLD</span><strong>{save.gold}</strong></div>
       </header>
       <section className={styles.locationBar}><span>{terrainLabel}</span><strong>{nearPortal ? `A • ${nearPortal.label}` : notice}</strong></section>
       <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE} height={VIEW_H * TILE} aria-label={`${map.name} exploration map`} />
-      <div className={styles.memoStrip}><span>MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>{save.techniques.length}/16 TECH • {save.equipmentOwned.length}/12 EQUIP</strong></div>
+      <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>{save.techniques.length}/16 TECH • {save.equipmentOwned.length}/12 EQUIP</strong></div>
 
       <section className={styles.controls} aria-label="RPG touch controls">
         <div className={styles.dpad}>

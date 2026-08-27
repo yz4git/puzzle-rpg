@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import { PIXEL_ART_ASSETS } from "../pixelArtAssets";
 import { playSfx, primeAudio } from "../gameAudio";
 import { ITEMS } from "./data/items";
 import { TECHNIQUES } from "./data/techniques";
 import { setRpgMusic, stopRpgMusic } from "./rpgAudio";
+import RPGIcon from "./RPGIcon";
+import { enemySpriteCell, type EnemySpriteFrame } from "./assets";
 import type { BattleResult, BattleStats, EnemyDefinition, EnemyIntentDefinition, InventoryStack, PanelType, RPGSaveData, TechniqueId } from "./types";
 import styles from "./RPGPuzzleBattle.module.css";
 
@@ -152,6 +153,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   const [resolving, setResolving] = useState(false);
   const [armorWeakened, setArmorWeakened] = useState(false);
   const [drainWeakened, setDrainWeakened] = useState(false);
+  const [nullHesitated, setNullHesitated] = useState(false);
   const [phase, setPhase] = useState(1);
   const [feedback, setFeedback] = useState("");
   const finished = useRef(false);
@@ -177,7 +179,10 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       const bonus = ratio <= .25 ? 2 : ratio <= .5 ? 1 : 0;
       power += bonus;
       if (base.kind === "disrupt") detail = `攻撃＋${2 + bonus}枚変色`;
+      const releases = Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0);
+      if (releases >= 4) { power = Math.max(1, power - 1); detail += " • 聞いた声で弱体"; }
     }
+    if (enemy.id === "citadelEye" && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 3) power = Math.max(1, power - 1);
     if (drainWeakened && base.kind === "drain") { power = Math.max(1, power - 2); detail = "TALKで弱体化"; }
     return { ...base, power, detail };
   }
@@ -191,8 +196,8 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       enemyId: enemy.id,
       hp: Math.max(0, nextHp),
       inventory: nextInventory,
-      exp: outcome === "victory" && !training ? enemy.exp : 0,
-      gold: outcome === "victory" && !training ? enemy.gold : 0,
+      exp: !training ? outcome === "victory" ? enemy.exp : outcome === "release" ? Math.max(1, Math.floor(enemy.exp * .35)) : 0 : 0,
+      gold: !training ? outcome === "victory" ? enemy.gold : outcome === "release" ? Math.floor(enemy.gold * .2) : 0 : 0,
       setFlags: [],
       stats: nextStats,
       ...options,
@@ -412,7 +417,11 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (enemy.id.includes("iron") || enemy.id === "ironTyrant") setArmorWeakened(true);
     if ((enemy.id === "scarletOracle" && save.memos.some((memo) => memo.id === "red-spring")) || enemy.id === "redHermit") setDrainWeakened(true);
     let nextFree = free;
-    if ((enemy.id === "voidHerald" || enemy.id === "ashCrow") && nextStats.skipUses >= 2) { nextFree += 1; setFree(nextFree); }
+    if (enemy.id === "voidHerald" && nextStats.skipUses >= 2) { nextFree += 1; setFree(nextFree); }
+    if (enemy.id === "ashCrow" && nextStats.skipUses >= 3) { nextFree += 1; setFree(nextFree); }
+    if (enemy.id === "nullExecutioner" && !nullHesitated && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => save.techniques.includes(id as TechniqueId))) {
+      nextFree += 1; setFree(nextFree); setNullHesitated(true);
+    }
     setMessage(alternateReady(nextStats) ? enemy.conditionalTalk : enemy.talk);
     await delay(520);
     const result = await resolveEnemyTurn(hp, barrier, enemyHp, nextFree, nextStats);
@@ -489,15 +498,32 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   }, []);
 
   useEffect(() => {
-    if (enemy.id !== "prismSovereign") return;
+    if (!enemy.boss || training) return;
     const ratio = enemyHp / effectiveEnemy.hp;
     const nextPhase = ratio <= .25 ? 3 : ratio <= .5 ? 2 : 1;
     if (nextPhase > phase) {
-      setPhase(nextPhase); setMessage(nextPhase === 2 ? "『半分の答えでは、世界は映らない』 • PHASE II" : "『最後の色を選んで』 • FINAL PHASE");
+      const line = enemy.phaseDialogue?.[nextPhase - 2] ?? (nextPhase === 2 ? "構えが変わった。" : "最後の力を解き放った。");
+      setPhase(nextPhase); setMessage(`${line} • ${nextPhase === 2 ? "PHASE II" : "FINAL PHASE"}`);
       if (save.equipment.armor === "prismGuard") setBarrier((value) => Math.min(30, value + 2));
       playSfx("enemyDisrupt");
     }
-  }, [effectiveEnemy.hp, enemy.id, enemyHp, phase, save.equipment.armor]);
+  }, [effectiveEnemy.hp, enemy.boss, enemy.phaseDialogue, enemyHp, phase, save.equipment.armor, training]);
+
+  const enemyFrame: EnemySpriteFrame = phase > 1
+    ? "phase"
+    : feedback.includes("HP")
+      ? "attack"
+      : feedback.startsWith("-")
+        ? "hurt"
+        : feedback
+          ? "reaction"
+          : "idle";
+  const enemySprite = enemySpriteCell(enemy.id, enemyFrame);
+  const enemySpriteStyle: CSSProperties | undefined = enemySprite ? {
+    backgroundImage: `url(${enemySprite.src})`,
+    backgroundSize: `${enemySprite.columns * 100}% ${enemySprite.rows * 100}%`,
+    backgroundPosition: `${enemySprite.col / (enemySprite.columns - 1) * 100}% ${enemySprite.row / (enemySprite.rows - 1) * 100}%`,
+  } : undefined;
 
   return (
     <main className={styles.battle} data-enemy={enemy.portrait}>
@@ -509,7 +535,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       </header>
 
       <section className={styles.enemyRow}>
-        <img src={PIXEL_ART_ASSETS.enemies[enemy.portrait]} alt={enemy.name} />
+        <span className={styles.enemySprite} role="img" aria-label={enemy.name} style={enemySpriteStyle} />
         <div><strong>{effectiveEnemy.name}</strong><i><u style={{ width: `${Math.max(0, enemyHp / effectiveEnemy.hp) * 100}%` }} /></i><span>HP {enemyHp}/{effectiveEnemy.hp}</span><small>{enemy.trait}</small></div>
       </section>
 
@@ -548,16 +574,16 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
         {PANEL_TYPES.map((type) => <span className={styles[type]} key={type}>{LABEL[type]} <b>×{largest[type]}</b></span>)}
       </section>
       <div className={styles.message} role="status">{message}</div>
-      <button className={styles.commandButton} type="button" onClick={() => { primeAudio(); playSfx("uiSelect"); setCommandOpen(true); setCommandPage("root"); }}>B • RPG COMMAND</button>
+      <button className={styles.commandButton} type="button" onClick={() => { primeAudio(); playSfx("uiSelect"); setCommandOpen(true); setCommandPage("root"); }}><RPGIcon name="talk" size={14} /> B • RPG COMMAND</button>
 
       {commandOpen ? <div className={styles.overlay} onClick={() => { setCommandOpen(false); setCommandPage("root"); }}>
         <div className={styles.commandWindow} onClick={(event) => event.stopPropagation()}>
           {commandPage === "root" ? <>
             <span>RPG COMMAND</span>
-            <button type="button" onClick={() => void talk()}>TALK<small>{enemy.alt?.hint ?? "敵の性格を読む"}</small></button>
-            <button type="button" onClick={() => setCommandPage("item")}>ITEM<small>{inventory.reduce((sum, item) => sum + item.count, 0)} ITEMS</small></button>
-            <button type="button" onClick={() => setCommandPage("status")}>STATUS<small>ターン消費なし</small></button>
-            <button type="button" disabled={Boolean(enemy.boss || training)} onClick={() => void run()}>RUN<small>{enemy.boss || training ? "使用不可" : "成功率72%"}</small></button>
+            <button type="button" onClick={() => void talk()}><b><RPGIcon name="talk" /> TALK</b><small>{enemy.alt?.hint ?? "敵の性格を読む"}</small></button>
+            <button type="button" onClick={() => setCommandPage("item")}><b><RPGIcon name="item" /> ITEM</b><small>{inventory.reduce((sum, item) => sum + item.count, 0)} ITEMS</small></button>
+            <button type="button" onClick={() => setCommandPage("status")}><b><RPGIcon name="status" /> STATUS</b><small>ターン消費なし</small></button>
+            <button type="button" disabled={Boolean(enemy.boss || training)} onClick={() => void run()}><b><RPGIcon name="run" /> RUN</b><small>{enemy.boss || training ? "使用不可" : "成功率72%"}</small></button>
           </> : commandPage === "item" ? <>
             <span>ITEM</span>
             {inventory.length ? inventory.map((stack, index) => <button type="button" key={`${stack.id}-${index}`} onClick={() => void useItem(index)}><b>{ITEMS[stack.id].icon} {ITEMS[stack.id].name} ×{stack.count}</b><small>{ITEMS[stack.id].description}</small></button>) : <p>ITEMがない。</p>}

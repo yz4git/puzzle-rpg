@@ -85,14 +85,14 @@ function worldMap(): MapDefinition {
     { id: "world-tower", x: 32, y: 6, label: "MIRROR TOWER", targetMap: "mirrorTower", target: { x: 10, y: 15 } },
     { id: "world-hour", x: 22, y: 6, label: "HOUR SPIRE", targetMap: "hourSpire", target: { x: 8, y: 9 } },
     { id: "world-void", x: 38, y: 7, label: "VOID PASS", targetMap: "voidPass", target: { x: 8, y: 13 }, requireFlag: "boss:ironTyrant", blockedText: "IRON CITYの門が閉じ、北へ進めない。" },
-    { id: "world-citadel", x: 42, y: 3, label: "PRISM CITADEL", targetMap: "prismCitadel", target: { x: 10, y: 20 }, requireFlag: "gate:citadel", blockedText: "四つの修行印とVOIDの証が必要だ。" },
+    { id: "world-citadel", x: 42, y: 3, label: "PRISM CITADEL", targetMap: "prismCitadel", target: { x: 10, y: 20 }, requireFlag: "gate:citadel", blockedText: "四つの修行印・VOIDの証・鏡鍵が必要だ。" },
   ];
 
   return {
     id: "world", name: "PRISM ROAD", kind: "field", width, height, tiles: rows(map), portals,
     chests: [
       { id: "world-forest-cache", x: 9, y: 18, item: "smoke" },
-      { id: "world-lake-cache", x: 26, y: 20, item: "guardStone" },
+      { id: "world-lake-cache", x: 27, y: 20, item: "guardStone" },
       { id: "world-danger-cache", x: 37, y: 15, equipment: "roadBell" },
     ],
     fixedEncounters: [
@@ -218,7 +218,7 @@ const mapList: MapDefinition[] = [
   town("reedHamlet", "REED HAMLET", { x: 32, y: 19 }, true),
   {
     ...town("ironCity", "IRON CITY", { x: 15, y: 13 }),
-    fixedEncounters: [{ id: "iron-throne", x: 9, y: 2, enemyId: "ironTyrant", requireFlag: "boss:scarletOracle", defeatedFlag: "boss:ironTyrant" }],
+    fixedEncounters: [{ id: "iron-throne", x: 9, y: 5, enemyId: "ironTyrant", requireFlag: "boss:scarletOracle", defeatedFlag: "boss:ironTyrant" }],
   },
   town("mirrorTown", "MIRROR TOWN", { x: 29, y: 11 }),
   training("emberShrine", "EMBER SHRINE", { x: 3, y: 23 }),

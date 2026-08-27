@@ -4,7 +4,7 @@ export const NPCS: NPCDefinition[] = [
   { id: "hearth-elder", mapId: "hearthVillage", x: 9, y: 4, name: "村の長", sprite: "elder", palette: 0, dialogueKey: "hearthElder", memo: { id: "old-temple", title: "古寺の橋印", text: "Hearth Villageの北、Old Templeに崩れた橋を起こす印がある。" }, action: { kind: "story", setFlag: "story:begun" } },
   { id: "hearth-inn", mapId: "hearthVillage", x: 4, y: 5, name: "宿の女主人", sprite: "woman", palette: 1, dialogueKey: "hearthInn", action: { kind: "inn", price: 5 } },
   { id: "hearth-child", mapId: "hearthVillage", x: 12, y: 9, name: "森を見た子", sprite: "child", palette: 2, dialogueKey: "hearthChild", memo: { id: "forest-wisp", title: "森の灯", text: "東の森の灯は、攻撃せず静かに待つと話せるかもしれない。" } },
-  { id: "hearth-road", mapId: "hearthVillage", x: 8, y: 11, name: "街道番", sprite: "soldier", palette: 0, dialogueKey: "hearthKeeper", memo: { id: "road-risk", title: "道の危険度", text: "街道は安全。草地は通常遭遇。赤い地面は危険な近道。" } },
+  { id: "hearth-road", mapId: "hearthVillage", x: 7, y: 11, name: "街道番", sprite: "soldier", palette: 0, dialogueKey: "hearthKeeper", memo: { id: "road-risk", title: "道の危険度", text: "街道は安全。草地は通常遭遇。赤い地面は危険な近道。" } },
   { id: "hearth-shop", mapId: "hearthVillage", x: 14, y: 5, name: "旅商人", sprite: "merchant", palette: 3, dialogueKey: "hearthMerchant", action: { kind: "shop", stock: ["herb", "smoke", "travellerCoat", "ironSword"] } },
   { id: "hearth-traveller", mapId: "hearthVillage", x: 6, y: 8, name: "古い旅人", sprite: "traveller", palette: 1, dialogueKey: "hearthTraveller", memo: { id: "four-masters", title: "四人の師", text: "炎・癒し・鉄壁・時の師が世界のどこかにいる。" } },
   { id: "hearth-well", mapId: "hearthVillage", x: 11, y: 6, name: "井戸番", sprite: "man", palette: 2, dialogueKey: "hearthWell" },

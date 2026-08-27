@@ -80,6 +80,8 @@ export type EnemyDefinition = {
   intents: EnemyIntentDefinition[];
   talk: string;
   conditionalTalk: string;
+  phaseDialogue?: [string, string];
+  victoryTalk?: string;
   alt?: AlternateResolution;
   drop?: ItemId;
 };

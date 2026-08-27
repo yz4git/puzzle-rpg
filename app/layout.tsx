@@ -18,11 +18,20 @@ const pixelArtPreloads = [
   "/assets/pixel8/orbs/light.png",
   "/assets/pixel8/orbs/heart.png",
   "/assets/pixel8/orbs/guard.png",
+  "/assets/rpg/atlas/hero.png",
+  "/assets/rpg/atlas/npcs.png",
+  "/assets/rpg/atlas/field.png",
+  "/assets/rpg/atlas/town.png",
+  "/assets/rpg/atlas/dungeon.png",
+  "/assets/rpg/atlas/enemy-a.png",
+  "/assets/rpg/atlas/enemy-b.png",
+  "/assets/rpg/atlas/boss.png",
+  "/assets/rpg/atlas/ui.png",
 ];
 
 export const metadata: Metadata = {
-  title: "Puzzle RPG",
-  description: "iPhone縦画面で遊ぶ、連鎖とスキルが気持ちいいパズルRPG。",
+  title: "Puzzle RPG — The Prism Road",
+  description: "世界を歩き、師から技を学び、会話と6×6 Cluster Breakで戦う一人旅8bitパズルRPG。",
   manifest: `${githubPagesBasePath}/manifest.json`,
   appleWebApp: {
     capable: true,
@@ -30,7 +39,6 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   formatDetection: { telephone: false },
-  other: { "codex-preview": "development" },
   icons: {
     icon: `${githubPagesBasePath}/favicon.svg`,
     shortcut: `${githubPagesBasePath}/favicon.svg`,

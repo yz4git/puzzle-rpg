@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "logicalPixel": "nearest-neighbour",
+  "atlases": {
+    "hero": { "file": "hero.png", "columns": 4, "rows": 4, "cell": 16 },
+    "npcs": { "file": "npcs.png", "columns": 4, "rows": 3, "cell": 16 },
+    "field": { "file": "field.png", "columns": 10, "rows": 10, "cell": 16 },
+    "town": { "file": "town.png", "columns": 8, "rows": 8, "cell": 16 },
+    "dungeon": { "file": "dungeon.png", "columns": 8, "rows": 8, "cell": 16 },
+    "enemyA": { "file": "enemy-a.png", "columns": 4, "rows": 3, "cell": 64, "frames": ["idle", "reaction"] },
+    "enemyB": { "file": "enemy-b.png", "columns": 8, "rows": 3, "cell": 64, "frames": ["idle", "reaction"] },
+    "boss": { "file": "boss.png", "columns": 8, "rows": 3, "cell": 64, "frames": ["idle", "attack", "hurt", "phase"] },
+    "ui": { "file": "ui.png", "columns": 5, "rows": 4, "cell": 16 }
+  }
+}

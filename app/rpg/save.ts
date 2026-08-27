@@ -7,8 +7,8 @@ import { TECHNIQUES } from "./data/techniques";
 const STORAGE_KEY = "puzzle-rpg:rpg-mode:v1";
 
 export function maxHpForLevel(level: number) {
-  if (level <= 1) return 20;
-  return 20 + Math.floor(level * 0.82) + Math.floor(level / 3);
+  if (level <= 5) return 19 + level;
+  return 24 + Math.floor((level - 5) * 1.2);
 }
 
 export function expForNextLevel(level: number) {
@@ -31,7 +31,7 @@ export function createNewSave(): RPGSaveData {
     inventory: [{ id: "herb", count: 2 }, { id: "smoke", count: 1 }],
     inventorySlots: 4,
     equipmentOwned: ["travellerCoat"],
-    equipment: { weapon: null, armor: "travellerCoat", charm: null },
+    equipment: { weapon: null, armor: null, charm: null },
     techniques: [],
     techniqueSlots: 2,
     memos: [{ id: "journey", title: "最初の旅", text: "村の長から北のOld Templeについて聞く。", read: false }],
