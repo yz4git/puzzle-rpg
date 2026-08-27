@@ -27,6 +27,13 @@ jobs:
         run: python3 scripts/fix-chapter1-patcher.py
       - name: Apply Chapter 1 patch
         run: python3 scripts/implement-chapter1-build.py
+      - name: Normalize generated Chapter 1 CSS
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/PuzzleRPGChapter1.module.css')
+          p.write_text(p.read_text().replace('\\n', '\n'))
+          PY
       - name: Install dependencies
         run: npm ci
       - name: TypeScript check
