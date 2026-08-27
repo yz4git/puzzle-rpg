@@ -526,7 +526,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   } : undefined;
 
   return (
-    <main className={styles.battle} data-enemy={enemy.portrait}>
+    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"}>
       {feedback ? <div className={styles.feedback}>{feedback}</div> : null}
       <header className={styles.header}>
         <span>{training ? "TRAINING" : enemy.boss ? `BOSS • PHASE ${phase}` : "ENCOUNTER"}</span>

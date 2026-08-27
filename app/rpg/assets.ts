@@ -14,29 +14,71 @@ export const RPG_ASSETS = {
 } as const;
 
 export type AtlasKey = "field" | "town" | "dungeon";
-export type AtlasCell = { atlas: AtlasKey; col: number; row: number };
+export type AtlasCell = { atlas: AtlasKey; col: number; row: number; rotation?: 0 | 1 | 2 | 3 };
 export type EnemySpriteFrame = "idle" | "reaction" | "attack" | "hurt" | "phase";
 export type EnemySpriteCell = { src: string; columns: number; rows: number; col: number; row: number };
 
+export const RPG_ATLAS_METRICS = {
+  terrain: { width: 64, height: 64 },
+  hero: { width: 96, height: 96 },
+  npc: { width: 96, height: 128 },
+  enemyA: { width: 128, height: 128 },
+  enemyB: { width: 128, height: 128 },
+  boss: { width: 160, height: 160 },
+  ui: { width: 96, height: 96 },
+} as const;
+
+function stableSeed(x: number, y: number) {
+  let value = Math.imul(x + 37, 0x45d9f3b) ^ Math.imul(y + 71, 0x119de1f3);
+  value ^= value >>> 16;
+  return Math.abs(value);
+}
+
+function isRoadConnection(map: MapDefinition, x: number, y: number) {
+  const row = map.tiles[y];
+  if (!row) return false;
+  const code = row[x];
+  return code === "r" || code === "b";
+}
+
+function roadCell(map: MapDefinition, x: number, y: number): AtlasCell {
+  const up = isRoadConnection(map, x, y - 1);
+  const right = isRoadConnection(map, x + 1, y);
+  const down = isRoadConnection(map, x, y + 1);
+  const left = isRoadConnection(map, x - 1, y);
+  const count = Number(up) + Number(right) + Number(down) + Number(left);
+  if (count >= 4) return { atlas: "field", col: 9, row: 1 };
+  if (count === 3) {
+    const rotation = !up ? 0 : !right ? 1 : !down ? 2 : 3;
+    return { atlas: "field", col: 8, row: 1, rotation };
+  }
+  if (count === 2 && ((up && right) || (right && down) || (down && left) || (left && up))) {
+    const rotation = up && right ? 0 : right && down ? 1 : down && left ? 2 : 3;
+    return { atlas: "field", col: 8, row: 1, rotation };
+  }
+  if (left || right) return { atlas: "field", col: 7, row: 1 };
+  return { atlas: "field", col: 5, row: 1 };
+}
+
 export function terrainAtlasCell(map: MapDefinition, code: string, x: number, y: number): AtlasCell {
-  const seed = Math.abs(x * 7 + y * 11);
+  const seed = stableSeed(x, y);
   if (map.id === "world") {
     if (code === "g") return { atlas: "field", col: seed % 6, row: 0 };
     if (code === "f") return { atlas: "field", col: 6 + seed % 4, row: seed % 3 === 0 ? 0 : 1 };
-    if (code === "r") return { atlas: "field", col: 5 + seed % 5, row: 1 };
+    if (code === "r") return roadCell(map, x, y);
     if (code === "d" || code === "x") return { atlas: "field", col: seed % 10, row: 2 };
     if (code === "w") return { atlas: "field", col: seed % 4, row: 3 };
-    if (code === "b") return { atlas: "field", col: seed % 7, row: 4 };
+    if (code === "b") return { atlas: "field", col: isRoadConnection(map, x - 1, y) || isRoadConnection(map, x + 1, y) ? 0 : 1, row: 4 };
     if (code === "m") return { atlas: "field", col: seed % 8, row: 5 };
     return { atlas: "field", col: 0, row: 0 };
   }
 
   if (map.kind === "town" || map.kind === "training") {
-    if (code === "h") return { atlas: "town", col: seed % 8, row: 1 };
+    if (code === "h") return { atlas: "town", col: seed % 2, row: 7 };
     if (code === "#") return { atlas: "town", col: 6 + seed % 2, row: 6 };
     if (code === "w") return { atlas: "town", col: 5 + seed % 3, row: 7 };
     if (code === "b") return { atlas: "town", col: 3 + seed % 2, row: 4 };
-    if (code === "a") return { atlas: "town", col: 2 + seed % 3, row: 5 };
+    if (code === "a") return { atlas: "town", col: 4 + seed % 3, row: 4 };
     if (code === "r") return { atlas: "town", col: 2 + seed % 2, row: 0 };
     return { atlas: "town", col: seed % 2, row: 7 };
   }

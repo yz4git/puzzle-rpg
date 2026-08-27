@@ -2,7 +2,9 @@
 
 ## Current phase
 
-Phase 20 complete — RPG MODE v1.0 is saved on GitHub `main` and deployed to the existing Sites project.
+Visual Reconstruction Pass in progress — high-density atlases, layered overworld
+rendering and reconstructed battle/title presentation are complete. Final targeted
+checks, GitHub main sync and existing Sites publication remain.
 
 ## Completed
 
@@ -30,20 +32,31 @@ Phase 20 complete — RPG MODE v1.0 is saved on GitHub `main` and deployed to th
 - Passed final TypeScript, RPG content, PWA startup-safety and production build gates.
 - Fast-forwarded GitHub `main` without modifying either restore branch.
 - Published Sites Version 31 at `https://puzzle-rpg.yzgame.chatgpt.site` and verified terminal deployment success.
+- Preserved the v1.0 baseline as `restore/pre-visual-reconstruction-20260828`.
+- Rebuilt every production atlas from the approved high-resolution source cells;
+  removed whole-sheet stretching and destructive 16px pre-downscaling.
+- Added a deterministic atlas rebuild script and v2 manifest with explicit cell metrics.
+- Upgraded the overworld to a 2× backing canvas with semantic roads, connected town
+  facades, depth shadows, larger actors and atlas-backed fixed encounters.
+- Reconstructed the title around the full-resolution hero portrait.
+- Enlarged battle enemies, strengthened panel material separation and locked NEXT
+  DROP MAP/readout to the exact 6×6 board width.
+- Completed a live visual pass through title, opening dialogue, town, world map and
+  a normal RPG battle; no app-origin console error was observed.
 
 ## In progress
 
-- None for v1.0.
+- Final targeted content/PWA gates, production checkpoint and publication.
 
 ## Not completed
 
-- None for the requested v1.0 scope.
+- GitHub `main` and existing Sites are not yet updated with this reconstruction pass.
 
 ## Next work
 
-1. Use this file and `docs/RPG_BALANCE_REPORT.md` as the v1.1 starting point if new content is requested.
-2. Preserve both restore branches and the background-only Service Worker policy.
-3. Re-run only the checks relevant to future changes.
+1. Run the RPG content and PWA startup-safety checks.
+2. Save the reconstruction milestone and update GitHub `main`.
+3. Publish and verify the existing Sites project without changing its identity.
 
 ## Important decisions
 

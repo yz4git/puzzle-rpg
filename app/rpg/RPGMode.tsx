@@ -12,7 +12,7 @@ import { TECHNIQUES } from "./data/techniques";
 import { BOSS_TECHNIQUE_REWARDS, TECHNIQUE_EQUIPMENT_REWARDS } from "./data/rewards";
 import RPGPuzzleBattle from "./RPGPuzzleBattle";
 import RPGIcon from "./RPGIcon";
-import { heroAtlasCell, npcAtlasCell, RPG_ASSETS, terrainAtlasCell } from "./assets";
+import { enemySpriteCell, heroAtlasCell, npcAtlasCell, RPG_ASSETS, RPG_ATLAS_METRICS, terrainAtlasCell, type AtlasCell } from "./assets";
 import { setRpgMusic, stopRpgMusic } from "./rpgAudio";
 import { expForNextLevel, exportSave, importSave, maxHpForLevel, saveGame } from "./save";
 import type { BattleResult, Direction, EquipmentId, ItemId, MapDefinition, NPCAction, NPCDefinition, PanelType, RPGSaveData, RPGScreen, TechniqueId, Vec2 } from "./types";
@@ -30,16 +30,47 @@ type ResultState = { title: string; lines: string[]; ending?: boolean } | null;
 const TILE = 16;
 const VIEW_W = 15;
 const VIEW_H = 13;
+const WORLD_RENDER_SCALE = 2;
+type AtlasImageKey = "hero" | "npcs" | "field" | "town" | "dungeon" | "ui" | "enemyA" | "enemyB" | "bosses";
 const DIR_DELTA: Record<Direction, Vec2> = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
 
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 function hasFlag(save: RPGSaveData, flag?: string) { return !flag || save.flags.includes(flag); }
 function addUnique<T extends string>(values: T[], value: T): T[] { return values.includes(value) ? values : [...values, value]; }
+function stableVisualIndex(id: string, x: number, y: number) {
+  let value = x * 31 + y * 53;
+  for (let index = 0; index < id.length; index += 1) value = Math.imul(value ^ id.charCodeAt(index), 16777619);
+  return Math.abs(value);
+}
 function encounterReset(save: RPGSaveData) {
   let value = 11 + Math.floor(Math.random() * 8);
   if (save.equipment.charm === "roadBell") value = Math.ceil(value * 1.3);
   if (save.techniques.includes("quietStep")) value = Math.ceil(value * 1.25);
   return value;
+}
+
+function drawAtlasTile(context: CanvasRenderingContext2D, image: HTMLImageElement, cell: AtlasCell, x: number, y: number) {
+  const { width, height } = RPG_ATLAS_METRICS.terrain;
+  const rotation = cell.rotation ?? 0;
+  if (!rotation) {
+    context.drawImage(image, cell.col * width, cell.row * height, width, height, x, y, TILE, TILE);
+    return;
+  }
+  context.save();
+  context.translate(x + TILE / 2, y + TILE / 2);
+  context.rotate(rotation * Math.PI / 2);
+  context.drawImage(image, cell.col * width, cell.row * height, width, height, -TILE / 2, -TILE / 2, TILE, TILE);
+  context.restore();
+}
+
+function drawGroundShadow(context: CanvasRenderingContext2D, x: number, y: number, width: number) {
+  context.save();
+  context.globalAlpha = .48;
+  context.fillStyle = "#05040a";
+  context.beginPath();
+  context.ellipse(x + width / 2, y, width * .38, 2.2, 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
 }
 
 function drawTile(context: CanvasRenderingContext2D, code: string, x: number, y: number, worldX: number, worldY: number) {
@@ -109,7 +140,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const atlasImages = useRef<Partial<Record<"hero" | "npcs" | "field" | "town" | "dungeon" | "ui", HTMLImageElement>>>({});
+  const atlasImages = useRef<Partial<Record<AtlasImageKey, HTMLImageElement>>>({});
   const afterDialogue = useRef<null | (() => void)>(null);
   const heldTimer = useRef<number | null>(null);
   const importRef = useRef<HTMLInputElement | null>(null);
@@ -420,6 +451,9 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       town: RPG_ASSETS.town,
       dungeon: RPG_ASSETS.dungeon,
       ui: RPG_ASSETS.ui,
+      enemyA: RPG_ASSETS.enemyA,
+      enemyB: RPG_ASSETS.enemyB,
+      bosses: RPG_ASSETS.bosses,
     } as const;
     for (const [key, src] of Object.entries(sources) as Array<[keyof typeof sources, string]>) {
       const image = new window.Image();
@@ -457,27 +491,60 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   });
 
   useEffect(() => {
-    const context = canvasRef.current?.getContext("2d");
-    if (!context) return;
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.setTransform(WORLD_RENDER_SCALE, 0, 0, WORLD_RENDER_SCALE, 0, 0);
     context.imageSmoothingEnabled = false;
     context.fillStyle = "#050509"; context.fillRect(0, 0, VIEW_W * TILE, VIEW_H * TILE);
     const cameraX = clamp(save.position.x - Math.floor(VIEW_W / 2), 0, Math.max(0, map.width - VIEW_W));
     const cameraY = clamp(save.position.y - Math.floor(VIEW_H / 2), 0, Math.max(0, map.height - VIEW_H));
+
+    // Base terrain is rendered first from dense 64 px source cells. The world
+    // remains a precise 16 px gameplay grid while retaining the source texture.
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
       const code = tileAt(map, worldX, worldY);
       const cell = terrainAtlasCell(map, code, worldX, worldY);
       const atlas = atlasImages.current[cell.atlas];
-      if (atlas?.complete && atlas.naturalWidth) context.drawImage(atlas, cell.col * TILE, cell.row * TILE, TILE, TILE, viewX * TILE, viewY * TILE, TILE, TILE);
+      if (atlas?.complete && atlas.naturalWidth) drawAtlasTile(context, atlas, cell, viewX * TILE, viewY * TILE);
       else drawTile(context, code, viewX * TILE, viewY * TILE, worldX, worldY);
     }
+
+    // A connected two-row house block is reconstructed from complete facade
+    // sprites instead of repeating random wall fragments on every tile.
+    const townAtlas = atlasImages.current.town;
+    if (townAtlas?.complete && townAtlas.naturalWidth && map.kind === "town") {
+      for (let worldY = 0; worldY < map.height; worldY += 1) {
+        for (let worldX = 0; worldX < map.width; worldX += 1) {
+          if (tileAt(map, worldX, worldY) !== "h" || tileAt(map, worldX - 1, worldY) === "h" || tileAt(map, worldX, worldY - 1) === "h") continue;
+          let width = 1;
+          while (tileAt(map, worldX + width, worldY) === "h") width += 1;
+          let height = 1;
+          while (tileAt(map, worldX, worldY + height) === "h") height += 1;
+          if (worldX + width < cameraX || worldX >= cameraX + VIEW_W || worldY + height < cameraY || worldY >= cameraY + VIEW_H) continue;
+          const starts = width <= 2 ? [0] : Array.from(new Set(Array.from({ length: Math.ceil(width / 2) }, (_, index) => Math.min(index * 2, width - 2))));
+          starts.forEach((offset, buildingIndex) => {
+            const col = (stableVisualIndex(map.id, worldX, worldY) + buildingIndex) % 8;
+            const drawX = (worldX + offset - cameraX) * TILE;
+            const drawY = (worldY - cameraY) * TILE;
+            const drawWidth = Math.min(2, width) * TILE;
+            const drawHeight = Math.max(2, height) * TILE;
+            context.drawImage(townAtlas, col * 64, 64, 64, 64, drawX, drawY, drawWidth, drawHeight);
+          });
+        }
+      }
+    }
+
     map.portals.forEach((portal, portalIndex) => {
       const x = (portal.x - cameraX) * TILE, y = (portal.y - cameraY) * TILE;
       if (x < -TILE || y < -TILE || x >= VIEW_W * TILE || y >= VIEW_H * TILE) return;
       const atlas = atlasImages.current.field;
       if (atlas?.complete && atlas.naturalWidth) {
         context.globalAlpha = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? .42 : 1;
-        context.drawImage(atlas, (portalIndex % 10) * TILE, 9 * TILE, TILE, TILE, x, y, TILE, TILE);
+        context.drawImage(atlas, (portalIndex % 10) * 64, 9 * 64, 64, 64, x - 6, y - 12, 28, 28);
         context.globalAlpha = 1;
       } else {
         context.fillStyle = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? "#55515d" : "#ffe060";
@@ -487,30 +554,47 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     for (const chest of map.chests) if (!save.openedChests.includes(chest.id)) {
       const x = (chest.x - cameraX) * TILE, y = (chest.y - cameraY) * TILE;
       const atlas = atlasImages.current.ui;
-      if (atlas?.complete && atlas.naturalWidth) context.drawImage(atlas, 3 * TILE, 3 * TILE, TILE, TILE, x, y, TILE, TILE);
+      if (atlas?.complete && atlas.naturalWidth) {
+        drawGroundShadow(context, x - 1, y + TILE - 1, 18);
+        context.drawImage(atlas, 3 * 96, 3 * 96, 96, 96, x - 1, y - 2, 18, 18);
+      }
       else { context.fillStyle = "#2b160d"; context.fillRect(x + 3, y + 5, 10, 8); context.fillStyle = "#e0a53e"; context.fillRect(x + 4, y + 6, 8, 2); context.fillRect(x + 7, y + 9, 2, 3); }
     }
     const npcAtlas = atlasImages.current.npcs;
     const npcColors = ["#e0644d", "#5db8c8", "#d7b454", "#9d68c9"];
     mapNpcs.forEach((npc) => {
       const x = (npc.x - cameraX) * TILE, y = (npc.y - cameraY) * TILE;
+      if (x < -TILE * 2 || y < -TILE * 2 || x >= VIEW_W * TILE + TILE || y >= VIEW_H * TILE + TILE) return;
       if (npcAtlas?.complete && npcAtlas.naturalWidth) {
         const cell = npcAtlasCell(npc.sprite);
-        context.filter = npc.palette ? `hue-rotate(${npc.palette * 72}deg)` : "none";
-        context.drawImage(npcAtlas, cell.col * TILE, cell.row * TILE, TILE, TILE, x, y, TILE, TILE);
-        context.filter = "none";
+        drawGroundShadow(context, x - 1, y + TILE - 1, 20);
+        context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 2, y - 12, 20, 28);
       } else drawPerson(context, x, y, npcColors[npc.palette % npcColors.length]!, "down", 0);
     });
     visibleFixed.forEach((entry) => {
       const x = (entry.x - cameraX) * TILE, y = (entry.y - cameraY) * TILE;
-      context.fillStyle = "#08080d"; context.fillRect(x + 2, y + 2, 12, 12); context.fillStyle = "#ff4f64"; context.fillRect(x + 5, y + 4, 6, 7); context.fillStyle = "#fff7d8"; context.fillRect(x + 6, y + 5, 1, 1); context.fillRect(x + 9, y + 5, 1, 1);
+      const sprite = enemySpriteCell(entry.enemyId, "idle");
+      const atlasKey: AtlasImageKey | null = !sprite ? null : sprite.src === RPG_ASSETS.enemyA ? "enemyA" : sprite.src === RPG_ASSETS.enemyB ? "enemyB" : "bosses";
+      const atlas = atlasKey ? atlasImages.current[atlasKey] : null;
+      if (sprite && atlas?.complete && atlas.naturalWidth) {
+        const sourceWidth = atlas.naturalWidth / sprite.columns;
+        const sourceHeight = atlas.naturalHeight / sprite.rows;
+        const size = ENEMIES[entry.enemyId]?.boss ? 32 : 26;
+        drawGroundShadow(context, x + (TILE - size) / 2, y + TILE, size);
+        context.drawImage(atlas, sprite.col * sourceWidth, sprite.row * sourceHeight, sourceWidth, sourceHeight, x + (TILE - size) / 2, y + TILE - size, size, size);
+      } else {
+        context.fillStyle = "#08080d"; context.fillRect(x + 2, y + 2, 12, 12); context.fillStyle = "#ff4f64"; context.fillRect(x + 5, y + 4, 6, 7);
+      }
     });
     const heroAtlas = atlasImages.current.hero;
     const heroX = (save.position.x - cameraX) * TILE, heroY = (save.position.y - cameraY) * TILE;
     if (heroAtlas?.complete && heroAtlas.naturalWidth) {
       const cell = heroAtlasCell(save.direction, walkFrame);
-      context.drawImage(heroAtlas, cell.col * TILE, cell.row * TILE, TILE, TILE, heroX, heroY, TILE, TILE);
+      drawGroundShadow(context, heroX - 3, heroY + TILE, 22);
+      context.drawImage(heroAtlas, cell.col * 96, cell.row * 96, 96, 96, heroX - 3, heroY - 8, 22, 24);
     } else drawPerson(context, heroX, heroY, "#f0c85a", save.direction, walkFrame, true);
+
+    context.setTransform(1, 0, 0, 1, 0, 0);
   }, [atlasVersion, map, mapNpcs, save, visibleFixed, walkFrame]);
 
   useEffect(() => () => { stopHold(); stopRpgMusic(); setSfxEnabled(true); }, []);
@@ -530,7 +614,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         <div><span><RPGIcon name="gold" size={10} /> GOLD</span><strong>{save.gold}</strong></div>
       </header>
       <section className={styles.locationBar}><span>{terrainLabel}</span><strong>{nearPortal ? `A • ${nearPortal.label}` : notice}</strong></section>
-      <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE} height={VIEW_H * TILE} aria-label={`${map.name} exploration map`} />
+      <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE * WORLD_RENDER_SCALE} height={VIEW_H * TILE * WORLD_RENDER_SCALE} aria-label={`${map.name} exploration map`} />
       <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>{save.techniques.length}/16 TECH • {save.equipmentOwned.length}/12 EQUIP</strong></div>
 
       <section className={styles.controls} aria-label="RPG touch controls">
