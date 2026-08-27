@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Phase 20 in progress — implementation, art, audio, content, browser play and balance passes are complete. Final GitHub main sync and existing Sites deployment remain.
+Phase 20 complete — RPG MODE v1.0 is saved on GitHub `main` and deployed to the existing Sites project.
 
 ## Completed
 
@@ -27,21 +27,23 @@ Phase 20 in progress — implementation, art, audio, content, browser play and b
 - Added content integrity tests and a reproducible five-archetype balance runner.
 - Completed real-browser checks for NEW GAME, world/NPC/MEMO, encounter, TALK/ITEM/STATUS/RUN, SAVE EXPORT/IMPORT, Chapter Battle, final boss phases, ending and title return.
 - Fixed NPC visibility, blocked exits/chests/fixed encounters, equipment rank enforcement and compact-height title mode selection found during browser play.
+- Passed final TypeScript, RPG content, PWA startup-safety and production build gates.
+- Fast-forwarded GitHub `main` without modifying either restore branch.
+- Published Sites Version 31 at `https://puzzle-rpg.yzgame.chatgpt.site` and verified terminal deployment success.
 
 ## In progress
 
-- Run the final TypeScript, targeted test and production build gates after the last compact-height fix.
-- Save the final milestone to GitHub `main`, then publish the existing Sites project.
+- None for v1.0.
 
 ## Not completed
 
-- Final GitHub merge and existing Sites deployment.
+- None for the requested v1.0 scope.
 
 ## Next work
 
-1. Run final compile, content/PWA tests and production build.
-2. Save the production atlases and source changes to the RPG milestone branch, then fast-forward `main`.
-3. Checkpoint and deploy the existing Sites project, then verify the live startup path.
+1. Use this file and `docs/RPG_BALANCE_REPORT.md` as the v1.1 starting point if new content is requested.
+2. Preserve both restore branches and the background-only Service Worker policy.
+3. Re-run only the checks relevant to future changes.
 
 ## Important decisions
 
@@ -56,4 +58,4 @@ Phase 20 in progress — implementation, art, audio, content, browser play and b
 
 ## Known issues
 
-- No app-origin browser errors are known. The remaining work is repository/deployment finalization.
+- No app-origin browser errors or blocking v1.0 issues are known.
