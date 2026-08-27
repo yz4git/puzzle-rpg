@@ -1,0 +1,144 @@
+.rewardCard {
+  width: min(94vw, 390px);
+  max-height: calc(100dvh - 18px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chapterName {
+  margin: -2px 0 6px;
+  color: #ffe56c;
+  font: 1000 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 1px;
+}
+
+.encounterBadge, .buildCounter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  min-height: 18px;
+  padding: 2px 7px;
+  border: 2px solid #ffe56c;
+  background: #09090d;
+  color: #ffe56c;
+  font: 1000 8px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: .7px;
+}
+
+.buildCounter {
+  border-color: #80eaff;
+  color: #80eaff;
+}
+
+.rewardLead {
+  margin: 2px 0 6px !important;
+  color: #d9dded;
+  font-size: 10px !important;
+}
+
+.rewardGrid {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 4px 0 7px;
+}
+
+.rewardChoice {
+  appearance: none;
+  display: grid !important;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 58px;
+  margin: 0 !important;
+  padding: 6px 8px !important;
+  border: 3px solid #8c93a8 !important;
+  background: #08090f !important;
+  color: #fff !important;
+  text-align: left;
+  box-shadow: inset 0 0 0 2px #171924, 3px 3px 0 #000 !important;
+}
+.rewardChoice > b, .acquired > b {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-height: 38px;
+  border: 2px solid currentColor;
+  background: #11131c;
+  font: 1000 11px/1 ui-monospace, monospace;
+}
+.rewardChoice > span, .acquired > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.rewardChoice > span > strong, .acquired > span > strong {
+  font: 1000 11px/1 ui-monospace, monospace !important;
+  letter-spacing: .5px;
+}
+.rewardChoice small, .acquired small {
+  color: #d7dae5;
+  font: 800 8px/1.35 ui-monospace, monospace;
+  white-space: normal;
+}
+.rewardChoice:active {
+  transform: translate(2px, 2px);
+  box-shadow: inset 0 0 0 2px #171924, 1px 1px 0 #000 !important;
+}
+
+.rewardChoice[data-tag="ATK"], .acquired[data-tag="ATK"] { color: #ff755f !important; border-color: #ff755f !important; }
+.rewardChoice[data-tag="HEAL"], .acquired[data-tag="HEAL"] { color: #ff77c8 !important; border-color: #ff77c8 !important; }
+.rewardChoice[data-tag="BAR"], .acquired[data-tag="BAR"] { color: #6ee8ff !important; border-color: #6ee8ff !important; }
+.rewardChoice[data-tag="SKIP"], .acquired[data-tag="SKIP"] { color: #ffe56c !important; border-color: #ffe56c !important; }
+.rewardChoice[data-tag="CORE"], .acquired[data-tag="CORE"] { color: #c69bff !important; border-color: #c69bff !important; }
+
+.acquired {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 6px 0 8px;
+  padding: 7px 8px;
+  border: 3px solid currentColor;
+  background: #08090f;
+  text-align: left;
+}
+
+.buildTitle, .buildFooter {
+  margin: 5px 0 4px;
+  color: #aeb4ca;
+  font: 1000 7px/1 ui-monospace, monospace;
+  letter-spacing: .7px;
+}
+
+.buildSummary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 7px;
+}
+.buildSummary i {
+  padding: 3px 5px;
+  border: 1px solid #73798d;
+  background: #0a0b11;
+  color: #dfe3f2;
+  font: 900 6px/1 ui-monospace, monospace;
+  font-style: normal;
+  letter-spacing: .2px;
+}
+.buildSummary i[data-tag="ATK"] { border-color: #ff755f; color: #ff9c8d; }
+.buildSummary i[data-tag="HEAL"] { border-color: #ff77c8; color: #ffaddd; }
+.buildSummary i[data-tag="BAR"] { border-color: #6ee8ff; color: #a9f2ff; }
+.buildSummary i[data-tag="SKIP"] { border-color: #ffe56c; color: #fff0a3; }
+.buildSummary i[data-tag="CORE"] { border-color: #c69bff; color: #dec4ff; }
+
+@media (max-height: 720px) {
+  .rewardCard { padding-top: 9px !important; padding-bottom: 9px !important; }
+  .rewardChoice { min-height: 52px; padding: 5px 7px !important; }
+  .rewardChoice > b, .acquired > b { min-height: 34px; }
+}

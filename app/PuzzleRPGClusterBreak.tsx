@@ -6,12 +6,20 @@ import { playSfx, primeAudio } from "./gameAudio";
 import { PIXEL_ART_ASSETS, type PixelEnemyKind } from "./pixelArtAssets";
 import styles from "./PuzzleRPGClusterBreak.module.css";
 import v2 from "./PuzzleRPGGameplayV2.module.css";
+import chapter from "./PuzzleRPGChapter1.module.css";
 
 type PanelType = "attack" | "heal" | "barrier" | "skip";
 type Tile = { id: number; type: PanelType; row: number; col: number };
 type IntentKind = "attack" | "heavy" | "drain" | "pierce" | "disrupt";
 type Intent = { kind: IntentKind; label: string; detail: string; power: number; icon: string };
 type EnemyDef = { kind: PixelEnemyKind; name: string; quote: string; hint: string; passive: string };
+type StageDef = EnemyDef & { hp: number; powerBonus: number; elite?: boolean; boss?: boolean };
+type RewardId =
+  | "berserker" | "finisher" | "redline" | "overheal"
+  | "fieldMedic" | "vitalGuard" | "fortress" | "lastStand"
+  | "timeThief" | "tempoBlade" | "deepFocus" | "wideBreak";
+type RewardTag = "ATK" | "HEAL" | "BAR" | "SKIP" | "CORE";
+type RewardDef = { id: RewardId; name: string; icon: string; tag: RewardTag; description: string };
 type Preview = { seedId: number; ids: Set<number>; type: PanelType; count: number };
 type FxState = { token: number; type: PanelType; count: number; rank: string; sourceX: number; sourceY: number; dx: number; dy: number };
 type FeedbackTarget = "enemy" | "hp" | "barrier" | "free";
@@ -43,43 +51,99 @@ const PANEL_EFFECT: Record<PanelType, string> = {
   skip: "DELAY",
 };
 
-const ENEMIES: EnemyDef[] = [
+const CHAPTER_TITLE = "THE SHATTERED GATE";
+const CHAPTER_LENGTH = 10;
+
+const CHAPTER_ONE_STAGES: StageDef[] = [
   {
-    kind: "warden",
-    name: "VOID WARDEN",
+    kind: "warden", name: "VOID WARDEN", hp: 18, powerBonus: 0,
     quote: "力だけでは届かぬ。時を読め。",
     hint: "SKIPを2個以上まとめて消すと、敵より多く行動できる。",
     passive: "2回目の行動はVOID CRUSH。SKIPしても技の順番は消えない。",
   },
   {
-    kind: "bastion",
-    name: "IRON BASTION",
+    kind: "bastion", name: "IRON BASTION", hp: 25, powerBonus: 0,
     quote: "崩せるものなら、崩してみろ。",
     hint: "ATK塊を育てて一気に削る。BARRIERを先に貯めてもよい。",
     passive: "重い攻撃が多い。小刻みな攻撃より、大量消しの攻勢が有効。",
   },
   {
-    kind: "oracle",
-    name: "BLOOD ORACLE",
+    kind: "oracle", name: "BLOOD ORACLE", hp: 32, powerBonus: 0,
     quote: "流した血は、わたしの糧になる。",
     hint: "DRAINでHPに通った分だけ敵が回復。BARRIERか大量SKIPで封じる。",
     passive: "DRAINは実際に失ったHPと同じ量だけ敵HPを回復する。",
   },
   {
-    kind: "null",
-    name: "NULL KNIGHT",
+    kind: "null", name: "NULL KNIGHT", hp: 38, powerBonus: 0,
     quote: "盾の向こう側まで斬る。",
     hint: "PIERCEはBARRIER無視。HEALかSKIPで発動そのものを遅らせる。",
     passive: "PIERCEはBARRIERを消費せず、HPへ直接ダメージを通す。",
   },
   {
-    kind: "trickster",
-    name: "PRISM TRICKSTER",
+    kind: "trickster", name: "PRISM TRICKSTER", hp: 45, powerBonus: 0, elite: true,
     quote: "いい塊だね。壊れる前に使えるかな？",
     hint: "DISRUPTは盤面の一部を変色。巨大塊は抱えすぎず使う判断も必要。",
-    passive: "DISRUPT後、盤面2枚の種類を変える。NEXTを読み直そう。",
+    passive: "CHAPTER中間戦。PRISM SHIFT後はNEXTと盤面を読み直そう。",
+  },
+  {
+    kind: "warden", name: "VOID HERALD", hp: 48, powerBonus: 1, elite: true,
+    quote: "止めた時間ごと、砕いてみせる。",
+    hint: "前半より攻撃が重い。SKIPで作ったFREE中にATK塊を完成させる。",
+    passive: "強化VOID CRUSHを使用。FREEを攻撃準備に変える判断が重要。",
+  },
+  {
+    kind: "bastion", name: "IRON TYRANT", hp: 54, powerBonus: 1, elite: true,
+    quote: "守り切れるか。それとも先に砕くか。",
+    hint: "IRON CRUSHに備えてBARを作るか、ATKでレースを仕掛けるか選ぶ。",
+    passive: "高耐久＋強化重撃。ビルドの得意色を大きく育てたい。",
+  },
+  {
+    kind: "oracle", name: "SCARLET ORACLE", hp: 60, powerBonus: 1, elite: true,
+    quote: "その回復さえ、血に変えてあげる。",
+    hint: "DRAINを受ける前にBARかSKIP。HEALビルドなら回復超過も活用できる。",
+    passive: "強化DRAIN。防ぐ・遅らせる・先に削るの三択を迫る。",
+  },
+  {
+    kind: "null", name: "NULL EXECUTIONER", hp: 66, powerBonus: 2, elite: true,
+    quote: "盾は数えない。残る命だけを数える。",
+    hint: "PIERCE直前はBARだけに頼らずHPを確保。FREE中のATKボーナスも有効。",
+    passive: "強化PIERCE。終盤ビルドの弱点を突く処刑戦。",
+  },
+  {
+    kind: "trickster", name: "PRISM SOVEREIGN", hp: 78, powerBonus: 2, boss: true,
+    quote: "十の戦いで得た答えを、すべて見せて。",
+    hint: "BOSSは2回に1回PRISM COLLAPSE。3枚変色する前に大塊を使う判断も必要。",
+    passive: "CHAPTER BOSS。高頻度の盤面変色と重い攻撃で完成したビルドを試す。",
   },
 ];
+
+const REWARDS: RewardDef[] = [
+  { id: "berserker", name: "BERSERKER", icon: "▲+", tag: "ATK", description: "ATK ×6以上 → +3 DAMAGE" },
+  { id: "finisher", name: "FINISHER", icon: "50", tag: "ATK", description: "敵HPが半分以下 → ATK +3" },
+  { id: "redline", name: "REDLINE", icon: "HP!", tag: "ATK", description: "HP 8以下 → ATK +3" },
+  { id: "overheal", name: "OVERHEAL", icon: "♥◆", tag: "HEAL", description: "余剰HEALを同量のBARへ変換" },
+  { id: "fieldMedic", name: "FIELD MEDIC", icon: "♥+", tag: "HEAL", description: "HEAL ×6以上 → HEAL +3" },
+  { id: "vitalGuard", name: "VITAL GUARD", icon: "♥→◆", tag: "HEAL", description: "HEAL ×6以上 → BAR +2" },
+  { id: "fortress", name: "FORTRESS", icon: "◆+", tag: "BAR", description: "BAR ×6以上 → BAR +3" },
+  { id: "lastStand", name: "LAST STAND", icon: "!◆", tag: "BAR", description: "HP 8以下 → BAR効果 +4" },
+  { id: "timeThief", name: "TIME THIEF", icon: "Ⅱ+", tag: "SKIP", description: "SKIP ×4以上 → FREE +1" },
+  { id: "tempoBlade", name: "TEMPO BLADE", icon: "Ⅱ▲", tag: "SKIP", description: "敵WAIT中のATK → +2 DAMAGE" },
+  { id: "deepFocus", name: "DEEP FOCUS", icon: "×8", tag: "CORE", description: "×8以上のATK/HEAL/BAR効果 +2" },
+  { id: "wideBreak", name: "WIDE BREAK", icon: "↔", tag: "CORE", description: "3列以上にまたがる塊のATK/HEAL/BAR +2" },
+];
+
+function stageDef(stage: number): StageDef {
+  return CHAPTER_ONE_STAGES[Math.max(0, Math.min(CHAPTER_LENGTH - 1, stage - 1))]!;
+}
+
+function rewardDef(id: RewardId): RewardDef {
+  return REWARDS.find((reward) => reward.id === id)!;
+}
+
+function drawRewardChoices(owned: RewardId[]): RewardId[] {
+  const available = REWARDS.filter((reward) => !owned.includes(reward.id));
+  return [...available].sort(() => Math.random() - 0.5).slice(0, 3).map((reward) => reward.id);
+}
 
 let tileId = 1;
 let fxToken = 1;
@@ -219,18 +283,16 @@ function coolSkipQueues(queues: PanelType[][]): PanelType[][] {
   }));
 }
 
-function enemyForStage(stage: number): EnemyDef {
-  return ENEMIES[(stage - 1) % ENEMIES.length]!;
+function enemyForStage(stage: number): StageDef {
+  return stageDef(stage);
 }
 
 function enemyMaxHp(stage: number): number {
-  const base = [18, 25, 32, 38, 45][(stage - 1) % 5]!;
-  return base + Math.floor((stage - 1) / 5) * 10;
+  return stageDef(stage).hp;
 }
 
-function enemyIntent(stage: number, step: number, enemy: EnemyDef): Intent {
-  const tier = Math.floor((stage - 1) / 5);
-  const add = tier * 2;
+function enemyIntent(stage: number, step: number, enemy: StageDef): Intent {
+  const add = enemy.powerBonus;
   if (enemy.kind === "warden") {
     return step % 3 === 1
       ? { kind: "heavy", label: "VOID CRUSH", detail: "重撃", power: 6 + add, icon: "!!" }
@@ -250,6 +312,11 @@ function enemyIntent(stage: number, step: number, enemy: EnemyDef): Intent {
     return step % 2 === 1
       ? { kind: "pierce", label: "NULL PIERCE", detail: "BARRIER無視", power: 5 + add, icon: ">>" }
       : { kind: "attack", label: "NULL SLASH", detail: "通常攻撃", power: 4 + add, icon: "!" };
+  }
+  if (enemy.boss) {
+    return step % 2 === 1
+      ? { kind: "disrupt", label: "PRISM COLLAPSE", detail: "攻撃＋3枚変色", power: 7 + add, icon: "<>" }
+      : { kind: "attack", label: "PRISM RAY", detail: "通常攻撃", power: 5 + add, icon: "!" };
   }
   return step % 3 === 1
     ? { kind: "disrupt", label: "PRISM SHIFT", detail: "攻撃＋2枚変色", power: 5 + add, icon: "<>" }
@@ -310,10 +377,10 @@ function collapseBoard(currentTiles: Tile[], currentQueues: PanelType[][], remov
   return { startTiles, finalTiles, nextQueues };
 }
 
-function disruptBoard(current: Tile[]): Tile[] {
+function disruptBoard(current: Tile[], amount = 2): Tile[] {
   const candidates = current.filter((tile) => tile.row >= 0);
   if (candidates.length < 2) return current;
-  const chosen = [...candidates].sort(() => Math.random() - 0.5).slice(0, 2);
+  const chosen = [...candidates].sort(() => Math.random() - 0.5).slice(0, Math.min(amount, candidates.length));
   const ids = new Set(chosen.map((tile) => tile.id));
   return current.map((tile) => ids.has(tile.id) ? { ...tile, type: weightedType() } : tile);
 }
@@ -337,6 +404,9 @@ export default function PuzzleRPGClusterBreak() {
   const [resolving, setResolving] = useState(false);
   const [message, setMessage] = useState("塊を押して効果を確認。離すと消去。1個でも消せる。");
   const [bestGroup, setBestGroup] = useState(1);
+  const [build, setBuild] = useState<RewardId[]>([]);
+  const [rewardChoices, setRewardChoices] = useState<RewardId[]>([]);
+  const [rewardPicked, setRewardPicked] = useState<RewardId | null>(null);
   const [fx, setFx] = useState<FxState | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -345,10 +415,11 @@ export default function PuzzleRPGClusterBreak() {
   const barrierRef = useRef<HTMLDivElement | null>(null);
   const freeRef = useRef<HTMLDivElement | null>(null);
 
-  const enemy = enemyForStage(stage);
+  const currentStage = enemyForStage(stage);
+  const enemy = currentStage;
   const maxEnemyHp = enemyMaxHp(stage);
-  const intent = enemyIntent(stage, enemyStep, enemy);
-  const nextIntent = enemyIntent(stage, enemyStep + 1, enemy);
+  const intent = enemyIntent(stage, enemyStep, currentStage);
+  const nextIntent = enemyIntent(stage, enemyStep + 1, currentStage);
   const largest = useMemo(() => largestGroups(tiles), [tiles]);
   const boardMap = useMemo(() => tileMap(tiles), [tiles]);
   const previewDropCounts = useMemo(() => {
@@ -366,6 +437,7 @@ export default function PuzzleRPGClusterBreak() {
       : Math.max(0, intent.power - barrier);
   const isCritical = playerHp <= 5 || (enemyDelay === 0 && incomingHpDamage >= playerHp);
   const isDanger = !isCritical && (playerHp <= 9 || (enemyDelay === 0 && incomingHpDamage >= Math.ceil(playerHp * 0.6)));
+  const ownedBuildDefs = build.map(rewardDef);
 
   function resetRun() {
     tileId = 1;
@@ -379,6 +451,9 @@ export default function PuzzleRPGClusterBreak() {
     setEnemyDelay(0);
     setTurn(1);
     setBestGroup(1);
+    setBuild([]);
+    setRewardChoices([]);
+    setRewardPicked(null);
     setGameOver(false);
     setStageClear(false);
     setStageIntro(true);
@@ -403,6 +478,7 @@ export default function PuzzleRPGClusterBreak() {
   }
 
   function nextStage() {
+    if (stage >= CHAPTER_LENGTH) return;
     const next = stage + 1;
     setStage(next);
     setEnemyHp(enemyMaxHp(next));
@@ -412,10 +488,21 @@ export default function PuzzleRPGClusterBreak() {
     setPlayerHp((hp) => Math.min(PLAYER_MAX_HP, hp + 3));
     setStageClear(false);
     setStageIntro(true);
+    setRewardChoices([]);
+    setRewardPicked(null);
     setPreview(null);
     setFx(null);
     setFeedback([]);
-    setMessage(`STAGE ${next}`);
+    setMessage(`CHAPTER 1 • STAGE ${next}/${CHAPTER_LENGTH}`);
+  }
+
+  function chooseReward(id: RewardId) {
+    if (rewardPicked || !rewardChoices.includes(id)) return;
+    primeAudio();
+    playSfx("uiConfirm");
+    setBuild((current) => current.includes(id) ? current : [...current, id]);
+    setRewardPicked(id);
+    setMessage(`BUILD ACQUIRED • ${rewardDef(id).name}`);
   }
 
   function showGroupPreview(tile: Tile, event?: PointerEvent<HTMLButtonElement>) {
@@ -520,33 +607,61 @@ export default function PuzzleRPGClusterBreak() {
     let nextPlayerHp = playerHp;
     let nextBarrier = barrier;
     let nextDelay = enemyDelay;
+    const spanColumns = new Set(group.map((tile) => tile.col)).size;
+    const focusBonus = build.includes("deepFocus") && count >= 8 ? 2 : 0;
+    const wideBonus = build.includes("wideBreak") && spanColumns >= 3 ? 2 : 0;
+    const coreBonus = focusBonus + wideBonus;
 
     if (currentSeed.type === "attack") {
-      nextEnemyHp = Math.max(0, enemyHp - count);
+      let damage = count + coreBonus;
+      if (build.includes("berserker") && count >= 6) damage += 3;
+      if (build.includes("finisher") && enemyHp <= Math.ceil(maxEnemyHp / 2)) damage += 3;
+      if (build.includes("redline") && playerHp <= 8) damage += 3;
+      if (build.includes("tempoBlade") && enemyDelay > 0) damage += 2;
+      const buildBonus = Math.max(0, damage - count);
+      nextEnemyHp = Math.max(0, enemyHp - damage);
       setEnemyHp(nextEnemyHp);
-      setMessage(`ATK ×${count} → ${count} DAMAGE`);
-      showFeedback("enemy", `-${count}`, "loss");
+      setMessage(`ATK ×${count} → ${damage} DAMAGE${buildBonus > 0 ? ` • BUILD +${buildBonus}` : ""}`);
+      showFeedback("enemy", `-${damage}`, "loss");
       playSfx("playerAttack");
     } else if (currentSeed.type === "heal") {
-      const healed = Math.min(PLAYER_MAX_HP, playerHp + count);
+      let healPower = count + coreBonus;
+      if (build.includes("fieldMedic") && count >= 6) healPower += 3;
+      const healed = Math.min(PLAYER_MAX_HP, playerHp + healPower);
       const actual = healed - playerHp;
+      const excess = Math.max(0, healPower - actual);
       nextPlayerHp = healed;
       setPlayerHp(nextPlayerHp);
-      setMessage(`HEAL ×${count} → HP +${actual}`);
+      let bonusBarrier = 0;
+      if (build.includes("vitalGuard") && count >= 6) bonusBarrier += 2;
+      if (build.includes("overheal")) bonusBarrier += excess;
+      const shielded = Math.min(BARRIER_MAX, nextBarrier + bonusBarrier);
+      const actualBarrier = shielded - nextBarrier;
+      nextBarrier = shielded;
+      if (actualBarrier > 0) {
+        setBarrier(nextBarrier);
+        showFeedback("barrier", `+${actualBarrier} BAR`, "gain");
+      }
+      setMessage(`HEAL ×${count} → HP +${actual}${actualBarrier > 0 ? ` • BAR +${actualBarrier}` : ""}`);
       showFeedback("hp", actual > 0 ? `+${actual} HP` : "HP FULL", actual > 0 ? "gain" : "special");
       playSfx("heal");
     } else if (currentSeed.type === "barrier") {
-      const shielded = Math.min(BARRIER_MAX, barrier + count);
+      let barrierPower = count + coreBonus;
+      if (build.includes("fortress") && count >= 6) barrierPower += 3;
+      if (build.includes("lastStand") && playerHp <= 8) barrierPower += 4;
+      const shielded = Math.min(BARRIER_MAX, barrier + barrierPower);
       const actual = shielded - barrier;
       nextBarrier = shielded;
       setBarrier(nextBarrier);
-      setMessage(`BAR ×${count} → BARRIER +${actual}`);
+      setMessage(`BAR ×${count} → BARRIER +${actual}${barrierPower > count ? ` • BUILD +${barrierPower - count}` : ""}`);
       showFeedback("barrier", actual > 0 ? `+${actual} BAR` : "BAR MAX", actual > 0 ? "gain" : "special");
       playSfx("shield");
     } else {
-      nextDelay += count;
-      setMessage(`SKIP ×${count} → ${Math.max(0, count - 1)} FREE MOVE${count - 1 === 1 ? "" : "S"}`);
-      showFeedback("free", `+${Math.max(0, count - 1)} FREE`, "special");
+      const extraFree = build.includes("timeThief") && count >= 4 ? 1 : 0;
+      nextDelay += count + extraFree;
+      const granted = Math.max(0, count - 1 + extraFree);
+      setMessage(`SKIP ×${count} → ${granted} FREE MOVE${granted === 1 ? "" : "S"}${extraFree > 0 ? " • TIME THIEF +1" : ""}`);
+      showFeedback("free", `+${granted} FREE`, "special");
       playSfx(count >= 6 ? "skill" : "setup");
     }
 
@@ -565,6 +680,13 @@ export default function PuzzleRPGClusterBreak() {
       playSfx("enemyBreak");
       await delay(330);
       playSfx("stageClear");
+      if (stage < CHAPTER_LENGTH) {
+        setRewardChoices(drawRewardChoices(build));
+        setRewardPicked(null);
+      } else {
+        setRewardChoices([]);
+        setRewardPicked(null);
+      }
       setStageClear(true);
       setResolving(false);
       return;
@@ -606,9 +728,10 @@ export default function PuzzleRPGClusterBreak() {
       setMessage((text) => `${text} • DRAIN +${hpDamage}`);
     }
     if (currentIntent.kind === "disrupt") {
-      setTiles((current) => disruptBoard(current));
-      showFeedback("enemy", "SHIFT!", "special");
-      setMessage((text) => `${text} • 2 PANELS SHIFT`);
+      const shiftCount = currentStage.boss ? 3 : 2;
+      setTiles((current) => disruptBoard(current, shiftCount));
+      showFeedback("enemy", currentStage.boss ? "COLLAPSE!" : "SHIFT!", "special");
+      setMessage((text) => `${text} • ${shiftCount} PANELS SHIFT`);
     }
 
     setEnemyStep((value) => value + 1);
@@ -637,14 +760,15 @@ export default function PuzzleRPGClusterBreak() {
     return (
       <main className={styles.titleScreen} aria-label="Puzzle RPG title">
         <div className={styles.titleLogo}>PUZZLE<br />RPG</div>
-        <div className={styles.titleSub}>CLUSTER BREAK TACTICAL BATTLE</div>
+        <div className={styles.titleSub}>CHAPTER 1 • {CHAPTER_TITLE}</div>
         <img className={styles.hero} src={PIXEL_ART_ASSETS.hero} alt="8bit hero" />
         <button className={styles.startButton} type="button" onClick={startGame}>▶ START GAME</button>
         <div className={styles.titleRules}>
           <strong>1 PANEL = 1 EFFECT</strong>
           <span>ATK / HEAL / BARRIER / SKIP</span>
           <span>つながった同種の塊を押す。1個でも消せる。</span>
-          <span>大きなSKIP塊なら、敵を止めて一気に攻められる。</span>
+          <span>10 BATTLES • 勝つたび3つのBUILDから1つ選ぶ。</span>
+          <span>BUILDの組み合わせで、同じ盤面の価値が変わる。</span>
         </div>
       </main>
     );
@@ -680,8 +804,8 @@ export default function PuzzleRPGClusterBreak() {
       ) : null}
 
       <header className={styles.topBar}>
-        <div><span>TACTICAL CLUSTER BREAK</span><strong>STAGE {stage}</strong></div>
-        <div className={styles.turnBox}>TURN {String(turn).padStart(2, "0")}</div>
+        <div><span>CHAPTER 1 • {CHAPTER_TITLE}</span><strong>STAGE {stage}/{CHAPTER_LENGTH}{currentStage.boss ? " • BOSS" : currentStage.elite ? " • ELITE" : ""}</strong></div>
+        <div className={styles.turnBox}>TURN {String(turn).padStart(2, "0")} • BUILD {build.length}</div>
       </header>
 
       <section className={`${styles.enemyStage} ${v2.feedbackHost} ${fx?.type === "attack" ? styles.targetHit : ""}`}>
@@ -782,11 +906,13 @@ export default function PuzzleRPGClusterBreak() {
       {stageIntro ? (
         <div className={styles.overlay} role="dialog" aria-label={`Stage ${stage} intro`} onClick={beginStage}>
           <div className={styles.introCard}>
-            <span>STAGE {stage}</span>
+            <span>CHAPTER 1 • STAGE {stage}/{CHAPTER_LENGTH}</span>
+            {currentStage.boss ? <b className={chapter.encounterBadge}>CHAPTER BOSS</b> : currentStage.elite ? <b className={chapter.encounterBadge}>ELITE</b> : null}
             <img src={PIXEL_ART_ASSETS.enemies[enemy.kind]} alt="" fetchPriority="high" />
             <strong>{enemy.name}</strong>
             <div className={styles.dialogue}>「{enemy.quote}」</div>
             <div className={styles.hint}><b>HINT</b>{enemy.hint}</div>
+            <div className={chapter.buildCounter}>CURRENT BUILD {build.length}</div>
             <button type="button" onClick={(event) => { event.stopPropagation(); beginStage(); }}>▶ BATTLE START</button>
             <small>画面のどこを押しても開始</small>
           </div>
@@ -795,12 +921,60 @@ export default function PuzzleRPGClusterBreak() {
 
       {stageClear ? (
         <div className={styles.overlay} role="dialog" aria-label="Stage Clear">
-          <div className={styles.clearCard}>
-            <span>STAGE {stage}</span>
-            <strong>CLEAR!</strong>
-            <p>BEST CLUSTER ×{bestGroup}</p>
-            <p>HP +3して次の敵へ</p>
-            <button type="button" onClick={nextStage}>▶ NEXT STAGE</button>
+          <div className={`${styles.clearCard} ${chapter.rewardCard}`}>
+            {stage >= CHAPTER_LENGTH ? (
+              <>
+                <span>CHAPTER 1</span>
+                <strong>CHAPTER CLEAR!</strong>
+                <div className={chapter.chapterName}>{CHAPTER_TITLE}</div>
+                <p>10 BATTLES COMPLETE • BEST ×{bestGroup}</p>
+                <div className={chapter.buildTitle}>FINAL BUILD • {build.length}</div>
+                <div className={chapter.buildSummary}>
+                  {ownedBuildDefs.map((reward) => <i key={reward.id} data-tag={reward.tag}>{reward.name}</i>)}
+                </div>
+                <button type="button" onClick={resetRun}>▶ NEW RUN</button>
+              </>
+            ) : !rewardPicked ? (
+              <>
+                <span>STAGE {stage}/{CHAPTER_LENGTH} CLEAR</span>
+                <strong>CHOOSE 1 BUILD</strong>
+                <p className={chapter.rewardLead}>次の戦いのルールを変える報酬</p>
+                <div className={chapter.rewardGrid}>
+                  {rewardChoices.map((id) => {
+                    const reward = rewardDef(id);
+                    return (
+                      <button
+                        key={reward.id}
+                        className={chapter.rewardChoice}
+                        data-tag={reward.tag}
+                        type="button"
+                        aria-label={`Choose reward ${reward.name}`}
+                        onClick={() => chooseReward(reward.id)}
+                      >
+                        <b>{reward.icon}</b>
+                        <span><strong>{reward.name}</strong><small>{reward.description}</small></span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className={chapter.buildFooter}>OWNED BUILD {build.length} / 12</div>
+              </>
+            ) : (
+              <>
+                <span>STAGE {stage}/{CHAPTER_LENGTH} CLEAR</span>
+                <strong>BUILD ACQUIRED</strong>
+                <div className={chapter.acquired} data-tag={rewardDef(rewardPicked).tag}>
+                  <b>{rewardDef(rewardPicked).icon}</b>
+                  <span><strong>{rewardDef(rewardPicked).name}</strong><small>{rewardDef(rewardPicked).description}</small></span>
+                </div>
+                <div className={chapter.buildTitle}>CURRENT BUILD • {build.length}</div>
+                <div className={chapter.buildSummary}>
+                  {ownedBuildDefs.map((reward) => <i key={reward.id} data-tag={reward.tag}>{reward.name}</i>)}
+                </div>
+                <p>HP +3して次の敵へ</p>
+                <button type="button" onClick={nextStage}>▶ NEXT STAGE</button>
+              </>
+            )}
           </div>
         </div>
       ) : null}
@@ -810,7 +984,7 @@ export default function PuzzleRPGClusterBreak() {
           <div className={styles.gameOverCard}>
             <img src={PIXEL_ART_ASSETS.hero} alt="" />
             <strong>GAME OVER</strong>
-            <p>STAGE {stage} • BEST ×{bestGroup}</p>
+            <p>STAGE {stage}/{CHAPTER_LENGTH} • BUILD {build.length} • BEST ×{bestGroup}</p>
             <button type="button" onClick={resetRun}>▶ RETRY</button>
           </div>
         </div>
