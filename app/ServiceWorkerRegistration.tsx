@@ -33,7 +33,17 @@ export default function ServiceWorkerRegistration() {
   useEffect(() => {
     let cancelled = false;
     let reloading = false;
+    let userInteracted = false;
     const hasServiceWorker = "serviceWorker" in navigator;
+
+    const markInteracted = () => {
+      userInteracted = true;
+    };
+
+    // Once the player touches/uses the page, that play session must never be
+    // interrupted by a delayed fresh-build reload.
+    window.addEventListener("pointerdown", markInteracted, { capture: true });
+    window.addEventListener("keydown", markInteracted, { capture: true });
 
     // Remove the previous cache-busting URL without causing another navigation.
     cleanLegacyBuildQuery();
@@ -47,6 +57,26 @@ export default function ServiceWorkerRegistration() {
         previousBuild = window.localStorage.getItem(BUILD_STORAGE_KEY);
       } catch {
         // Storage may be unavailable in private/embedded browsing. Fresh SW logic still works.
+      }
+
+      const buildChanged = Boolean(previousBuild && previousBuild !== buildId);
+
+      // Record the discovered build immediately so this mismatch is handled only once.
+      // If the player has already started, the current session stays intact and the
+      // network-first worker makes the next navigation/reload pick up the new build.
+      try {
+        window.localStorage.setItem(BUILD_STORAGE_KEY, buildId);
+      } catch {
+        // Ignore storage failures.
+      }
+
+      // If we can refresh before the player has interacted, do it immediately.
+      // Do not wait for service-worker registration/update: that delay was what caused
+      // the game to jump back to the title several seconds after START was pressed.
+      if (buildChanged && !userInteracted && !reloading) {
+        reloading = true;
+        window.location.reload();
+        return;
       }
 
       if (hasServiceWorker) {
@@ -63,27 +93,12 @@ export default function ServiceWorkerRegistration() {
           // The game remains usable without PWA installation.
         }
       }
-
-      if (cancelled) return;
-
-      try {
-        window.localStorage.setItem(BUILD_STORAGE_KEY, buildId);
-      } catch {
-        // Ignore storage failures.
-      }
-
-      // First visit: keep the already-rendered page stable. On a later publish, reload
-      // exactly once at the same clean URL. Navigation requests are network-first/no-store
-      // in sw.js, so this fetches the new HTML without the delayed ?__build redirect that
-      // could surface a non-HTML Sites response in embedded Safari.
-      if (previousBuild && previousBuild !== buildId && !reloading) {
-        reloading = true;
-        window.location.reload();
-      }
     })();
 
     return () => {
       cancelled = true;
+      window.removeEventListener("pointerdown", markInteracted, { capture: true });
+      window.removeEventListener("keydown", markInteracted, { capture: true });
     };
   }, []);
 
