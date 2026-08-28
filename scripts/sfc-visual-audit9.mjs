@@ -27,6 +27,7 @@ class CDP {
 async function evaluate(cdp, expression) { const r = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.text); return r.result.value; }
 async function waitFor(cdp, expression, timeout = 12000) { const end = Date.now() + timeout; while (Date.now() < end) { if (await evaluate(cdp, expression)) return true; await sleep(100); } return false; }
 async function click(cdp, text) { return evaluate(cdp, `(()=>{const e=[...document.querySelectorAll('button')].find(x=>(x.innerText||'').includes(${JSON.stringify(text)}));if(!e)return false;e.click();return true})()`); }
+async function pointerDown(cdp, text) { return evaluate(cdp, `(()=>{const e=[...document.querySelectorAll('button')].find(x=>(x.innerText||'').includes(${JSON.stringify(text)}));if(!e)return false;e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:1,pointerType:'touch',isPrimary:true}));return true})()`); }
 async function shot(cdp, name, note) {
   const metrics = await evaluate(cdp, `(()=>{const c=document.querySelector('canvas[aria-label$="exploration map"]');const r=c?.getBoundingClientRect();const box=document.querySelector('[data-portrait]');return{scroll:document.documentElement.scrollHeight,canvas:r?{w:Math.round(r.width),h:Math.round(r.height)}:null,portrait:box?.getAttribute('data-portrait')??null,text:document.body.innerText.replace(/\\s+/g,' ').slice(0,430)}})()`);
   const { data } = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
@@ -56,8 +57,7 @@ async function teleport(cdp, mapId, x, y, direction='up') {
   await evaluate(cdp, saveExpr(mapId,x,y,direction)); await cdp.send('Page.reload',{ignoreCache:true}); await sleep(400); await enter(cdp);
 }
 async function talkAndShot(cdp, name, note, expectedName) {
-  if (!(await waitFor(cdp, `document.body.innerText.includes(${JSON.stringify(expectedName)}) || !!document.querySelector('canvas[aria-label$="exploration map"]')`, 2000))) throw new Error('target context missing');
-  await click(cdp,'CHECK');
+  if (!(await pointerDown(cdp,'CHECK'))) throw new Error('A CHECK button missing');
   if (!(await waitFor(cdp, `document.body.innerText.includes(${JSON.stringify(expectedName)}) && !!document.querySelector('[data-portrait="true"]')`, 4000))) throw new Error(`${expectedName}: portrait dialog missing`);
   return shot(cdp,name,note);
 }
@@ -91,11 +91,10 @@ try {
   records.push(await shot(cdp,'09-master-target','Master crest and talk marker'));
   records.push(await talkAndShot(cdp,'10-master-dialogue','Master portrait dialogue','炎の師イグナ'));
 
-  // Opening/system dialogue must remain portrait-free.
   await evaluate(cdp, `localStorage.removeItem('puzzle-rpg:rpg-mode:v1');true`);
   await cdp.send('Page.reload',{ignoreCache:true}); await sleep(450);
   await click(cdp,'RPG MODE'); await sleep(120); await click(cdp,'NEW GAME');
-  await waitFor(cdp, `!!document.querySelector('[data-portrait="false"]')`, 4000);
+  if (!(await waitFor(cdp, `!!document.querySelector('[data-portrait="false"]')`, 4000))) throw new Error('opening portrait-free dialogue missing');
   records.push(await shot(cdp,'11-opening-no-portrait','Story/system opening remains portrait-free'));
 
   for (const record of records) {
