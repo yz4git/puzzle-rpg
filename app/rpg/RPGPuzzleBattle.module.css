@@ -126,12 +126,12 @@
 .stopwatchPanel::before{content:"";position:absolute;left:50%;top:-9px;width:12px;height:5px;transform:translateX(-50%);background:#fff078;box-shadow:0 -2px #5b4911,9px 6px 0 -3px #fff078}
 .stopwatchPanel::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:10px;transform:translate(-50%,-88%) rotate(-28deg);transform-origin:50% 88%;background:#fff7bf;box-shadow:4px 7px 0 -1px #fff7bf}
 
-.skipEnemyOverlay{position:absolute;z-index:6;left:50%;top:50%;width:100px;height:74px;display:grid;place-items:center;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(3px 4px 0 #000);overflow:visible}
-.stopwatchFace{position:absolute;left:50%;top:5px;width:57px;height:57px;transform:translateX(-50%);border:5px solid #ffe56d;border-radius:50%;background:#08080d;box-shadow:inset 0 0 0 3px #6d5818,0 0 0 2px #08080d}
-.stopwatchFace::before{content:"";position:absolute;left:50%;top:-13px;width:20px;height:7px;transform:translateX(-50%);background:#ffe56d;box-shadow:0 -3px #5f4b13,15px 8px 0 -5px #ffe56d}
-.stopwatchFace::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:19px;transform:translate(-50%,-92%) rotate(-25deg);transform-origin:50% 92%;background:#fff4ae;box-shadow:7px 13px 0 -1px #fff4ae}
-.skipEnemyOverlay>strong{position:absolute;z-index:8;left:50%;top:24px;min-width:31px;transform:translateX(-50%);color:#fff7c9;font:1000 27px/1 monospace;text-align:center;text-shadow:2px 2px #000}
-.skipEnemyOverlay>span{position:absolute;z-index:9;left:3px;right:3px;bottom:0;padding:3px 2px;border:2px solid #e9ca54;background:#09080d;color:#ffe56d;font:1000 6px/1 monospace;letter-spacing:.12em;text-align:center;box-shadow:2px 2px #000}
+.skipEnemyOverlay{position:absolute;z-index:6;left:82%;top:42%;width:64px;height:64px;display:grid;place-items:center;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(3px 4px 0 #000);overflow:visible}
+.stopwatchFace{position:absolute;z-index:5;box-sizing:border-box;left:50%;top:3px;width:46px;height:46px;transform:translateX(-50%);border:4px solid #ffe56d;border-radius:50%;background:#08080d;box-shadow:inset 0 0 0 2px #6d5818,0 0 0 2px #08080d}
+.stopwatchFace::before{content:"";position:absolute;left:50%;top:-10px;width:15px;height:6px;transform:translateX(-50%);background:#ffe56d;box-shadow:0 -2px #5f4b13,11px 6px 0 -4px #ffe56d}
+.stopwatchFace::after{content:"";position:absolute;z-index:1;left:59%;top:55%;width:3px;height:12px;transform:translate(-50%,-90%) rotate(-38deg);transform-origin:50% 90%;background:#fff4ae;box-shadow:5px 8px 0 -1px #fff4ae}
+.skipEnemyOverlay>strong{position:absolute;z-index:8;left:50%;top:15px;min-width:24px;padding:0 2px;transform:translateX(-50%);background:#08080d;color:#fff7c9;font:1000 22px/1 monospace;text-align:center;text-shadow:2px 2px #000;box-shadow:0 0 0 2px #08080d}
+.skipEnemyOverlay>span{position:absolute;z-index:9;left:0;right:0;bottom:0;padding:3px 1px;border:2px solid #e9ca54;background:#09080d;color:#ffe56d;font:1000 6px/1 monospace;letter-spacing:.1em;text-align:center;box-shadow:2px 2px #000}
 .skipEnemyOverlay[data-phase="tick"]{animation:stopwatchTick 480ms steps(6,end) both}
 .skipEnemyOverlay[data-zero="true"] .stopwatchFace{border-color:#ff8b68;box-shadow:inset 0 0 0 3px #6e241d,0 0 0 2px #08080d}
 .skipEnemyOverlay[data-zero="true"] .stopwatchFace::before{background:#ff8b68}.skipEnemyOverlay[data-zero="true"]>strong,.skipEnemyOverlay[data-zero="true"]>span{color:#ffb08c;border-color:#ff7c61}
@@ -151,7 +151,7 @@
 .guardFx[data-phase="break"]>small{color:#ffad91}
 @keyframes shieldCatch{0%{opacity:0;transform:scale(.48);filter:brightness(2.5) drop-shadow(5px 6px 0 #000)}22%{opacity:1;transform:scale(1.12)}48%{transform:scale(.94)}70%{transform:scale(1.03)}100%{opacity:1;transform:scale(1);filter:brightness(1) drop-shadow(5px 6px 0 #000)}}
 @keyframes shieldBreak{0%{opacity:1;transform:translate(0) scale(1);filter:brightness(2) drop-shadow(5px 6px 0 #000)}22%{transform:translate(-5px,2px) rotate(-3deg) scale(1.05)}44%{transform:translate(6px,-3px) rotate(4deg) scale(.97)}66%{opacity:1;transform:translate(-4px,5px) rotate(-5deg) scale(.91)}100%{opacity:0;transform:translate(8px,18px) rotate(8deg) scale(.65);filter:brightness(.7) drop-shadow(5px 6px 0 #000)}}
-@media(max-height:700px){.skipEnemyOverlay{width:92px;height:70px;transform:translate(-50%,-50%) scale(.9);transform-origin:center center}.guardShield{width:106px;height:120px}.guardFx>strong{font-size:16px}.stopwatchPanel{width:25px;height:25px;border-width:3px}}
+@media(max-height:700px){.skipEnemyOverlay{left:80%;top:43%;width:60px;height:60px;transform:translate(-50%,-50%)}.stopwatchFace{width:42px;height:42px;border-width:4px}.skipEnemyOverlay>strong{top:14px;min-width:22px;font-size:20px}.skipEnemyOverlay>span{font-size:5px}.guardShield{width:106px;height:120px}.guardFx>strong{font-size:16px}.stopwatchPanel{width:25px;height:25px;border-width:3px}}
 @media(prefers-reduced-motion:reduce){.skipEnemyOverlay[data-phase="tick"],.guardShield,.guardFx[data-phase="break"] .guardShield{animation-duration:1ms!important}}
 
 

@@ -364,3 +364,11 @@ are complete.
 - Scoped HP/name panel selectors to `enemyInfo`, preventing enemy-row generic `div/i/span/strong` rules from corrupting the stopwatch.
 - Centered the stopwatch directly over the enemy sprite with an explicit z-index and non-clipped face/number/label layers.
 - Preserved SKIP/FREE timing and battle balance.
+
+### Battle stopwatch overlay polish
+- Screenshot QA at 402×874 showed the SKIP stopwatch was functioning but obscured too much of the enemy and the hand visually crossed the remaining-turn digit.
+- Moved the stopwatch toward the enemy sprite's upper-right edge and reduced the clock face from 57px to 46px (42px on short-height layouts).
+- Put the remaining-turn digit on an opaque center patch above the clock hands so `1` and especially `0` stay readable.
+- Shortened and offset the hands, reduced the crown, and kept `TIME STOP` / `TIME UP` in a separate label beneath the face.
+- Gameplay timing, FREE/SKIP values, enemy turns, battle math, and save data are unchanged.
+
