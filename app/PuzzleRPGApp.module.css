@@ -48,3 +48,11 @@
 @media(max-width:380px){.title{padding-left:max(7px,env(safe-area-inset-left));padding-right:max(7px,env(safe-area-inset-right))}.modeGrid{gap:5px}.modeGrid button{padding-inline:7px}.modeGrid strong{font-size:13px}.modeGrid small{font-size:5.5px}.continuePanel{padding:6px}}
 @media(max-height:667px){.title{gap:3px}.logo{font-size:clamp(36px,10.8vw,46px)}.logo::after{margin-top:4px}.subtitle{padding-block:2px}.hero{width:min(25vw,92px);height:min(13dvh,86px)}.title:has(.continuePanel) .hero{width:min(23vw,82px);height:min(11dvh,76px)}.modeGrid button{min-height:62px}.continuePanel button{min-height:46px}.continuePanel .back{min-height:42px}}
 @media(max-height:600px){.hero{width:64px;height:54px}.modeGrid button{min-height:52px}.modeGrid strong{font-size:10.5px}.modeGrid small{font-size:5px}.title footer{display:none}}
+
+/* SFC visual reconstruction pass 34 — QA touch target correction */
+.continuePanel button{min-height:44px!important;box-sizing:border-box}
+.continuePanel .back{min-height:44px!important}
+/* The old save-panel scaleY entrance also scaled the button hit boxes to ~32 px
+   during the first 360 ms. Keep the SFC stepped entrance without shrinking touch area. */
+.continuePanel{animation:savePanelOpenSafe 360ms steps(5,end) both!important}
+@keyframes savePanelOpenSafe{0%{opacity:0;transform:translateY(8px)}36%{opacity:1;transform:translateY(-2px)}100%{opacity:1;transform:translateY(0)}}

@@ -305,3 +305,10 @@ are complete.
 - Added dedicated 380px-wide, 667px-tall and 590px-tall portrait breakpoints so world/board play space remains primary while secondary labels collapse before core interaction does.
 - Added overflow wrapping and ellipsis rules for long Japanese/English labels plus symmetric left/right safe-area padding for Dynamic Island/notch landscape-to-portrait transitions.
 - Viewport metadata, battle math, encounter logic, reward values, maps, story flags, save format and Chapter Battle rules remain unchanged.
+
+## SFC Visual Reconstruction Pass 34 — Final visual regression and gameplay QA
+- Ran browser-driven iPhone portrait QA at 375×667, 390×844 and 430×932 with touch/mobile emulation after a clean TypeScript check and production build.
+- Verified title → RPG MODE → NEW GAME → opening dialogue → field exploration → FIELD MENU, plus CHAPTER BATTLE → stage intro → live 6×6 board.
+- Browser QA found undersized NEW GAME / MODE SELECT, FIELD MENU tabs and CHAPTER MODE-return targets; raised those primary touch targets to at least 44 px. The RPG save-slot entrance was also changed from scaleY to stepped translate so its hit boxes never shrink during the opening animation.
+- Checked horizontal overflow, fixed-card clipping, primary touch-target sizes, D-pad minimum sizes, world-canvas readability, menu tabs, 36 puzzle panels, six NEXT columns and runtime console/page errors.
+- No gameplay values, encounter tables, maps, rewards, save data or battle math were changed by this QA pass.

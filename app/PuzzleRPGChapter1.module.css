@@ -262,3 +262,6 @@
 @media(max-width:380px){.rewardChoice,.acquired,.nextEncounter{grid-template-columns:40px minmax(0,1fr);gap:6px}.rewardChoice>b,.acquired>b{width:36px}.buildPanel{padding-inline:9px}}
 @media(max-height:667px){.rewardCard{padding:8px!important}.rewardGrid{gap:4px}.rewardChoice{min-height:50px;padding-block:4px!important}.acquired{margin-block:4px;padding-block:5px}.nextEncounter{margin-block:3px}.buildPanel{padding-top:10px;padding-bottom:9px}.buildList{gap:4px}.buildList>div{padding-block:5px}.buildSummary{margin-bottom:5px}}
 @media(max-height:590px){.rewardChoice{min-height:46px}.rewardChoice small,.acquired small{font-size:7px}.nextEncounter img{width:36px;height:36px}.buildPanel>strong{margin-bottom:7px}.buildList small{font-size:6.5px}}
+
+/* SFC visual reconstruction pass 34 — QA chapter touch target correction */
+.modeExit{min-height:44px;min-width:48px}
