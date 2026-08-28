@@ -154,3 +154,8 @@ are complete.
 - Added a pixel talk marker only for the NPC directly in front of the hero and contextual bump text (`NPC name • Aで話す`).
 - Added crisp 48x64 atlas portraits to NPC dialogue windows while keeping story/system dialogue portrait-free.
 - Dialogue behavior and NPC actions are unchanged.
+
+## SFC Visual Reconstruction Pass 10 — Interaction clarity
+- Moved interaction glyphs to the final canvas layer so large hero/NPC sprites cannot hide them.
+- Reduced the marker footprint and added contextual front-tile glyphs for TALK, treasure, fixed encounters and exits.
+- Interaction rules, collision, map data, progression and save format are unchanged.

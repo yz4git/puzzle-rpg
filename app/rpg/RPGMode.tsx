@@ -1145,12 +1145,24 @@ function drawNpcRoleProp(context: CanvasRenderingContext2D, npc: NPCDefinition, 
   context.restore();
 }
 
-function drawTalkMarker(context: CanvasRenderingContext2D, x: number, y: number) {
+type InteractionMarkerKind = "talk" | "treasure" | "danger" | "exit";
+
+function drawInteractionMarker(context: CanvasRenderingContext2D, x: number, y: number, kind: InteractionMarkerKind) {
+  const accent = kind === "danger" ? "#ff6a66" : kind === "treasure" ? "#ffd765" : kind === "exit" ? "#7ee8ef" : "#f1d06a";
   context.save();
-  context.fillStyle = "#111017"; context.fillRect(x + 7, y - 24, 10, 11);
-  context.fillStyle = "#f1d06a"; context.fillRect(x + 8, y - 23, 8, 9);
-  context.fillStyle = "#231c21"; context.fillRect(x + 11, y - 21, 2, 4); context.fillRect(x + 11, y - 16, 2, 2);
-  context.fillStyle = "#f1d06a"; context.fillRect(x + 10, y - 13, 4, 2);
+  context.fillStyle = "#0a0910"; context.fillRect(x + 7, y - 22, 8, 9);
+  context.fillStyle = accent; context.fillRect(x + 8, y - 21, 6, 7);
+  context.fillStyle = "#201b22";
+  if (kind === "talk") {
+    context.fillRect(x + 10, y - 19, 2, 1); context.fillRect(x + 9, y - 18, 1, 4); context.fillRect(x + 12, y - 18, 1, 4); context.fillRect(x + 10, y - 17, 2, 1);
+  } else if (kind === "treasure") {
+    context.fillRect(x + 10, y - 19, 2, 4); context.fillRect(x + 9, y - 18, 4, 2);
+  } else if (kind === "danger") {
+    context.fillRect(x + 10, y - 20, 2, 4); context.fillRect(x + 10, y - 15, 2, 1);
+  } else {
+    context.fillRect(x + 10, y - 20, 2, 4); context.fillRect(x + 9, y - 17, 4, 1); context.fillRect(x + 10, y - 16, 2, 1);
+  }
+  context.fillStyle = accent; context.fillRect(x + 10, y - 13, 2, 2);
   context.restore();
 }
 
@@ -1646,8 +1658,6 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         drawGroundShadow(context, x - 5, y + TILE, 26);
         context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 5, y - 18, 26, 34);
       } else drawPerson(context, x, y, npcColors[npc.palette % npcColors.length]!, "down", 0);
-      const delta = DIR_DELTA[save.direction];
-      if (npc.x === save.position.x + delta.x && npc.y === save.position.y + delta.y) drawTalkMarker(context, x, y);
     });
     visibleFixed.forEach((entry) => {
       const x = (entry.x - cameraX) * TILE, y = (entry.y - cameraY) * TILE;
@@ -1673,6 +1683,23 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     } else drawPerson(context, heroX, heroY, "#f0c85a", save.direction, walkFrame, true);
 
     drawInteriorForeground(context, map, cameraX, cameraY);
+
+    // Interaction glyphs are intentionally rendered last. Large SNES-style actors
+    // can overlap adjacent tiles, so drawing these inside an NPC loop allowed the
+    // hero to hide the cue even though interaction still worked.
+    const frontDelta = DIR_DELTA[save.direction];
+    const frontPosition = { x: save.position.x + frontDelta.x, y: save.position.y + frontDelta.y };
+    const frontNpc = mapNpcs.find((npc) => npc.x === frontPosition.x && npc.y === frontPosition.y);
+    const frontChest = map.chests.find((chest) => chest.x === frontPosition.x && chest.y === frontPosition.y && !save.openedChests.includes(chest.id) && hasFlag(save, chest.requireFlag));
+    const frontFixed = visibleFixed.find((entry) => entry.x === frontPosition.x && entry.y === frontPosition.y);
+    const frontPortal = map.portals.find((portal) => portal.x === frontPosition.x && portal.y === frontPosition.y);
+    const markerTarget = frontNpc ?? frontChest ?? frontFixed ?? frontPortal;
+    if (markerTarget) {
+      const markerX = (markerTarget.x - cameraX) * TILE;
+      const markerY = (markerTarget.y - cameraY) * TILE;
+      const markerKind: InteractionMarkerKind = frontNpc ? "talk" : frontChest ? "treasure" : frontFixed ? "danger" : "exit";
+      drawInteractionMarker(context, markerX, markerY, markerKind);
+    }
     context.setTransform(1, 0, 0, 1, 0, 0);
   }, [atlasVersion, map, mapNpcs, save, visibleFixed, walkFrame]);
 
