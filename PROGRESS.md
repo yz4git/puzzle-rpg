@@ -229,3 +229,10 @@ are complete.
 - STATUS now reads as a compact character sheet; ITEM / EQUIP / TECH / MEMO use denser role-specific rows instead of web-card styling, with equipped/new states receiving stronger pixel cues.
 - SHOP and SAVE/service panels now share the same game-window grammar, including compact currency/action framing and stepped pressed states.
 - Menu tab logic, inventory/equipment behavior, prices, save/import/export, touch targets and RPG progression remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 23 — Title and mode select
+- Reframed the opening screen as one SFC title composition with a pixel horizon/stage behind the existing hero art, stronger logo lockup and a compact PRISM ROAD subtitle plate.
+- Converted RPG MODE and CHAPTER BATTLE from stacked web buttons into two numbered game-mode slots with distinct gold/cyan identity and stronger press feedback.
+- Rebuilt the RPG continue/new-game screen as a save-slot window with CONTINUE visually prioritized while preserving the existing save metadata and mode flow.
+- Title music, save loading, mode selection, Chapter Battle entry and RPG initialization remain unchanged.
