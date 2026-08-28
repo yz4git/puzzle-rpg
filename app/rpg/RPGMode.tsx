@@ -156,6 +156,41 @@ function drawWorldDangerMass(context: CanvasRenderingContext2D, map: MapDefiniti
   if (!down && seed % 3 === 0) { context.fillRect(x + 8, y + TILE, 4, 2); context.fillRect(x + 9, y + TILE + 2, 1, 1); }
   if (!left && seed % 2 === 1) context.fillRect(x - 2, y + 7, 2, 4);
   if (!right && seed % 4 === 0) context.fillRect(x + TILE, y + 5, 2, 5);
+
+  // Grass bites back into the outer corruption edge in uneven chunks. This
+  // visually breaks the rectangular 9x5 map-data block while collision stays unchanged.
+  const grass = seed % 3 === 0 ? "#5d9d46" : seed % 3 === 1 ? "#68a64a" : "#518f40";
+  context.fillStyle = grass;
+  if (!up) {
+    context.fillRect(x, y, 3 + seed % 5, 3);
+    context.fillRect(x + 11 - (seed % 3), y, 5 + seed % 2, 2 + (seed % 2));
+    if (seed % 2 === 0) context.fillRect(x + 1, y + 3, 3, 1);
+  }
+  if (!down) {
+    context.fillRect(x, y + 13, 5 + seed % 4, 3);
+    context.fillRect(x + 12 - (seed % 4), y + 14, 4 + seed % 4, 2);
+    if (seed % 3 === 0) context.fillRect(x + 10, y + 12, 3, 2);
+  }
+  if (!left) {
+    context.fillRect(x, y, 2 + seed % 2, 5 + seed % 5);
+    context.fillRect(x, y + 11 - seed % 3, 3, 5 + seed % 3);
+  }
+  if (!right) {
+    context.fillRect(x + 13, y + 1, 3, 4 + seed % 5);
+    context.fillRect(x + 14, y + 11 - seed % 4, 2, 5 + seed % 4);
+  }
+  // Mossy islands and deep pools keep the interior from reading as a flat red floor.
+  if (seed % 7 === 0) {
+    context.fillStyle = "#485f38";
+    context.fillRect(x + 5, y + 7, 4, 3);
+    context.fillStyle = "#7da452";
+    context.fillRect(x + 6, y + 7, 2, 1);
+  } else if (seed % 5 === 0) {
+    context.fillStyle = "#351426";
+    context.fillRect(x + 4, y + 6, 6, 4);
+    context.fillStyle = "#9c3343";
+    context.fillRect(x + 5, y + 7, 4, 1);
+  }
 }
 
 function drawGroundMacro(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {

@@ -137,3 +137,4 @@ are complete.
 - Added irregular landmark aprons/approaches and locked-gate seal markers without changing map collision, portal coordinates or encounter data.
 - Preserved the Pass 6 continuous water, bridge, mountain, forest and route reconstruction.
 - Pass 7 audit correction: dense danger blocks now render as continuous corruption fields; locked major landmarks keep an opaque seal marker.
+- Pass 7C: Crimson Marsh corruption boundary gains irregular grass bites, moss islands and deep pools to remove the rectangular biome silhouette.
