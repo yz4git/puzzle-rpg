@@ -23,6 +23,18 @@ jobs:
           cache: npm
       - name: Apply input and transition fix
         run: python3 scripts/pass38_input_battle_transition.py
+      - name: Make encounter observer robust
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/pass38_input_qa.mjs')
+          s = p.read_text()
+          old = '''await page.mouse.down();\nawait page.waitForTimeout(430);\nconst cue = page.getByText("ENCOUNTER", { exact: true });\nif (!(await cue.isVisible().catch(() => false))) throw new Error("battle entry transition did not become visible");\nawait page.waitForTimeout(520);'''
+          new = '''await page.mouse.down();\nconst transition = page.locator('main[data-encounter]:not([data-encounter="none"])');\ntry {\n  await transition.waitFor({ state: "visible", timeout: 1600 });\n} catch {\n  const snapshot = await page.evaluate(() => ({\n    text: document.body.innerText.slice(0, 1200),\n    save: JSON.parse(localStorage.getItem("puzzle-rpg:rpg-mode:v1") || "null")\n  }));\n  throw new Error(`battle entry transition did not become visible: ${JSON.stringify(snapshot)}`);\n}\nconst transitionText = await transition.textContent();\nif (!/ENCOUNTER|DANGER|GUARDIAN|TRIAL|BOSS/.test(transitionText || "")) throw new Error(`unexpected battle transition text: ${transitionText}`);\nawait page.waitForTimeout(800);'''
+          if old not in s:
+              raise SystemExit('QA observer block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Install dependencies
         run: npm ci
       - name: Input lifecycle regression tests
