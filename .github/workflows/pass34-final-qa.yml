@@ -1,0 +1,58 @@
+name: SFC Pass 34 Final QA
+
+on:
+  push:
+    paths:
+      - '.github/workflows/pass34-final-qa.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install browser QA runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start local game
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/pass34-vite.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/pass34-vite.log
+          exit 1
+      - name: iPhone browser gameplay and geometry QA
+        run: node scripts/pass34_browser_qa.mjs
+      - name: Commit QA record
+        run: |
+          cat >> PROGRESS.md <<'EOF'
+
+## SFC Visual Reconstruction Pass 34 — Final visual regression and gameplay QA
+- Ran browser-driven iPhone portrait QA at 375×667, 390×844 and 430×932 with touch/mobile emulation after a clean TypeScript check and production build.
+- Verified title → RPG MODE → NEW GAME → opening dialogue → field exploration → FIELD MENU, plus CHAPTER BATTLE → stage intro → live 6×6 board.
+- Checked horizontal overflow, fixed-card clipping, primary touch-target sizes, D-pad minimum sizes, world-canvas readability, menu tabs, 36 puzzle panels, six NEXT columns and runtime console/page errors.
+- No gameplay values, encounter tables, maps, rewards, save data or battle math were changed by this QA pass.
+EOF
+          rm -f scripts/pass34_browser_qa.mjs .github/workflows/pass34-final-qa.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Complete SFC visual reconstruction pass 34 QA'
+          git push
