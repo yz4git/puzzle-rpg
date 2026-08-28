@@ -567,8 +567,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       if (x < -TILE * 2 || y < -TILE * 2 || x >= VIEW_W * TILE + TILE || y >= VIEW_H * TILE + TILE) return;
       if (npcAtlas?.complete && npcAtlas.naturalWidth) {
         const cell = npcAtlasCell(npc.sprite);
-        drawGroundShadow(context, x - 1, y + TILE - 1, 20);
-        context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 2, y - 12, 20, 28);
+        drawGroundShadow(context, x - 4, y + TILE, 24);
+        context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 4, y - 16, 24, 32);
       } else drawPerson(context, x, y, npcColors[npc.palette % npcColors.length]!, "down", 0);
     });
     visibleFixed.forEach((entry) => {
@@ -590,8 +590,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     const heroX = (save.position.x - cameraX) * TILE, heroY = (save.position.y - cameraY) * TILE;
     if (heroAtlas?.complete && heroAtlas.naturalWidth) {
       const cell = heroAtlasCell(save.direction, walkFrame);
-      drawGroundShadow(context, heroX - 3, heroY + TILE, 22);
-      context.drawImage(heroAtlas, cell.col * 96, cell.row * 96, 96, 96, heroX - 3, heroY - 8, 22, 24);
+      drawGroundShadow(context, heroX - 5, heroY + TILE, 27);
+      context.drawImage(heroAtlas, cell.col * 96, cell.row * 96, 96, 96, heroX - 5, heroY - 14, 26, 30);
     } else drawPerson(context, heroX, heroY, "#f0c85a", save.direction, walkFrame, true);
 
     context.setTransform(1, 0, 0, 1, 0, 0);
@@ -607,15 +607,18 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const endingLines = save.releasedEnemies && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 4 ? STORY_TEXT.endingMercy : STORY_TEXT.endingForce;
 
   return (
-    <main className={styles.rpg}>
+    <main className={styles.rpg} data-map={map.id} data-kind={map.kind}>
       <header className={styles.hud}>
         <div><span>RPG MODE</span><strong>{map.name}</strong></div>
         <div><span>LV {save.level}</span><strong>HP {save.hp}/{save.maxHp}</strong></div>
         <div><span><RPGIcon name="gold" size={10} /> GOLD</span><strong>{save.gold}</strong></div>
       </header>
       <section className={styles.locationBar}><span>{terrainLabel}</span><strong>{nearPortal ? `A • ${nearPortal.label}` : notice}</strong></section>
-      <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE * WORLD_RENDER_SCALE} height={VIEW_H * TILE * WORLD_RENDER_SCALE} aria-label={`${map.name} exploration map`} />
-      <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>{save.techniques.length}/16 TECH • {save.equipmentOwned.length}/12 EQUIP</strong></div>
+      <div className={styles.worldFrame}>
+        <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE * WORLD_RENDER_SCALE} height={VIEW_H * TILE * WORLD_RENDER_SCALE} aria-label={`${map.name} exploration map`} />
+        <div className={styles.worldGloss} aria-hidden="true" />
+      </div>
+      <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>JOURNEY • {save.steps} STEPS</strong></div>
 
       <section className={styles.controls} aria-label="RPG touch controls">
         <div className={styles.dpad}>
