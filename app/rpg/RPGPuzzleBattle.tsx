@@ -573,7 +573,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
         {queues.map((queue, col) => <div className={previewDrops[col] ? styles.nextActive : ""} key={col}><small className={styles[queue[1]!]}>{GLYPH[queue[1]!]}</small><strong className={styles[queue[0]!]}>{GLYPH[queue[0]!]}</strong><i>{col + 1}▼{previewDrops[col] || ""}</i></div>)}
       </section>
 
-      <section className={styles.board} data-preview={preview ? "true" : "false"} aria-label="RPG Cluster Break board">
+      <section className={`${styles.board} ${styles.prismBoard} ${preview ? styles.prismPreview : ""}`} data-preview={preview ? "true" : "false"} aria-label="RPG Cluster Break board">
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
