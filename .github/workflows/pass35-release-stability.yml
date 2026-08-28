@@ -19,10 +19,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Apply lifecycle persistence fix
+        run: python3 scripts/pass35_stability_fix.py
       - name: Install dependencies
         run: npm ci
-      - name: Targeted PWA startup tests
-        run: npm run test:pwa
+      - name: Targeted Puzzle RPG PWA tests
+        run: node --test tests/pwa-cache.test.mjs
       - name: Install browser stability runtime
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
@@ -42,10 +44,10 @@ jobs:
           exit 1
       - name: Safari-style release stability browser audit
         run: node scripts/pass35_stability_qa.mjs
-      - name: Commit stability record
+      - name: Commit stability fix and record
         run: |
-          printf '%s\n' '' '## Release Candidate Stability Pass 35' '- Ran targeted PWA/startup tests plus browser-driven iPhone Safari-style stability QA after a clean TypeScript check and production build.' '- Verified build-id Service Worker registration, controlled reload, offline app-shell reload, RPG opening autosave, immediate reload/CONTINUE persistence, pagehide persistence and rapid mode transitions.' '- No gameplay balance, encounter tables, rewards, maps or battle math were changed by this stability audit.' >> PROGRESS.md
-          rm -f scripts/pass35_stability_qa.mjs .github/workflows/pass35-release-stability.yml
+          printf '%s\n' '' '## Release Candidate Stability Pass 35' '- Ran targeted Puzzle RPG PWA tests plus browser-driven iPhone Safari-style stability QA after a clean TypeScript check and production build.' '- Verified build-id Service Worker registration, controlled reload, offline app-shell reload, RPG opening autosave, immediate reload/CONTINUE persistence, pagehide persistence and rapid mode transitions.' '- Browser QA found that normal field movement could remain only in React state until a later autosave event; added pagehide and hidden-state lifecycle persistence backed by a synchronously updated save ref so iPhone app switching/reload preserves the newest field state.' '- No gameplay balance, encounter tables, rewards, maps or battle math were changed by this stability pass.' >> PROGRESS.md
+          rm -f scripts/pass35_stability_qa.mjs scripts/pass35_stability_fix.py .github/workflows/pass35-release-stability.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
