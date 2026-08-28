@@ -123,3 +123,5 @@ are complete.
 - Reconstructed mountain tiles into connected ridgelines and cliff faces instead of isolated atlas cards.
 - Added destination-specific landmark ground footprints/plazas so towns, schools, dungeons and the citadel visually connect to the road network.
 - Map collision, encounters, portals and progression data are unchanged.
+
+- Pass 6 visual correction: rejected the first rectangular ridge because it read as a fortress wall. Replaced it with overlapping stepped peaks/foothills and added a dedicated bridge compositor over the continuous water layer.
