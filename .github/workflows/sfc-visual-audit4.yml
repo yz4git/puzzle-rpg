@@ -1,0 +1,28 @@
+name: SFC Visual Audit 4
+on:
+  push:
+    branches: [review/sfc-visual-audit4-20260828]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start review server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/puzzle-rpg-dev.log 2>&1 &
+          for i in {1..60}; do if curl -fsS http://127.0.0.1:5173 >/dev/null; then exit 0; fi; sleep 1; done
+          cat /tmp/puzzle-rpg-dev.log; exit 1
+      - run: node scripts/sfc-visual-audit4.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-sfc-visual-audit4
+          path: sfc-visual-audit4
+          if-no-files-found: error
