@@ -18,10 +18,10 @@ section = r'''
 @media(max-height:700px){.enemyRow{grid-template-columns:102px 1fr}.enemySprite{width:100px;height:76px}.battle[data-boss="true"] .enemySprite{width:106px;height:78px}.enemyRow::after{width:88px}.battleBackdrop::before{height:18px}}
 '''
 if 'SFC visual reconstruction pass 13 — battle stage composition' not in css:
-    css_path.write_text(css + section + '\n')
+    css_path.write_text((css + section).rstrip() + '\n')
 
 progress = Path('PROGRESS.md')
 p = progress.read_text()
 record = '''\n\n## SFC Visual Reconstruction Pass 13 — Battle stage composition\n- Rebuilt the enemy strip as a grounded SFC-style battle stage with a scene-tinted pixel floor band and stronger contact platform.\n- Enlarged normal/boss enemy presentation without reducing the 360px short-screen puzzle board.\n- Reframed enemy information as a denser in-world window and added a stepped TALK reaction treatment driven by the existing reaction sprite state.\n- Battle math, panel rules, NEXT queues, intents, save data and encounter tables are unchanged.\n'''
 if '## SFC Visual Reconstruction Pass 13' not in p:
-    progress.write_text(p.rstrip() + record)
+    progress.write_text(p.rstrip() + record.rstrip() + '\n')
