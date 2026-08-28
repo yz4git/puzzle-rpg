@@ -215,7 +215,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       setFlags: [],
       stats: nextStats,
       ...options,
-    }), 360);
+    }), outcome === "release" ? 620 : outcome === "victory" ? 480 : outcome === "defeat" ? 420 : 360);
   }
 
   function showEffect(text: string, kind: BattleImpact = "skill", duration = 620) {

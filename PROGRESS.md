@@ -204,3 +204,9 @@ are complete.
 - Added target-specific stepped shakes, meter flashes and phase/release screen accents while preserving the existing 620ms feedback cadence for normal actions.
 - Damage/heal/barrier values, enemy intents, turn order, collapse timing, battle rules, touch targets and Chapter Battle remain unchanged.
 
+## SFC Visual Reconstruction Pass 19 — Encounter resolution transitions
+- Added a short stepped battle-entry shutter so encounters arrive as a game scene rather than an instantaneous web view swap.
+- Added enemy-HP-zero victory break, player-HP-zero defeat fade and RELEASE-specific exit light using the existing rendered HP state, with no new combat state machine.
+- Extended only the visual result hold to 480ms for victory, 420ms for defeat and 620ms for RELEASE so the new resolution beats are visible before returning to the field/result flow.
+- Rewards, outcome priority, battle math, save data, enemy logic, turn order, touch controls and Chapter Battle remain unchanged.
+
