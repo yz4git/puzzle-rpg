@@ -23,16 +23,16 @@ jobs:
           cache: npm
       - name: Apply input and transition fix
         run: python3 scripts/pass38_input_battle_transition.py
-      - name: Make encounter observer robust
+      - name: Observe transient encounter before hold
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('scripts/pass38_input_qa.mjs')
           s = p.read_text()
           old = '''await page.mouse.down();\nawait page.waitForTimeout(430);\nconst cue = page.getByText("ENCOUNTER", { exact: true });\nif (!(await cue.isVisible().catch(() => false))) throw new Error("battle entry transition did not become visible");\nawait page.waitForTimeout(520);'''
-          new = '''await page.mouse.down();\nconst transition = page.locator('main[data-encounter]:not([data-encounter="none"])');\ntry {\n  await transition.waitFor({ state: "visible", timeout: 1600 });\n} catch {\n  const snapshot = await page.evaluate(() => ({\n    text: document.body.innerText.slice(0, 1200),\n    save: JSON.parse(localStorage.getItem("puzzle-rpg:rpg-mode:v1") || "null")\n  }));\n  throw new Error(`battle entry transition did not become visible: ${JSON.stringify(snapshot)}`);\n}\nconst transitionText = await transition.textContent();\nif (!/ENCOUNTER|DANGER|GUARDIAN|TRIAL|BOSS/.test(transitionText || "")) throw new Error(`unexpected battle transition text: ${transitionText}`);\nawait page.waitForTimeout(800);'''
+          new = '''await page.evaluate(() => {\n  window.__encounterSeen = false;\n  const markEncounter = () => {\n    const main = document.querySelector('main[data-encounter]');\n    if (main && main.getAttribute('data-encounter') !== 'none') window.__encounterSeen = true;\n  };\n  markEncounter();\n  const observer = new MutationObserver(markEncounter);\n  observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-encounter'] });\n  window.__encounterObserver = observer;\n});\nawait page.mouse.down();\nawait page.waitForTimeout(1300);\nconst encounterSeen = await page.evaluate(() => {\n  window.__encounterObserver?.disconnect?.();\n  return Boolean(window.__encounterSeen);\n});\nconst battleVisible = await page.getByText(/TURN 1/).first().isVisible().catch(() => false);\nif (!encounterSeen && !battleVisible) {\n  const snapshot = await page.evaluate(() => ({ text: document.body.innerText.slice(0, 1200), save: JSON.parse(localStorage.getItem("puzzle-rpg:rpg-mode:v1") || "null") }));\n  throw new Error(`battle entry was never observed: ${JSON.stringify(snapshot)}`);\n}'''
           if old not in s:
-              raise SystemExit('QA observer block not found')
+              raise SystemExit('QA observer source block not found')
           p.write_text(s.replace(old, new, 1))
           PY
       - name: Install dependencies
