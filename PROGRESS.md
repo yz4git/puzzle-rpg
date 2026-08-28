@@ -312,3 +312,10 @@ are complete.
 - Browser QA found undersized NEW GAME / MODE SELECT, FIELD MENU tabs and CHAPTER MODE-return targets; raised those primary touch targets to at least 44 px. The RPG save-slot entrance was also changed from scaleY to stepped translate so its hit boxes never shrink during the opening animation.
 - Checked horizontal overflow, fixed-card clipping, primary touch-target sizes, D-pad minimum sizes, world-canvas readability, menu tabs, 36 puzzle panels, six NEXT columns and runtime console/page errors.
 - No gameplay values, encounter tables, maps, rewards, save data or battle math were changed by this QA pass.
+
+## Release Candidate Stability Pass 35
+- Ran targeted Puzzle RPG PWA tests plus browser-driven iPhone Safari-style stability QA after a clean TypeScript check and production build.
+- Verified build-id Service Worker registration, controlled reload, offline app-shell reload, RPG opening autosave, immediate reload/CONTINUE persistence, pagehide persistence and rapid mode transitions.
+- Browser QA found that normal field movement could remain only in React state until a later autosave event; added pagehide and hidden-state lifecycle persistence backed by a synchronously updated save ref so iPhone app switching/reload preserves the newest field state.
+- Chapter Battle transition QA follows the intended Stage Intro → Battle Start → Mode-return input order; the stage intro correctly blocks background controls.
+- No gameplay balance, encounter tables, rewards, maps or battle math were changed by this stability pass.

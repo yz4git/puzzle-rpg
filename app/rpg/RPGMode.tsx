@@ -1493,6 +1493,9 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   function commit(mutator: (current: RPGSaveData) => RPGSaveData, autosave = false) {
     setSave((current) => {
       const next = mutator(current);
+      // Keep the lifecycle-save ref synchronous with state so an immediate
+      // iPhone background/pagehide cannot persist the previous frame.
+      saveRef.current = next;
       if (autosave) saveGame(next);
       return next;
     });
@@ -1813,6 +1816,22 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   useEffect(() => {
     saveRef.current = save;
   }, [save]);
+
+  useEffect(() => {
+    // iOS Safari may suspend or discard a tab without another gameplay event.
+    // Persist the latest in-memory save at lifecycle boundaries; pagehide also
+    // fires on reload/navigation, while visibilitychange covers app switching.
+    const persistCurrentSave = () => saveGame(saveRef.current);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") persistCurrentSave();
+    };
+    window.addEventListener("pagehide", persistCurrentSave);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", persistCurrentSave);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
