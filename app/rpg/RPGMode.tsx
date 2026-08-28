@@ -1473,6 +1473,9 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const encounterTimer = useRef<number | null>(null);
   const dangerTimer = useRef<number | null>(null);
   const stepEncounterTimer = useRef<number | null>(null);
+  // Synchronous gameplay lock. Unlike React state, stale hold-repeat closures also
+  // observe this ref immediately, so no movement can leak into a battle transition.
+  const movementLockedRef = useRef(false);
   const keyboardHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
   const importRef = useRef<HTMLInputElement | null>(null);
   const saveRef = useRef(save);
@@ -1531,7 +1534,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function move(direction: Direction) {
-    if (screen !== "overworld" || service || battle || result || areaTransition || discovery || encounterCue) return;
+    if (movementLockedRef.current || stepEncounterTimer.current !== null || screen !== "overworld" || service || battle || result || areaTransition || discovery || encounterCue) return;
     const current = saveRef.current;
     const delta = DIR_DELTA[direction];
     const nextPosition = { x: current.position.x + delta.x, y: current.position.y + delta.y };
@@ -1557,6 +1560,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     let nextMeter = current.encounterMeter;
     if (!safe) nextMeter -= danger ? 2 : 1;
     const shouldEncounter = !safe && nextMeter <= 0 && Boolean(map.encounterTable || map.id === "world");
+    if (shouldEncounter) {
+      // Lock on the exact step that rolls an encounter, before the 90ms cue delay.
+      // This prevents a held D-pad repeat from moving LIO again behind the battle.
+      movementLockedRef.current = true;
+      stopHold();
+    }
     const updated: RPGSaveData = { ...current, position: nextPosition, direction, steps: current.steps + 1, encounterMeter: shouldEncounter ? encounterReset(current) : nextMeter };
     saveRef.current = updated; setSave(updated); setWalkFrame((frame) => (frame + 1) % 3);
     playSfx("step");
@@ -1603,6 +1612,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function interact() {
+    if (movementLockedRef.current) return;
     if (discovery) { setDiscovery(null); playSfx("uiSelect"); return; }
     if (areaTransition || encounterCue) return;
     if (screen === "dialogue" || screen === "event") { advanceDialogue(); return; }
@@ -1666,10 +1676,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   function startBattle(enemyId: string, context: Omit<BattleContext, "enemyId"> = {}, requestedKind?: EncounterCueKind) {
     const enemy = ENEMIES[enemyId];
     if (!enemy || encounterCue) return;
+    movementLockedRef.current = true;
+    stopHold();
     const kind: EncounterCueKind = requestedKind ?? (context.training ? "trial" : enemy.boss ? "boss" : context.fixedId ? "fixed" : "wild");
     const title = kind === "boss" ? "BOSS APPROACH" : kind === "trial" ? "TRIAL" : kind === "fixed" ? "GUARDIAN" : kind === "danger" ? "DANGER ENCOUNTER" : "ENCOUNTER";
     const subtitle = kind === "boss" ? "A POWERFUL PRESENCE" : kind === "trial" ? "MASTER'S TEST" : kind === "fixed" ? "PATH BLOCKED" : kind === "danger" ? "HOSTILE TERRITORY" : "WILD FOE";
-    const delay = kind === "boss" ? 620 : kind === "trial" ? 460 : kind === "fixed" ? 420 : kind === "danger" ? 320 : 240;
+    const delay = kind === "boss" ? 700 : kind === "trial" ? 520 : kind === "fixed" ? 480 : kind === "danger" ? 420 : 360;
     primeAudio(); playSfx("battleStart"); saveGame(saveRef.current); setResult(null); setEncounterCue({ enemyId, kind, title, subtitle, context });
     if (encounterTimer.current) window.clearTimeout(encounterTimer.current);
     encounterTimer.current = window.setTimeout(() => {
@@ -1767,6 +1779,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
   function closeResult() {
     if (result?.ending) { setEndingIndex(0); setScreen("ending"); setResult(null); return; }
+    movementLockedRef.current = false;
     setResult(null); setScreen("overworld"); setFieldReturn(true);
     window.setTimeout(() => setFieldReturn(false), 520);
   }
@@ -1813,7 +1826,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     playSfx("uiConfirm");
   }
 
-  function openMenu() { if (screen === "overworld" && !areaTransition && !discovery && !encounterCue) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
+  function openMenu() { if (!movementLockedRef.current && screen === "overworld" && !areaTransition && !discovery && !encounterCue) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
   function closeMenu() { setService(null); setScreen("overworld"); playSfx("uiSelect"); }
 
   function toggleSetting(key: "music" | "sfx") {
@@ -1821,7 +1834,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function startHold(direction: Direction, event: PointerEvent<HTMLButtonElement>) {
-    event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); move(direction);
+    event.preventDefault();
+    if (movementLockedRef.current) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    move(direction);
+    // move() may synchronously roll an encounter. Never recreate repeat after it locked.
+    if (movementLockedRef.current || stepEncounterTimer.current !== null) return;
     if (heldTimer.current !== null) window.clearInterval(heldTimer.current);
     heldTimer.current = window.setInterval(() => move(direction), 145);
   }

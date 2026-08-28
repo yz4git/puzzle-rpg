@@ -208,3 +208,38 @@
 
 /* SFC visual reconstruction pass 34 — QA menu touch target correction */
 .menuTabs button{min-height:44px}
+\n\n/* RPG field input + battle transition usability pass */
+/* Large contiguous D-pad cells: no cardinal direction falls below Apple's 44px touch target. */
+.controls{min-height:142px;padding:35px 12px 6px;}
+.controls::before{top:8px;}
+.dpad{width:150px;height:150px;grid-template-columns:repeat(3,50px);grid-template-rows:repeat(3,50px);filter:drop-shadow(4px 5px 0 #000);}
+.dpad button,.dpad i{min-width:50px;min-height:50px;border-width:3px;font-size:19px;box-shadow:inset 0 0 0 2px #565666,inset 0 -5px 0 rgba(0,0,0,.22);}
+.dpad button{position:relative;z-index:2;background:#272732;}
+.dpad button::after{content:"";position:absolute;inset:4px;border:1px solid rgba(255,255,255,.08);pointer-events:none;}
+.dpad i{pointer-events:none;background:#14141c;color:#6f6b7d;box-shadow:inset 0 0 0 3px #20202b;}
+.dpad button:active{background:var(--accent);color:#101015;transform:translate(1px,2px);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent2) 62%,#222),inset 0 4px 0 rgba(0,0,0,.2);}
+.abButtons{gap:11px;}
+.abButtons button{width:58px;height:58px;}
+
+/* Make the field-to-battle cut unmistakable: lock -> shutter -> prism slash -> battle. */
+.encounterCue{background:#020205;animation:encounterFieldSnap 360ms steps(6,end) both;}
+.encounterCue::before,.encounterCue::after{height:50%;background:#030307;}
+.encounterCue::before{animation:encounterShutterTopStrong 260ms steps(6,end) both;}
+.encounterCue::after{animation:encounterShutterBottomStrong 260ms steps(6,end) both;}
+.encounterCue>strong{z-index:2;animation:encounterTitleStrike 360ms steps(6,end) both;}
+.encounterCue>i{z-index:1;width:196px;height:196px;border-color:rgba(255,240,196,.28);box-shadow:0 0 0 10px rgba(255,255,255,.04),0 0 0 24px rgba(255,255,255,.025);animation:encounterPrismBurst 360ms steps(6,end) both;}
+.encounterCue>i::before,.encounterCue>i::after{content:"";position:absolute;left:50%;top:50%;background:#fff4c9;transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(255,255,255,.2);}
+.encounterCue>i::before{width:3px;height:240px;}
+.encounterCue>i::after{width:240px;height:3px;}
+.encounterCue[data-kind="danger"]{animation-duration:420ms;}.encounterCue[data-kind="fixed"]{animation-duration:480ms;}.encounterCue[data-kind="trial"]{animation-duration:520ms;}.encounterCue[data-kind="boss"]{animation:bossApproachStrong 700ms steps(10,end) both;background:#020205;}
+.encounterCue[data-kind="danger"]>i{border-color:rgba(255,100,92,.4);}.encounterCue[data-kind="fixed"]>i{border-color:rgba(130,224,244,.36);}.encounterCue[data-kind="trial"]>i{border-color:rgba(255,210,105,.38);}.encounterCue[data-kind="boss"]>i{animation:bossPrismBurst 700ms steps(10,end) both;}
+@keyframes encounterFieldSnap{0%{opacity:0;filter:brightness(2)}16%{opacity:1;filter:brightness(.65)}34%{filter:brightness(1.55)}52%,100%{filter:none}}
+@keyframes encounterShutterTopStrong{0%{transform:translateY(-102%)}100%{transform:none}}
+@keyframes encounterShutterBottomStrong{0%{transform:translateY(102%)}100%{transform:none}}
+@keyframes encounterPrismBurst{0%{opacity:0;transform:translate(-50%,-50%) rotate(45deg) scale(.08)}28%{opacity:1;transform:translate(-50%,-50%) rotate(45deg) scale(1.12)}58%{opacity:.8;transform:translate(-50%,-50%) rotate(45deg) scale(.72)}100%{opacity:.18;transform:translate(-50%,-50%) rotate(45deg) scale(1.28)}}
+@keyframes encounterTitleStrike{0%,30%{opacity:0;transform:translateY(8px)}46%{opacity:1;transform:translateY(-2px);filter:brightness(1.8)}100%{opacity:1;transform:none;filter:none}}
+@keyframes bossApproachStrong{0%{opacity:0;filter:brightness(2)}12%{opacity:1;filter:brightness(.35)}24%{filter:brightness(1.8)}36%{filter:brightness(.72)}52%,100%{filter:none}}
+@keyframes bossPrismBurst{0%{opacity:0;transform:translate(-50%,-50%) rotate(45deg) scale(.08)}22%{opacity:1;transform:translate(-50%,-50%) rotate(45deg) scale(.92)}48%{transform:translate(-50%,-50%) rotate(135deg) scale(1.18)}72%{opacity:.75;transform:translate(-50%,-50%) rotate(225deg) scale(.78)}100%{opacity:.25;transform:translate(-50%,-50%) rotate(315deg) scale(1.35)}}
+@media(max-height:700px){.controls{min-height:132px;padding:33px 10px 5px}.dpad{width:138px;height:138px;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px)}.dpad button,.dpad i{min-width:46px;min-height:46px;font-size:18px}.abButtons button{width:56px;height:56px}}
+@media(max-height:620px){.controls{min-height:124px;padding:31px 8px 4px}.dpad{width:132px;height:132px;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}.dpad button,.dpad i{min-width:44px;min-height:44px;font-size:17px}.abButtons button{width:54px;height:54px}}
+@media(prefers-reduced-motion:reduce){.encounterCue,.encounterCue::before,.encounterCue::after,.encounterCue>strong,.encounterCue>i{animation-duration:1ms!important}}

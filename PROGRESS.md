@@ -333,3 +333,11 @@ are complete.
 - Replaced per-render RPG keyboard listener churn with one stable listener backed by a current handler ref, and release atlas image onload handlers/references on RPGMode unmount.
 - Added targeted lifecycle regression tests plus a Chromium iPhone-size soak covering repeated menu cycles, 120 real touch taps, pagehide during a held touch and 12 RPG mount/unmount cycles with interval and heap-growth checks.
 - Gameplay balance, encounter odds, map topology, rewards, save progression and battle math remain unchanged.
+
+## RPG Field Control / Battle Entry Usability Pass
+- Enlarged the field D-pad to 50px cardinal touch cells on normal portrait screens and never below 44px on short iPhones.
+- Added a synchronous movement lock so the exact encounter-triggering step cancels held repeat before the delayed battle cue; stale callbacks cannot move the player behind combat.
+- Fixed startHold so it cannot recreate a repeat interval after move() synchronously rolls an encounter.
+- Strengthened field-to-battle presentation with full-screen pixel shutters, a prism cross burst and longer encounter-class-specific timing while preserving battle rules.
+- Added source regression tests and an iPhone-size real-pointer browser QA that holds UP through a forced encounter and verifies the saved position remains exactly on the triggering tile.
+- Encounter odds, map topology, enemy stats, rewards, save format and puzzle battle math remain unchanged.
