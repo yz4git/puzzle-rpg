@@ -80,6 +80,51 @@ function drawGroundShadow(context: CanvasRenderingContext2D, x: number, y: numbe
   context.restore();
 }
 
+function sameRoute(map: MapDefinition, route: "road" | "danger", x: number, y: number) {
+  const code = tileAt(map, x, y);
+  return route === "road" ? code === "r" || code === "b" : code === "d" || code === "x";
+}
+
+function drawWorldRoute(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  if (map.id !== "world" || (code !== "r" && code !== "d")) return;
+  const route = code === "r" ? "road" : "danger";
+  const up = sameRoute(map, route, worldX, worldY - 1);
+  const right = sameRoute(map, route, worldX + 1, worldY);
+  const down = sameRoute(map, route, worldX, worldY + 1);
+  const left = sameRoute(map, route, worldX - 1, worldY);
+  const edge = route === "road" ? "#6e5538" : "#371421";
+  const base = route === "road" ? "#b99861" : "#772536";
+  const light = route === "road" ? "#d0b271" : "#b83a45";
+  const dark = route === "road" ? "#8f7049" : "#501a2a";
+  // Build one connected 10px-wide metatile path. Arms meet adjacent cells at the
+  // exact edge, removing the card-like square road tiles from the source atlas.
+  context.fillStyle = edge;
+  context.fillRect(x + 3, y + 3, 10, 10);
+  if (up) context.fillRect(x + 3, y, 10, 8);
+  if (down) context.fillRect(x + 3, y + 8, 10, 8);
+  if (left) context.fillRect(x, y + 3, 8, 10);
+  if (right) context.fillRect(x + 8, y + 3, 8, 10);
+  context.fillStyle = base;
+  context.fillRect(x + 4, y + 4, 8, 8);
+  if (up) context.fillRect(x + 4, y, 8, 9);
+  if (down) context.fillRect(x + 4, y + 7, 8, 9);
+  if (left) context.fillRect(x, y + 4, 9, 8);
+  if (right) context.fillRect(x + 7, y + 4, 9, 8);
+  const seed = stableVisualIndex(route, worldX, worldY);
+  context.fillStyle = light;
+  context.fillRect(x + 5 + seed % 4, y + 5 + (seed >> 2) % 4, route === "road" ? 2 : 1, 1);
+  context.fillStyle = dark;
+  context.fillRect(x + 4 + (seed >> 4) % 6, y + 7 + (seed >> 6) % 3, 1, 1);
+  if (route === "danger") {
+    // Corruption leaks beyond the route edges in deterministic pixel tendrils.
+    context.fillStyle = "#9a2e3d";
+    if (seed % 3 === 0) { context.fillRect(x + 1, y + 5, 3, 1); context.fillRect(x + 1, y + 4, 1, 1); }
+    if (seed % 4 === 0) { context.fillRect(x + 12, y + 10, 3, 1); context.fillRect(x + 14, y + 11, 1, 1); }
+    context.fillStyle = "#e45b4d";
+    if (seed % 5 === 0) context.fillRect(x + 7, y + 2, 1, 2);
+  }
+}
+
 function drawTerrainEdge(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
   const up = tileAt(map, worldX, worldY - 1), right = tileAt(map, worldX + 1, worldY), down = tileAt(map, worldX, worldY + 1), left = tileAt(map, worldX - 1, worldY);
   const road = code === "r" || code === "b";
@@ -541,16 +586,21 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
       const code = tileAt(map, worldX, worldY);
-      const cell = terrainAtlasCell(map, code, worldX, worldY);
+      // World roads and danger routes receive a grass foundation; a connected
+      // metatile route is painted afterward. Bridges keep their dedicated atlas art.
+      const baseCode = map.id === "world" && (code === "r" || code === "d") ? "g" : code;
+      const cell = terrainAtlasCell(map, baseCode, worldX, worldY);
       const atlas = atlasImages.current[cell.atlas];
       if (atlas?.complete && atlas.naturalWidth) drawAtlasTile(context, atlas, cell, viewX * TILE, viewY * TILE);
-      else drawTile(context, code, viewX * TILE, viewY * TILE, worldX, worldY);
+      else drawTile(context, baseCode, viewX * TILE, viewY * TILE, worldX, worldY);
     }
 
     // A lightweight autotile edge pass stitches roads, shores, forest walls and danger ground together.
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
-      drawTerrainEdge(context, map, tileAt(map, worldX, worldY), worldX, worldY, viewX * TILE, viewY * TILE);
+      const code = tileAt(map, worldX, worldY);
+      drawTerrainEdge(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
+      drawWorldRoute(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
     }
 
     // A connected two-row house block is reconstructed from complete facade

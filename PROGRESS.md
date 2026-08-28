@@ -94,3 +94,10 @@ are complete.
 - Cropped atlas presentation rims during map rendering so 16x16 tiles read as continuous terrain rather than a visible square grid.
 - Rebuilt the large lower touch-control area as an intentional SNES-inspired PRISM LINK controller deck with stronger tactile targets and regional accent framing.
 - Required validation: 402x690 DPR3 village/world screenshots, touch control bounds, no page overflow, battle/Chapter regression.
+
+
+## Visual Reconstruction Pass 4 — world metatile routes
+- Replaced modern-looking dashed world road atlas cells with connected dirt-road metatiles painted over the grass foundation.
+- Replaced rectangular red danger tile strips with a connected CRIMSON SCAR route plus deterministic corruption tendrils.
+- Bridges, collision, encounter danger flags, portals and map topology remain unchanged.
+- Required validation: Prism Road 402x690 screenshot, route continuity near intersections, natural encounter, battle and Chapter regression.
