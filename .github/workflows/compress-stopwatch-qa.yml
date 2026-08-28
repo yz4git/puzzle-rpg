@@ -10,10 +10,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Install Pillow
+        run: python3 -m pip install --user pillow
       - name: Make compact inspection copies
         run: |
-          ffmpeg -y -loglevel error -i qa-stopwatch-armed.jpg -vf scale=260:-1 -q:v 15 /tmp/armed-small.jpg
-          ffmpeg -y -loglevel error -i qa-stopwatch-zero.jpg -vf scale=260:-1 -q:v 15 /tmp/zero-small.jpg
+          python3 - <<'PY'
+          from PIL import Image
+          for src, dst in [('qa-stopwatch-armed.jpg','/tmp/armed-small.jpg'),('qa-stopwatch-zero.jpg','/tmp/zero-small.jpg')]:
+              im = Image.open(src).convert('RGB')
+              h = round(im.height * 260 / im.width)
+              im.resize((260,h), Image.Resampling.LANCZOS).save(dst, quality=35, optimize=True)
+          PY
           base64 -w0 /tmp/armed-small.jpg > qa-stopwatch-armed-small.b64
           base64 -w0 /tmp/zero-small.jpg > qa-stopwatch-zero-small.b64
           wc -c qa-stopwatch-armed-small.b64 qa-stopwatch-zero-small.b64
