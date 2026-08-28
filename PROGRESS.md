@@ -88,3 +88,9 @@ are complete.
 - Added dedicated pixel battle background strips for field/town/marsh/tower/fortress/dungeon/citadel.
 - Added terrain edge stitching, richer town facade details, stronger hero/NPC field presence, and TALK reaction frame animation.
 - Required validation: TypeScript, vinext build, 402x690 DPR3 screenshots, Chapter Battle regression.
+
+
+## Visual Reconstruction Pass 3 — seamless terrain + controller deck
+- Cropped atlas presentation rims during map rendering so 16x16 tiles read as continuous terrain rather than a visible square grid.
+- Rebuilt the large lower touch-control area as an intentional SNES-inspired PRISM LINK controller deck with stronger tactile targets and regional accent framing.
+- Required validation: 402x690 DPR3 village/world screenshots, touch control bounds, no page overflow, battle/Chapter regression.
