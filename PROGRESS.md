@@ -210,3 +210,9 @@ are complete.
 - Extended only the visual result hold to 480ms for victory, 420ms for defeat and 620ms for RELEASE so the new resolution beats are visible before returning to the field/result flow.
 - Rewards, outcome priority, battle math, save data, enemy logic, turn order, touch controls and Chapter Battle remain unchanged.
 
+
+## SFC Visual Reconstruction Pass 20 — Battle reward ceremony
+- Rebuilt the RPG battle result card into a staged battle report with persistent LV/HP/GOLD status, distinct reward, level-up, acquisition, story and loss rows.
+- Added stepped reveal timing so EXP/GOLD lands first, LEVEL UP receives a dedicated celebratory beat and item/technique/equipment acquisitions read as separate rewards.
+- Added a 520ms field-return flash/frame settle after CONTINUE so returning from battle feels like a scene transition instead of an overlay simply disappearing.
+- EXP, GOLD, drops, level formulas, HP recovery, rewards, autosave, outcome handling, battle telemetry and Chapter Battle remain unchanged.

@@ -1166,6 +1166,14 @@ function drawInteractionMarker(context: CanvasRenderingContext2D, x: number, y: 
   context.restore();
 }
 
+function resultLineKind(line: string) {
+  if (line.includes("LEVEL UP")) return "level";
+  if (line.startsWith("EXP +")) return "reward";
+  if (/手に入れた|覚えた|習得|取得/.test(line)) return "acquire";
+  if (/失った|YOU AWAKEN/.test(line)) return "loss";
+  return "story";
+}
+
 function worldEnemyTable(position: Vec2, danger: boolean) {
   if (position.x < 14) return danger ? ["copperBeetle", "forestWisp", "thornBat"] : ["mossSlime", "roadFang", "thornBat"];
   if (position.x < 28) return danger ? ["ironSentry", "ashCrow", "lostKnight"] : ["lakeImp", "copperBeetle", "ashCrow"];
@@ -1184,6 +1192,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [service, setService] = useState<ServiceState>(null);
   const [battle, setBattle] = useState<BattleContext | null>(null);
   const [result, setResult] = useState<ResultState>(null);
+  const [fieldReturn, setFieldReturn] = useState(false);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
@@ -1433,7 +1442,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
   function closeResult() {
     if (result?.ending) { setEndingIndex(0); setScreen("ending"); setResult(null); return; }
-    setResult(null); setScreen("overworld");
+    setResult(null); setScreen("overworld"); setFieldReturn(true);
+    window.setTimeout(() => setFieldReturn(false), 520);
   }
 
   function buy(id: ItemId | EquipmentId) {
@@ -1713,7 +1723,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const endingLines = save.releasedEnemies && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 4 ? STORY_TEXT.endingMercy : STORY_TEXT.endingForce;
 
   return (
-    <main className={styles.rpg} data-map={map.id} data-kind={map.kind}>
+    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-returning={fieldReturn ? "true" : "false"}>
       <header className={styles.hud}>
         <div><span>RPG MODE</span><strong>{map.name}</strong></div>
         <div><span>LV {save.level}</span><strong>HP {save.hp}/{save.maxHp}</strong></div>
@@ -1779,7 +1789,13 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         </div>
       </div> : null}
 
-      {screen === "result" && result ? <div className={styles.resultOverlay}><div className={styles.resultCard}><span>RPG MODE</span><strong>{result.title}</strong>{result.lines.map((line) => <p key={line}>{line}</p>)}<button type="button" onClick={closeResult}>A • CONTINUE</button></div></div> : null}
+      {screen === "result" && result ? <div className={styles.resultOverlay} data-result={result.title.toLowerCase().replaceAll(" ", "-")}><div className={styles.resultCard}>
+        <span className={styles.resultEyebrow}>RPG MODE • BATTLE REPORT</span>
+        <strong>{result.title}</strong>
+        <div className={styles.resultStatus}><i><small>LV</small><b>{save.level}</b></i><i><small>HP</small><b>{save.hp}/{save.maxHp}</b></i><i><small>GOLD</small><b>{save.gold}</b></i></div>
+        <div className={styles.resultLines}>{result.lines.map((line, index) => <p data-kind={resultLineKind(line)} style={{ "--result-index": index } as Record<string, number>} key={`${index}-${line}`}>{line}</p>)}</div>
+        <button type="button" onClick={closeResult}>A • CONTINUE</button>
+      </div></div> : null}
 
       {screen === "ending" ? <div className={styles.ending}><span>PRISM ROAD</span><strong>{endingIndex < endingLines.length ? "ENDING" : "THE END"}</strong><p>{endingLines[Math.min(endingIndex, endingLines.length - 1)]}</p>{endingIndex < endingLines.length - 1 ? <button type="button" onClick={() => setEndingIndex((index) => index + 1)}>A • NEXT</button> : <button type="button" onClick={() => { commit((current) => ({ ...current, flags: addUnique(current.flags, "ending:seen") }), true); onExit(); }}>TITLEへ</button>}<small>LV {save.level} • {Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0)} RELEASES • {Math.floor(save.playSeconds / 60)} MIN</small></div> : null}
     </main>
