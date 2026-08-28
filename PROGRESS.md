@@ -111,3 +111,7 @@ are complete.
 - Rebalanced world grass atlas selection so plain field cells dominate and decorative flower/stone cards become sparse accents.
 - Forest atlas selection now depends on neighbouring forest tiles: dense canopy inside, single trees/clearings at the perimeter.
 - Added forest seam stitching and low-frequency 3x3 ground macro tinting without changing map collision or encounter data.
+
+### Pass 5 correction — Forest metatile compositor
+- Rejected the straight seam-fill prototype after visual audit because it created a bright grid.
+- World forest now uses a greedy 2x2 canopy compositor over grass, reducing 16px seams while keeping single-tree edge silhouettes.
