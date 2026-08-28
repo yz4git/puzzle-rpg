@@ -138,3 +138,12 @@ are complete.
 - Preserved the Pass 6 continuous water, bridge, mountain, forest and route reconstruction.
 - Pass 7 audit correction: dense danger blocks now render as continuous corruption fields; locked major landmarks keep an opaque seal marker.
 - Pass 7C: Crimson Marsh corruption boundary gains irregular grass bites, moss islands and deep pools to remove the rectangular biome silhouette.
+
+
+## SFC Visual Reconstruction Pass 8 — Interior maps
+- Reconstructed town, training, dungeon and danger-area interiors with region-specific procedural floor, road, wall, water, hazard and altar layers.
+- Replaced generic non-world portal atlas stamps with contextual town gates, training altars, dungeon doors, Void rock gate and Prism gate art.
+- Added blocked-edge foreground lips and town facade foundations for stronger SNES-style layering without changing collision or map progression.
+- Map data, NPC coordinates, encounter rules, boss conditions and saves remain unchanged.
+
+- Pass 8B audit correction: removed dungeon walkable-floor road stamping, grouped floors into 2x2 macro palettes, rebuilt training altar rows as connected dais structures, added sparse exposed-wall pillars, and changed Void floor from repeated hazard stamps to dark fractured rock.
