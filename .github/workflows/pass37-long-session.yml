@@ -1,0 +1,55 @@
+name: Pass 37 Long Session Stability
+
+on:
+  push:
+    paths:
+      - '.github/workflows/pass37-long-session.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply long-session stability pass
+        run: python3 scripts/pass37_long_session.py
+      - name: Install dependencies
+        run: npm ci
+      - name: RPG lifecycle stability tests
+        run: node --import tsx --test tests/rpg-lifecycle-stability.test.ts
+      - name: Install browser soak runtime
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Start local game
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/pass37-vite.log 2>&1 &
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/pass37-vite.log
+          exit 1
+      - name: iPhone long-session browser soak
+        run: node scripts/pass37_soak_qa.mjs
+      - name: Commit long-session stability pass
+        run: |
+          printf '%s\n' '' '## Release Candidate Pass 37 — Long Session / Timer Stability' '- Added explicit ownership for delayed field encounter, held-input, battle finish and battle feedback timers so transient callbacks cannot outlive their owning RPG screen.' '- Safari pagehide/hidden lifecycle now releases held d-pad repeat immediately, while play-time accumulation pauses when the document is backgrounded.' '- Replaced per-render RPG keyboard listener churn with one stable listener backed by a current handler ref, and release atlas image onload handlers/references on RPGMode unmount.' '- Added targeted lifecycle regression tests plus a Chromium iPhone-size soak covering repeated menu cycles, 120 touch moves, pagehide during held input and 12 RPG mount/unmount cycles with interval and heap-growth checks.' '- Gameplay balance, encounter odds, map topology, rewards, save progression and battle math remain unchanged.' >> PROGRESS.md
+          rm -f scripts/pass37_long_session.py scripts/pass37_soak_qa.mjs .github/workflows/pass37-long-session.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Complete long-session stability pass 37'
+          git push
