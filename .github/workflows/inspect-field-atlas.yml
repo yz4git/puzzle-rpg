@@ -1,0 +1,20 @@
+name: Inspect Field Atlas
+on:
+  push:
+    branches: [review/sfc-visual-audit6-20260828]
+    paths:
+      - scripts/crop-field-row.py
+      - .github/workflows/inspect-field-atlas.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install pillow
+      - run: python scripts/crop-field-row.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: field-atlas-inspect
+          path: field-inspect
