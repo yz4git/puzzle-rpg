@@ -184,4 +184,4 @@ are complete.
 ## SFC Visual Reconstruction Pass 15 — Prism board housing
 - Unified NEXT DROP MAP and the 6x6 puzzle board as one scene-tinted PRISM BOARD device using shared SFC-style housing colors.
 - Added tiny non-interactive corner rails and a PRISM ARRAY label outside the play cells; panel colors, labels and hit regions are untouched.
-- The housing brightens only during the existing cluster preview using CSS presentation state; puzzle logic and timing are unchanged.
+- The housing brightens only during the existing cluster preview using an explicit board presentation state for reliable Safari rendering; puzzle logic and timing are unchanged.
