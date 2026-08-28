@@ -350,3 +350,10 @@ are complete.
 - New games start with TRAVELLER COAT equipped and HP/MAX HP 22, making starter gear explicit and reducing the first-dungeon punishment spike.
 - Removed the title screen's large hero-to-mode-select dead zone while preserving the existing title art and touch target sizes.
 - No story flags, map collision/topology, boss placement, reward logic, battle rules, Chapter Battle logic, or existing-save format were changed.
+
+
+## Battle Stopwatch / Shield Feedback Pass
+- Replaced SKIP panel art with a stopwatch motif; NEXT preview also uses a time glyph.
+- TIME STOP now overlays the enemy with remaining turns and visibly ticks to 0 on the skipped enemy turn before disappearing.
+- Barrier attacks now stage a large shield over the board; full absorption reads BLOCK, overflow visibly breaks the shield before HP damage appears.
+- Existing FREE, barrier, intent, damage, training, rewards, and save semantics remain unchanged.

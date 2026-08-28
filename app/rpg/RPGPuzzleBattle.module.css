@@ -115,3 +115,41 @@
 @keyframes defeatGate{0%{opacity:0;clip-path:inset(50% 0 50% 0)}20%{opacity:.34;clip-path:inset(34% 0 34% 0)}42%{opacity:.5;clip-path:inset(20% 0 20% 0)}68%{opacity:.64;clip-path:inset(7% 0 7% 0)}100%{opacity:.78;clip-path:inset(0)}}
 @keyframes releaseGate{0%{opacity:0;transform:scale(.85)}14%{opacity:.78;transform:scale(.92)}34%{opacity:.46;transform:scale(1)}58%{opacity:.22;transform:scale(1.08)}80%{opacity:.08;transform:scale(1.14)}100%{opacity:0;transform:scale(1.2)}}
 @media(prefers-reduced-motion:reduce){.battle,.battle::after,.battle .enemyRow{animation-duration:1ms!important;animation-iteration-count:1!important}}
+
+
+/* Battle status legibility pass — stopwatch SKIP + shield interception */
+.stopwatchPanel{
+  position:relative;width:29px;height:29px;align-self:center!important;margin-top:2px;
+  border:4px solid #fff078;border-radius:50%;background:#171207;box-shadow:inset 0 0 0 2px #6d5815,2px 2px #000;
+  font-size:0!important;text-shadow:none!important;
+}
+.stopwatchPanel::before{content:"";position:absolute;left:50%;top:-9px;width:12px;height:5px;transform:translateX(-50%);background:#fff078;box-shadow:0 -2px #5b4911,9px 6px 0 -3px #fff078}
+.stopwatchPanel::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:10px;transform:translate(-50%,-88%) rotate(-28deg);transform-origin:50% 88%;background:#fff7bf;box-shadow:4px 7px 0 -1px #fff7bf}
+
+.skipEnemyOverlay{position:absolute;z-index:8;left:4px;top:2px;width:112px;height:76px;display:grid;place-items:center;pointer-events:none;filter:drop-shadow(3px 4px 0 #000)}
+.stopwatchFace{position:absolute;left:18px;top:10px;width:57px;height:57px;border:5px solid #ffe56d;border-radius:50%;background:#08080d;box-shadow:inset 0 0 0 3px #6d5818,0 0 0 2px #08080d}
+.stopwatchFace::before{content:"";position:absolute;left:50%;top:-13px;width:20px;height:7px;transform:translateX(-50%);background:#ffe56d;box-shadow:0 -3px #5f4b13,15px 8px 0 -5px #ffe56d}
+.stopwatchFace::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:19px;transform:translate(-50%,-92%) rotate(-25deg);transform-origin:50% 92%;background:#fff4ae;box-shadow:7px 13px 0 -1px #fff4ae}
+.skipEnemyOverlay>strong{position:absolute;z-index:2;left:46px;top:28px;min-width:31px;color:#fff7c9;font:1000 27px/1 monospace;text-align:center;text-shadow:2px 2px #000}
+.skipEnemyOverlay>span{position:absolute;z-index:3;left:2px;right:2px;bottom:0;padding:3px 2px;border:2px solid #e9ca54;background:#09080d;color:#ffe56d;font:1000 6px/1 monospace;letter-spacing:.12em;text-align:center;box-shadow:2px 2px #000}
+.skipEnemyOverlay[data-phase="tick"]{animation:stopwatchTick 480ms steps(6,end) both}
+.skipEnemyOverlay[data-zero="true"] .stopwatchFace{border-color:#ff8b68;box-shadow:inset 0 0 0 3px #6e241d,0 0 0 2px #08080d}
+.skipEnemyOverlay[data-zero="true"] .stopwatchFace::before{background:#ff8b68}.skipEnemyOverlay[data-zero="true"]>strong,.skipEnemyOverlay[data-zero="true"]>span{color:#ffb08c;border-color:#ff7c61}
+@keyframes stopwatchTick{0%{filter:drop-shadow(3px 4px 0 #000) brightness(1)}18%{transform:translateX(-3px);filter:drop-shadow(3px 4px 0 #000) brightness(1.8)}36%{transform:translateX(3px)}54%{transform:translateX(-2px)}72%{transform:translateX(1px)}100%{transform:none;filter:drop-shadow(3px 4px 0 #000)}}
+
+.guardFx{position:absolute;z-index:45;inset:0;display:grid;place-content:center;justify-items:center;gap:7px;pointer-events:none;background:rgba(1,8,13,.26);isolation:isolate}
+.guardShield{position:relative;width:124px;height:140px;background:#65daf3;clip-path:polygon(50% 0,88% 14%,84% 62%,72% 80%,50% 100%,28% 80%,16% 62%,12% 14%);filter:drop-shadow(0 0 0 #fff) drop-shadow(5px 6px 0 #000);animation:shieldCatch 420ms steps(6,end) both}
+.guardShield::before{content:"";position:absolute;inset:9px;background:#0b5f78;clip-path:inherit;box-shadow:inset 0 0 0 5px #bff7ff}
+.guardShield::after{content:"";position:absolute;left:48%;top:19%;width:8px;height:65%;background:#d7fbff;transform:rotate(8deg);box-shadow:-24px 23px 0 -2px #d7fbff,26px 30px 0 -2px #d7fbff}
+.guardFx>strong{padding:5px 11px;border:3px solid #d9fbff;background:#07131a;color:#c9f7ff;font:1000 19px/1 monospace;letter-spacing:.06em;text-shadow:2px 2px #000;box-shadow:4px 4px #000}
+.guardFx>small{padding:3px 7px;background:#07090e;color:#8ee8f7;font:1000 7px/1 monospace;letter-spacing:.08em;box-shadow:2px 2px #000}
+.guardFx[data-phase="break"]{background:rgba(19,3,6,.32)}
+.guardFx[data-phase="break"] .guardShield{background:#ff8071;animation:shieldBreak 300ms steps(6,end) both}
+.guardFx[data-phase="break"] .guardShield::before{background:#6b2030}
+.guardFx[data-phase="break"] .guardShield::after{background:#fff0df;transform:rotate(38deg);box-shadow:-22px 24px 0 -2px #fff0df,23px 33px 0 -2px #fff0df}
+.guardFx[data-phase="break"]>strong{border-color:#ffb293;color:#ffd0b7;background:#1b090c}
+.guardFx[data-phase="break"]>small{color:#ffad91}
+@keyframes shieldCatch{0%{opacity:0;transform:scale(.48);filter:brightness(2.5) drop-shadow(5px 6px 0 #000)}22%{opacity:1;transform:scale(1.12)}48%{transform:scale(.94)}70%{transform:scale(1.03)}100%{opacity:1;transform:scale(1);filter:brightness(1) drop-shadow(5px 6px 0 #000)}}
+@keyframes shieldBreak{0%{opacity:1;transform:translate(0) scale(1);filter:brightness(2) drop-shadow(5px 6px 0 #000)}22%{transform:translate(-5px,2px) rotate(-3deg) scale(1.05)}44%{transform:translate(6px,-3px) rotate(4deg) scale(.97)}66%{opacity:1;transform:translate(-4px,5px) rotate(-5deg) scale(.91)}100%{opacity:0;transform:translate(8px,18px) rotate(8deg) scale(.65);filter:brightness(.7) drop-shadow(5px 6px 0 #000)}}
+@media(max-height:700px){.skipEnemyOverlay{transform:scale(.9);transform-origin:left top}.guardShield{width:106px;height:120px}.guardFx>strong{font-size:16px}.stopwatchPanel{width:25px;height:25px;border-width:3px}}
+@media(prefers-reduced-motion:reduce){.skipEnemyOverlay[data-phase="tick"],.guardShield,.guardFx[data-phase="break"] .guardShield{animation-duration:1ms!important}}

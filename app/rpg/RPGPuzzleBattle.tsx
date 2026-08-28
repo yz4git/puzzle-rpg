@@ -14,6 +14,8 @@ type Tile = { id: number; type: PanelType; row: number; col: number };
 type Preview = { seed: number; ids: Set<number>; type: PanelType; count: number } | null;
 type TrainingBrief = { school: PanelType; technique: TechniqueId; objective: string };
 type BattleImpact = "enemyHit" | "playerHit" | "heal" | "barrier" | "block" | "phase" | "release" | "skill" | "item" | null;
+type SkipFxState = { value: number; phase: "armed" | "tick" } | null;
+type GuardFxState = { phase: "block" | "break"; absorbed: number; damage: number } | null;
 
 type Props = {
   enemy: EnemyDefinition;
@@ -26,7 +28,7 @@ const SIZE = 6;
 const QUEUE_DEPTH = 12;
 const PANEL_TYPES: PanelType[] = ["attack", "heal", "barrier", "skip"];
 const LABEL: Record<PanelType, string> = { attack: "ATK", heal: "HEAL", barrier: "BAR", skip: "SKIP" };
-const GLYPH: Record<PanelType, string> = { attack: "▲", heal: "♥", barrier: "◆", skip: "Ⅱ" };
+const GLYPH: Record<PanelType, string> = { attack: "▲", heal: "♥", barrier: "◆", skip: "◷" };
 
 let nextTileId = 10_000;
 function tileId() { nextTileId += 1; return nextTileId; }
@@ -168,6 +170,8 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   const [phase, setPhase] = useState(1);
   const [feedback, setFeedback] = useState("");
   const [impact, setImpact] = useState<BattleImpact>(null);
+  const [skipFx, setSkipFx] = useState<SkipFxState>(null);
+  const [guardFx, setGuardFx] = useState<GuardFxState>(null);
   const [talkOverlay, setTalkOverlay] = useState<{ speaker: string; text: string } | null>(null);
   const finished = useRef(false);
   const feedbackSeq = useRef(0);
@@ -351,7 +355,11 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     } else {
       const power = count + bonus;
       nextFree += power;
-      setFree(nextFree); setMessage(`SKIP×${count} → FREE ${Math.max(0, nextFree - 1)}`); showEffect(`+${Math.max(0, power - 1)} FREE`); playSfx("skill");
+      setFree(nextFree);
+      setSkipFx({ value: nextFree, phase: "armed" });
+      setMessage(`SKIP×${count} → TIME STOP ${nextFree}`);
+      showEffect(`TIME STOP ${nextFree}`, "skill", 520);
+      playSfx("skill");
     }
 
     const fallen = collapse(tiles, queues, removed);
@@ -381,9 +389,21 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   async function resolveEnemyTurn(currentHp: number, currentBarrier: number, currentEnemyHp: number, currentFree: number, currentStats: BattleStats) {
     if (currentFree > 0) {
       const remaining = currentFree - 1;
-      setFree(remaining); setMessage((text) => `${text} • ENEMY WAIT${remaining ? ` • FREE ${remaining}` : ""}`);
+      setSkipFx({ value: remaining, phase: "tick" });
+      setMessage(`ENEMY TURN • TIME STOP ${currentFree} → ${remaining}`);
+      playSfx("skill");
+      await delay(480);
+      setFree(remaining);
+      if (remaining <= 0) {
+        setSkipFx(null);
+        setMessage("TIME STOP END • NEXT ENEMY TURN WILL ACT");
+        await delay(160);
+      } else {
+        setSkipFx({ value: remaining, phase: "armed" });
+      }
       return { hp: currentHp, barrier: currentBarrier, enemyHp: currentEnemyHp, free: remaining, stats: currentStats };
     }
+
     const action = adjustedIntent(intentStep, currentEnemyHp, currentHp);
     let damage = action.power;
     let blocked = 0;
@@ -392,13 +412,15 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       currentBarrier -= blocked;
       damage -= blocked;
     }
-    currentHp = Math.max(0, currentHp - damage);
+    const nextHp = Math.max(0, currentHp - damage);
     const nextStats = { ...currentStats, blocked: currentStats.blocked + blocked };
     if (damage === 0 && action.power > 0) {
       nextStats.perfectBlocks += 1;
       if (hasTechnique("ironBreath")) currentHp = Math.min(save.maxHp, currentHp + 1);
       if (hasTechnique("counterwall") && nextStats.perfectBlocks === 2) currentEnemyHp = Math.max(0, currentEnemyHp - 2);
     }
+    currentHp = damage === 0 && action.power > 0 ? currentHp : nextHp;
+
     if (action.kind === "drain" && damage > 0) {
       const extra = enemy.id === "scarletOracle" ? 2 : enemy.id === "marshLeech" ? 1 : 0;
       currentEnemyHp = Math.min(effectiveEnemy.hp, currentEnemyHp + damage + extra);
@@ -417,11 +439,32 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
         return candidate ? current.map((tile) => tile.id === candidate.id ? { ...tile, type: "attack" } : tile) : current;
       });
     }
+
+    const attackSfx = action.kind === "heavy" ? "enemyHeavy" : action.kind === "drain" ? "enemyDrain" : action.kind === "pierce" ? "pierce" : action.kind === "disrupt" || action.kind === "seal" ? "enemyDisrupt" : "enemyAttack";
+    playSfx(attackSfx);
+
+    // Barrier feedback is deliberately staged: hit shield -> absorb -> break only if damage leaks through.
+    if (blocked > 0) {
+      setBarrier(currentBarrier);
+      setGuardFx({ phase: "block", absorbed: blocked, damage });
+      setMessage(`${action.label} • SHIELD ${blocked}`);
+      playSfx("shield");
+      await delay(damage > 0 ? 260 : 420);
+      if (damage > 0) {
+        setGuardFx({ phase: "break", absorbed: blocked, damage });
+        setMessage(`${action.label} • SHIELD BREAK • HP -${damage}`);
+        await delay(300);
+      } else {
+        setMessage(`${action.label} • PERFECT BLOCK ${blocked}`);
+      }
+      setGuardFx(null);
+    }
+
     setHp(currentHp); setBarrier(currentBarrier); setEnemyHp(currentEnemyHp); setStats(nextStats); setIntentStep((step) => step + 1);
-    setMessage(`${action.label} • ${damage > 0 ? `HP -${damage}` : `BLOCK ${blocked}`}`);
-    showEffect(damage > 0 ? `-${damage} HP` : "PERFECT BLOCK", damage > 0 ? "playerHit" : "block");
-    playSfx(action.kind === "heavy" ? "enemyHeavy" : action.kind === "drain" ? "enemyDrain" : action.kind === "pierce" ? "pierce" : action.kind === "disrupt" || action.kind === "seal" ? "enemyDisrupt" : "enemyAttack");
-    await delay(320);
+    if (blocked === 0) setMessage(`${action.label} • ${damage > 0 ? `HP -${damage}` : "NO DAMAGE"}`);
+    if (damage > 0) showEffect(`-${damage} HP`, "playerHit");
+    else showEffect("PERFECT BLOCK", "block");
+    await delay(blocked > 0 ? 220 : 320);
     if (currentEnemyHp <= 0 && !training) finish("victory", currentHp, inventory, nextStats);
     if (currentHp <= 0) finish("defeat", 0, inventory, nextStats);
     return { hp: currentHp, barrier: currentBarrier, enemyHp: currentEnemyHp, free: 0, stats: nextStats };
@@ -446,10 +489,10 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (enemy.id.includes("iron") || enemy.id === "ironTyrant") setArmorWeakened(true);
     if ((enemy.id === "scarletOracle" && save.memos.some((memo) => memo.id === "red-spring")) || enemy.id === "redHermit") setDrainWeakened(true);
     let nextFree = free;
-    if (enemy.id === "voidHerald" && nextStats.skipUses >= 2) { nextFree += 1; setFree(nextFree); }
-    if (enemy.id === "ashCrow" && nextStats.skipUses >= 3) { nextFree += 1; setFree(nextFree); }
+    if (enemy.id === "voidHerald" && nextStats.skipUses >= 2) { nextFree += 1; setFree(nextFree); setSkipFx({ value: nextFree, phase: "armed" }); }
+    if (enemy.id === "ashCrow" && nextStats.skipUses >= 3) { nextFree += 1; setFree(nextFree); setSkipFx({ value: nextFree, phase: "armed" }); }
     if (enemy.id === "nullExecutioner" && !nullHesitated && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => save.techniques.includes(id as TechniqueId))) {
-      nextFree += 1; setFree(nextFree); setNullHesitated(true);
+      nextFree += 1; setFree(nextFree); setSkipFx({ value: nextFree, phase: "armed" }); setNullHesitated(true);
     }
     const talkLine = alternateReady(nextStats) ? enemy.conditionalTalk : enemy.talk;
     setMessage(talkLine);
@@ -477,7 +520,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (stack.id === "boardBell") { setTiles(makeBoard(skipBoost)); setQueues(makeQueues(skipBoost)); }
     if (stack.id === "smoke" && !enemy.boss && !training) { finish("run", hp, nextInventory, nextStats); return; }
     if (stack.id === "prismDrop") { nextHp = Math.min(save.maxHp, hp + 4); nextBarrier = Math.min(30, barrier + 4); nextFree += 1; }
-    setHp(nextHp); setBarrier(nextBarrier); setFree(nextFree); setMessage(`${ITEMS[stack.id].name} USED`); showEffect(ITEMS[stack.id].description, "item");
+    setHp(nextHp); setBarrier(nextBarrier); setFree(nextFree);
+    if (nextFree > free) setSkipFx({ value: nextFree, phase: "armed" });
+    setMessage(`${ITEMS[stack.id].name} USED`); showEffect(ITEMS[stack.id].description, "item");
     await delay(360);
     await resolveEnemyTurn(nextHp, nextBarrier, enemyHp, nextFree, nextStats);
     setResolving(false);
@@ -551,13 +596,14 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     ? "reaction"
     : impact === "enemyHit"
       ? "hurt"
-      : impact === "playerHit"
+      : impact === "playerHit" || guardFx
         ? "attack"
         : impact === "phase" || phase > 1
           ? "phase"
           : feedback
             ? "reaction"
             : "idle";
+  const skipDisplayValue = skipFx?.value ?? (free > 0 ? free : null);
   const enemySprite = enemySpriteCell(enemy.id, enemyFrame);
   const enemySpriteStyle: CSSProperties | undefined = enemySprite ? {
     backgroundImage: `url(${enemySprite.src})`,
@@ -579,6 +625,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
 
       <section className={styles.enemyRow}>
         <span className={styles.enemySprite} role="img" aria-label={enemy.name} style={enemySpriteStyle} />
+        {skipDisplayValue !== null ? <div className={styles.skipEnemyOverlay} data-phase={skipFx?.phase ?? "armed"} data-zero={skipDisplayValue === 0 ? "true" : "false"} aria-label={`Enemy time stop ${skipDisplayValue}`}>
+          <i className={styles.stopwatchFace} aria-hidden="true" /><strong>{skipDisplayValue}</strong><span>{skipDisplayValue === 0 ? "TIME UP" : "TIME STOP"}</span>
+        </div> : null}
         <div><strong>{effectiveEnemy.name}</strong><i><u style={{ width: `${Math.max(0, enemyHp / effectiveEnemy.hp) * 100}%` }} /></i><span>HP {enemyHp}/{effectiveEnemy.hp}</span><small>{enemy.trait}</small></div>
       </section>
 
@@ -599,6 +648,11 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       </section>
 
       <section className={styles.board} aria-label="RPG Cluster Break board">
+        {guardFx ? <div className={styles.guardFx} data-phase={guardFx.phase} aria-label={guardFx.phase === "break" ? `Shield break, ${guardFx.damage} damage` : `Shield blocks ${guardFx.absorbed}`}>
+          <i className={styles.guardShield} aria-hidden="true" />
+          <strong>{guardFx.phase === "break" ? "SHIELD BREAK" : "BLOCK"}</strong>
+          <small>{guardFx.phase === "break" ? `BLOCK ${guardFx.absorbed} • ${guardFx.damage} DAMAGE` : `${guardFx.absorbed} DAMAGE ABSORBED`}</small>
+        </div> : null}
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
@@ -609,7 +663,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
           onPointerDown={(event) => showPreview(tile, event)}
           onPointerUp={(event) => release(tile, event)}
           onPointerCancel={() => setPreview(null)}
-        ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
+        ><b className={tile.type === "skip" ? styles.stopwatchPanel : undefined}>{tile.type === "skip" ? "" : GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
         {preview ? <div className={`${styles.previewBanner} ${styles[preview.type]}`}>{LABEL[preview.type]} ×{preview.count}</div> : null}
       </section>
 
