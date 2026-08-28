@@ -23,7 +23,7 @@ jobs:
         run: npm ci
       - name: Install browser QA runtime
         run: |
-          npm install --no-save --package-lock=false playwright@1.55.0
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Puzzle RPG TypeScript check
         run: npx tsc -p tsconfig.puzzle.json --noEmit
