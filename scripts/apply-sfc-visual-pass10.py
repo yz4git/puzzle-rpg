@@ -73,4 +73,4 @@ progress = Path('PROGRESS.md')
 p = progress.read_text()
 section = '''\n\n## SFC Visual Reconstruction Pass 10 — Interaction clarity\n- Moved interaction glyphs to the final canvas layer so large hero/NPC sprites cannot hide them.\n- Reduced the marker footprint and added contextual front-tile glyphs for TALK, treasure, fixed encounters and exits.\n- Interaction rules, collision, map data, progression and save format are unchanged.\n'''
 if '## SFC Visual Reconstruction Pass 10' not in p:
-    progress.write_text(p.rstrip() + section + '\n')
+    progress.write_text(p.rstrip() + section)
