@@ -6,6 +6,7 @@ on:
       - visual/reconstruction-pass-sfc4
     paths:
       - scripts/apply-sfc-visual-pass4-landmarks.py
+      - .github/workflows/visual-reconstruction-sfc4-landmarks.yml
 
 permissions:
   contents: write
