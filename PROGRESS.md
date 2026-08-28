@@ -319,3 +319,10 @@ are complete.
 - Browser QA found that normal field movement could remain only in React state until a later autosave event; added pagehide and hidden-state lifecycle persistence backed by a synchronously updated save ref so iPhone app switching/reload preserves the newest field state.
 - Chapter Battle transition QA follows the intended Stage Intro → Battle Start → Mode-return input order; the stage intro correctly blocks background controls.
 - No gameplay balance, encounter tables, rewards, maps or battle math were changed by this stability pass.
+
+## Release Candidate Pass 36 — Save Integrity & Recovery
+- Added one-generation local save backup rotation and automatic recovery when the primary JSON is malformed or missing.
+- Added tolerant migration for recognizable pre-release/versionless saves while explicitly refusing future-version saves to prevent accidental downgrade.
+- Hardened save normalization: blocked/water coordinates recover to the nearest walkable tile; duplicate inventory stacks are merged; invalid/duplicate item, equipment, technique, flag, chest and encounter data are sanitized and bounded.
+- Added a permanent targeted RPG save-integrity regression test covering corrupted-primary recovery, future-version protection, backup rotation and storage-write failure safety.
+- Safari/private-mode/quota write failures remain non-fatal; gameplay balance, encounter tables, rewards, map topology and battle math are unchanged.
