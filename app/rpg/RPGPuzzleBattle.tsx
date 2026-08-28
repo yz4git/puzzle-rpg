@@ -624,11 +624,13 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       </header>
 
       <section className={styles.enemyRow}>
-        <span className={styles.enemySprite} role="img" aria-label={enemy.name} style={enemySpriteStyle} />
-        {skipDisplayValue !== null ? <div className={styles.skipEnemyOverlay} data-phase={skipFx?.phase ?? "armed"} data-zero={skipDisplayValue === 0 ? "true" : "false"} aria-label={`Enemy time stop ${skipDisplayValue}`}>
-          <i className={styles.stopwatchFace} aria-hidden="true" /><strong>{skipDisplayValue}</strong><span>{skipDisplayValue === 0 ? "TIME UP" : "TIME STOP"}</span>
-        </div> : null}
-        <div><strong>{effectiveEnemy.name}</strong><i><u style={{ width: `${Math.max(0, enemyHp / effectiveEnemy.hp) * 100}%` }} /></i><span>HP {enemyHp}/{effectiveEnemy.hp}</span><small>{enemy.trait}</small></div>
+        <div className={styles.enemyVisual}>
+          <span className={styles.enemySprite} role="img" aria-label={enemy.name} style={enemySpriteStyle} />
+          {skipDisplayValue !== null ? <div className={styles.skipEnemyOverlay} data-phase={skipFx?.phase ?? "armed"} data-zero={skipDisplayValue === 0 ? "true" : "false"} aria-label={`Enemy time stop ${skipDisplayValue}`}>
+            <i className={styles.stopwatchFace} aria-hidden="true" /><strong>{skipDisplayValue}</strong><span>{skipDisplayValue === 0 ? "TIME UP" : "TIME STOP"}</span>
+          </div> : null}
+        </div>
+        <div className={styles.enemyInfo}><strong>{effectiveEnemy.name}</strong><i><u style={{ width: `${Math.max(0, enemyHp / effectiveEnemy.hp) * 100}%` }} /></i><span>HP {enemyHp}/{effectiveEnemy.hp}</span><small>{enemy.trait}</small></div>
       </section>
 
       <section className={styles.intentRow}>

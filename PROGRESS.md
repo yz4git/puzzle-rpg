@@ -357,3 +357,10 @@ are complete.
 - TIME STOP now overlays the enemy with remaining turns and visibly ticks to 0 on the skipped enemy turn before disappearing.
 - Barrier attacks now stage a large shield over the board; full absorption reads BLOCK, overflow visibly breaks the shield before HP damage appears.
 - Existing FREE, barrier, intent, damage, training, rewards, and save semantics remain unchanged.
+
+
+## Enemy stopwatch overlay hotfix
+- Moved enemy sprite and TIME STOP overlay into a dedicated `enemyVisual` layer.
+- Scoped HP/name panel selectors to `enemyInfo`, preventing enemy-row generic `div/i/span/strong` rules from corrupting the stopwatch.
+- Centered the stopwatch directly over the enemy sprite with an explicit z-index and non-clipped face/number/label layers.
+- Preserved SKIP/FREE timing and battle balance.
