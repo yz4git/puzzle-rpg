@@ -1,0 +1,52 @@
+name: SFC Visual Reconstruction Pass
+
+on:
+  push:
+    branches:
+      - visual/reconstruction-pass-sfc
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply visual reconstruction
+        run: node scripts/apply-sfc-visual-pass.mjs
+
+      - name: TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Review diff
+        run: |
+          git status --short
+          git diff --stat
+          git diff --check
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/rpg/RPGMode.tsx app/rpg/RPGMode.module.css app/rpg/RPGPuzzleBattle.tsx app/rpg/RPGPuzzleBattle.module.css docs/VISUAL_RECONSTRUCTION_BIBLE.md PROGRESS.md
+          git commit -m "Implement SFC visual reconstruction pass"
+          git push origin HEAD:visual/reconstruction-pass-sfc
