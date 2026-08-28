@@ -216,3 +216,9 @@ are complete.
 - Added stepped reveal timing so EXP/GOLD lands first, LEVEL UP receives a dedicated celebratory beat and item/technique/equipment acquisitions read as separate rewards.
 - Added a 520ms field-return flash/frame settle after CONTINUE so returning from battle feels like a scene transition instead of an overlay simply disappearing.
 - EXP, GOLD, drops, level formulas, HP recovery, rewards, autosave, outcome handling, battle telemetry and Chapter Battle remain unchanged.
+
+## SFC Visual Reconstruction Pass 21 — Field HUD hierarchy
+- Rebuilt the exploration HUD so map/location identity is primary, HP reads as a green survival meter block and GOLD reads as a distinct reward/resource block.
+- Reframed the location bar as a scene-accented navigation plaque and tightened the MEMO/JOURNEY strip into a quieter secondary information ribbon.
+- Strengthened the world-frame bezel so the reconstructed map reads as the central game viewport instead of another web panel.
+- Field controls, map rendering, collision, encounters, portal logic, save data and Chapter Battle remain unchanged.
