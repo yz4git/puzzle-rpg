@@ -27,7 +27,7 @@ const save = {
   battleLog: [],
   steps: 0,
   playSeconds: 0,
-  encounterMeter: 1,
+  encounterMeter: 3,
   settings: { music: false, sfx: false },
 };
 
@@ -39,10 +39,12 @@ await page.evaluate((value) => localStorage.setItem('puzzle-rpg:rpg-mode:v1', JS
 await page.reload({ waitUntil: 'networkidle' });
 await page.getByRole('button', { name: /RPG MODE/ }).click();
 await page.getByRole('button', { name: /CONTINUE/ }).click();
-await page.getByRole('button', { name: 'Move up' }).click();
-await page.getByRole('region', { name: 'RPG Cluster Break board' }).waitFor({ state: 'visible', timeout: 15000 }).catch(async () => {
-  await page.locator('section[aria-label="RPG Cluster Break board"]').waitFor({ state: 'visible', timeout: 15000 });
-});
+const up = page.getByRole('button', { name: 'Move up' });
+for (let i = 0; i < 3; i += 1) {
+  await up.click();
+  await page.waitForTimeout(180);
+}
+await page.locator('section[aria-label="RPG Cluster Break board"]').waitFor({ state: 'visible', timeout: 15000 });
 const skip = page.locator('button[aria-label^="SKIP "]').first();
 await skip.waitFor({ state: 'visible', timeout: 10000 });
 await skip.click();
@@ -52,9 +54,10 @@ const enemyRow = page.locator('section:has([aria-label^="Enemy time stop "])').f
 await enemyRow.screenshot({ path: '/tmp/stopwatch-armed.jpg', type: 'jpeg', quality: 92 });
 const armedLabel = await overlay.getAttribute('aria-label');
 console.log('armed=', armedLabel);
+const armedBox = await overlay.boundingBox();
+const spriteBox = await page.locator('[role="img"][aria-label]').first().boundingBox();
+console.log('armedBox=', JSON.stringify(armedBox), 'spriteBox=', JSON.stringify(spriteBox));
 await page.locator('[aria-label="Enemy time stop 0"]').waitFor({ state: 'visible', timeout: 4000 });
 await enemyRow.screenshot({ path: '/tmp/stopwatch-zero.jpg', type: 'jpeg', quality: 92 });
-const box = await overlay.boundingBox();
-const spriteBox = await page.locator('[role="img"][aria-label]').first().boundingBox();
-console.log('overlayBox=', JSON.stringify(box), 'spriteBox=', JSON.stringify(spriteBox));
+console.log('zero captured');
 await browser.close();
