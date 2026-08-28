@@ -1,0 +1,57 @@
+name: Early Game iPhone Playcheck
+
+on:
+  push:
+    branches:
+      - review/early-game-playcheck-20260828b
+    paths:
+      - 'scripts/early_game_review.mjs'
+      - '.github/workflows/early-game-review.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  playcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install app dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Install Playwright
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start local game
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/early-review-vite.log 2>&1 &
+          for i in {1..50}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/early-review-vite.log
+          exit 1
+      - name: Play early game on iPhone viewport
+        run: node scripts/early_game_review.mjs
+      - name: Commit visual review output
+        if: always()
+        run: |
+          if [ -d review-output/early-game-20260828 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add review-output/early-game-20260828
+            if ! git diff --cached --quiet; then
+              git commit -m 'Capture early-game iPhone playcheck'
+              git push
+            fi
+          fi
