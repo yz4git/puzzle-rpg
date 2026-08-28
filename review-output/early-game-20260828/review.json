@@ -1,0 +1,183 @@
+{
+  "viewport": {
+    "width": 402,
+    "height": 874
+  },
+  "checkpoints": [
+    {
+      "name": "title",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "PUZZLE\nRPG\nTHE PRISM ROAD\nNEW ADVENTURE\nRPG MODE\nWORLD • TALK • TRAINING • STORY\nORIGINAL 10 BATTLES\nCHAPTER BATTLE\nBUILD • ELITE • PRISM SOVEREIGN\n1 PANEL = 1 EFFECT\nATK • HEAL • BAR • SKIP"
+    },
+    {
+      "name": "rpg-choice",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "PUZZLE\nRPG\nTHE PRISM ROAD\nRPG MODE\nTHE PRISM ROAD\n＋ NEW GAME\n最初から一人旅を始める\n◀ MODE SELECT\n1 PANEL = 1 EFFECT\nATK • HEAL • BAR • SKIP"
+    },
+    {
+      "name": "opening",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "RPG MODE\nHEARTH VILLAGE\nLV 1\nHP 20/20\n GOLD\n18\nROAD • SAFE\nA: 話す/調べる • B: メニュー\n MEMO NEW 1\nJOURNEY • 0 STEPS\n▲\n◀\n◆\n▶\n▼\nB\nMENU\nA\nCHECK\nPRISM ROAD\n\nPRISM ROADの色が失われて三年。\n\nA / TAP ▼"
+    },
+    {
+      "name": "hearth-start",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "RPG MODE\nHEARTH VILLAGE\nLV 1\nHP 20/20\n GOLD\n18\nROAD • SAFE\nA: 話す/調べる • B: メニュー\n MEMO NEW 1\nJOURNEY • 0 STEPS\n▲\n◀\n◆\n▶\n▼\nB\nMENU\nA\nCHECK",
+      "controlSizes": {
+        "up": {
+          "width": 50,
+          "height": 50
+        },
+        "left": {
+          "width": 50,
+          "height": 50
+        },
+        "a": {
+          "width": 65.50759887695312,
+          "height": 65.50762939453125
+        },
+        "b": {
+          "width": 65.507568359375,
+          "height": 65.507568359375
+        }
+      }
+    },
+    {
+      "name": "elder-dialogue",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "RPG MODE\nHEARTH VILLAGE\nLV 1\nHP 20/20\n GOLD\n18\nROAD • SAFE\n村の長 • Aで話す\n MEMO NEW 1\nJOURNEY • 6 STEPS\n▲\n◀\n◆\n▶\n▼\nB\nMENU\nA\nCHECK\n村の長\n\n北の古寺に、崩れた橋を起こす印が眠る。\n\nA / TAP ▼"
+    },
+    {
+      "name": "world-entry",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "RPG MODE\nPRISM ROAD\nLV 1\nHP 20/20\n GOLD\n18\nFIELD • ENCOUNTER\nA • HEARTH VILLAGE\n MEMO NEW 2\nJOURNEY • 14 STEPS\n▲\n◀\n◆\n▶\n▼\nB\nMENU\nA\nCHECK"
+    },
+    {
+      "name": "old-temple-entry",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "RPG MODE\nOLD TEMPLE\nLV 1\nHP 20/20\n GOLD\n18\nFIELD • ENCOUNTER\nOLD TEMPLE\n MEMO NEW 2\nJOURNEY • 23 STEPS\n▲\n◀\n◆\n▶\n▼\nB\nMENU\nA\nCHECK"
+    },
+    {
+      "name": "encounter-transition",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "RPG MODE\nOLD TEMPLE\nLV 1\nHP 20/20\n GOLD\n18\nFIELD • ENCOUNTER\nOLD TEMPLE\n MEMO NEW 2\nJOURNEY • 37 STEPS\n▲\n◀\n◆\n▶\n▼\nB\nMENU\nA\nCHECK",
+      "encounterKind": "wild"
+    },
+    {
+      "name": "battle-start",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "ENCOUNTER\nHOLLOW MONK\nTURN 1\nHOLLOW MONK\nHP 31/31\nPIERCEの前だけ静かに頭を下げる。\nNOW\n!\nPALM\n4\n通常攻撃\nNEXT\n>>\nEMPTY SPEAR\n6\nBAR無視\nHP\n20/20\nBAR\n0/30\nFREE\n0\nENEMY WAIT\nNEXT DROP MAP\n▲\n◆\n1▼\nⅡ\nⅡ\n2▼\n◆\n◆\n3▼\n▲\n◆\n4▼\n♥\n◆\n5▼\n◆\n◆\n6▼\nⅡ\nSKIP\nⅡ\nSKIP\n▲\nATK\n♥\nHEAL\n♥\nHEAL\nⅡ\nSKIP\nⅡ\nSKIP\n◆\nBAR\n◆\nBAR\n♥\nHEAL\n♥\nHEAL\nⅡ\nSKIP\n◆\nBAR\n♥\nHEAL\n▲\nATK\n▲\nATK\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\nⅡ\nSKIP\n♥\nHEAL\n▲\nATK\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\n◆\nBAR\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\n▲\nATK\n▲\nATK\n▲\nATK\n◆\nBAR\n♥\nHEAL\nATK ×3\nHEAL ×4\nBAR ×4\nSKIP ×3\nB • RPG COMMAND"
+    },
+    {
+      "name": "battle-late",
+      "bodyScrollWidth": 402,
+      "bodyScrollHeight": 874,
+      "innerWidth": 402,
+      "innerHeight": 874,
+      "text": "ENCOUNTER\nHOLLOW MONK\nTURN 1\nHOLLOW MONK\nHP 31/31\nPIERCEの前だけ静かに頭を下げる。\nNOW\n!\nPALM\n4\n通常攻撃\nNEXT\n>>\nEMPTY SPEAR\n6\nBAR無視\nHP\n20/20\nBAR\n0/30\nFREE\n0\nENEMY WAIT\nNEXT DROP MAP\n▲\n◆\n1▼\nⅡ\nⅡ\n2▼\n◆\n◆\n3▼\n▲\n◆\n4▼\n♥\n◆\n5▼\n◆\n◆\n6▼\nⅡ\nSKIP\nⅡ\nSKIP\n▲\nATK\n♥\nHEAL\n♥\nHEAL\nⅡ\nSKIP\nⅡ\nSKIP\n◆\nBAR\n◆\nBAR\n♥\nHEAL\n♥\nHEAL\nⅡ\nSKIP\n◆\nBAR\n♥\nHEAL\n▲\nATK\n▲\nATK\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\nⅡ\nSKIP\n♥\nHEAL\n▲\nATK\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\n◆\nBAR\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\n▲\nATK\n▲\nATK\n▲\nATK\n◆\nBAR\n♥\nHEAL\nATK ×3\nHEAL ×4\nBAR ×4\nSKIP ×3\nB • RPG COMMAND"
+    }
+  ],
+  "battleTurns": [],
+  "errors": [],
+  "finalSave": {
+    "version": 1,
+    "playerName": "LIO",
+    "level": 1,
+    "exp": 0,
+    "hp": 20,
+    "maxHp": 20,
+    "gold": 18,
+    "mapId": "oldTemple",
+    "position": {
+      "x": 8,
+      "y": 11
+    },
+    "direction": "down",
+    "lastInn": {
+      "mapId": "hearthVillage",
+      "position": {
+        "x": 8,
+        "y": 10
+      }
+    },
+    "inventory": [
+      {
+        "id": "herb",
+        "count": 2
+      },
+      {
+        "id": "smoke",
+        "count": 1
+      }
+    ],
+    "inventorySlots": 4,
+    "equipmentOwned": [
+      "travellerCoat"
+    ],
+    "equipment": {
+      "weapon": null,
+      "armor": null,
+      "charm": null
+    },
+    "techniques": [],
+    "techniqueSlots": 2,
+    "memos": [
+      {
+        "id": "journey",
+        "title": "最初の旅",
+        "text": "村の長から北のOld Templeについて聞く。",
+        "read": false
+      },
+      {
+        "id": "old-temple",
+        "title": "古寺の橋印",
+        "text": "Hearth Villageの北、Old Templeに崩れた橋を起こす印がある。",
+        "read": false
+      }
+    ],
+    "flags": [
+      "story:openingSeen",
+      "story:begun"
+    ],
+    "openedChests": [],
+    "defeatedEncounters": [],
+    "defeatedEnemies": {},
+    "releasedEnemies": {},
+    "battleLog": [],
+    "steps": 37,
+    "playSeconds": 10,
+    "encounterMeter": 11,
+    "settings": {
+      "music": true,
+      "sfx": true
+    }
+  },
+  "finalText": "ENCOUNTER\nHOLLOW MONK\nTURN 1\nHOLLOW MONK\nHP 31/31\nPIERCEの前だけ静かに頭を下げる。\nNOW\n!\nPALM\n4\n通常攻撃\nNEXT\n>>\nEMPTY SPEAR\n6\nBAR無視\nHP\n20/20\nBAR\n0/30\nFREE\n0\nENEMY WAIT\nNEXT DROP MAP\n▲\n◆\n1▼\nⅡ\nⅡ\n2▼\n◆\n◆\n3▼\n▲\n◆\n4▼\n♥\n◆\n5▼\n◆\n◆\n6▼\nⅡ\nSKIP\nⅡ\nSKIP\n▲\nATK\n♥\nHEAL\n♥\nHEAL\nⅡ\nSKIP\nⅡ\nSKIP\n◆\nBAR\n◆\nBAR\n♥\nHEAL\n♥\nHEAL\nⅡ\nSKIP\n◆\nBAR\n♥\nHEAL\n▲\nATK\n▲\nATK\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\nⅡ\nSKIP\n♥\nHEAL\n▲\nATK\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\n◆\nBAR\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\n▲\nATK\n▲\nATK\n▲\nATK\n◆\nBAR\n♥\nHEAL\nATK ×3\nHEAL ×4\nBAR ×4\nSKIP ×3\nB • RPG COMMAND"
+}
