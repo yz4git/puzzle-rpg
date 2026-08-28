@@ -249,3 +249,10 @@ are complete.
 - Added destination-type accenting for towns, training schools, dungeons and the world map while keeping the field renderer and map data unchanged.
 - Locked movement, interaction and menu input only during the short transition window to prevent double portal activation or accidental post-transition inputs.
 - Portal requirements, target coordinates, encounter reset, last-inn updates, save behavior, map topology and progression flags remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 26 — Discovery and acquisition presentation
+- Replaced generic TREASURE dialogue for field chests with a dedicated discovery ceremony that distinguishes GOLD, ITEM and EQUIPMENT rewards while preserving the same tap-to-continue cadence.
+- Added discovery input locking so movement/menu actions cannot fire underneath the acquisition card; the next A/TAP dismisses it and immediately returns control to exploration.
+- Split battle-result acquisition rows into ITEM, EQUIPMENT and TECHNIQUE materials so training rewards and boss technique unlocks no longer read as identical text rows.
+- Chest contents, inventory limits, equipment ownership, reward formulas, technique grants, save data, encounter logic and Chapter Battle remain unchanged.

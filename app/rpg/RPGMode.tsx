@@ -27,6 +27,7 @@ type ServiceState =
   | null;
 type ResultState = { title: string; lines: string[]; ending?: boolean } | null;
 type AreaTransitionState = { phase: "depart" | "arrive"; targetName: string; targetKind: string; label: string } | null;
+type DiscoveryState = { kind: "gold" | "item" | "equipment"; kicker: string; name: string; detail: string } | null;
 
 const TILE = 16;
 const VIEW_W = 15;
@@ -1174,6 +1175,11 @@ function resultLineKind(line: string) {
   if (/失った|YOU AWAKEN/.test(line)) return "loss";
   return "story";
 }
+function resultAcquireKind(line: string) {
+  if (line.startsWith("技「")) return "technique";
+  if (Object.values(EQUIPMENT).some((equipment) => line.startsWith(equipment.name))) return "equipment";
+  return "item";
+}
 
 function worldEnemyTable(position: Vec2, danger: boolean) {
   if (position.x < 14) return danger ? ["copperBeetle", "forestWisp", "thornBat"] : ["mossSlime", "roadFang", "thornBat"];
@@ -1195,6 +1201,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [result, setResult] = useState<ResultState>(null);
   const [fieldReturn, setFieldReturn] = useState(false);
   const [areaTransition, setAreaTransition] = useState<AreaTransitionState>(null);
+  const [discovery, setDiscovery] = useState<DiscoveryState>(null);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
@@ -1250,7 +1257,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function move(direction: Direction) {
-    if (screen !== "overworld" || service || battle || result || areaTransition) return;
+    if (screen !== "overworld" || service || battle || result || areaTransition || discovery) return;
     const current = saveRef.current;
     const delta = DIR_DELTA[direction];
     const nextPosition = { x: current.position.x + delta.x, y: current.position.y + delta.y };
@@ -1309,6 +1316,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function interact() {
+    if (discovery) { setDiscovery(null); playSfx("uiSelect"); return; }
     if (areaTransition) return;
     if (screen === "dialogue" || screen === "event") { advanceDialogue(); return; }
     if (screen !== "overworld") return;
@@ -1321,15 +1329,18 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     if (fixed) { startBattle(fixed.enemyId, { fixedId: fixed.id, afterFlag: fixed.afterFlag }); return; }
     const chest = findAt(map.chests.filter((entry) => !save.openedChests.includes(entry.id) && hasFlag(save, entry.requireFlag)));
     if (chest) {
-      let text = "宝箱を開けた。";
+      let found: Exclude<DiscoveryState, null> = { kind: "item", kicker: "TREASURE FOUND", name: "TREASURE", detail: "宝箱を開けた。" };
+      if (chest.gold) found = { kind: "gold", kicker: "TREASURE FOUND", name: `${chest.gold} GOLD`, detail: "旅の資金を手に入れた。" };
+      if (chest.item) found = { kind: "item", kicker: "ITEM ACQUIRED", name: ITEMS[chest.item].name, detail: "ITEMを手に入れた。" };
+      if (chest.equipment) found = { kind: "equipment", kicker: "EQUIPMENT ACQUIRED", name: EQUIPMENT[chest.equipment].name, detail: "EQUIPMENTを手に入れた。" };
       commit((current) => {
         let next = { ...current, openedChests: addUnique(current.openedChests, chest.id) };
-        if (chest.gold) { next = { ...next, gold: next.gold + chest.gold }; text = `${chest.gold} GOLDを見つけた。`; }
-        if (chest.item) { next = giveItem(next, chest.item); text = `${ITEMS[chest.item].name}を見つけた。`; }
-        if (chest.equipment) { next = { ...next, equipmentOwned: addUnique(next.equipmentOwned, chest.equipment) }; text = `${EQUIPMENT[chest.equipment].name}を見つけた。`; }
+        if (chest.gold) next = { ...next, gold: next.gold + chest.gold };
+        if (chest.item) next = giveItem(next, chest.item);
+        if (chest.equipment) next = { ...next, equipmentOwned: addUnique(next.equipmentOwned, chest.equipment) };
         saveGame(next); return next;
       });
-      openDialogue("TREASURE", [text]); playSfx("treasure"); return;
+      setDiscovery(found); playSfx("treasure"); return;
     }
     const portal = findAt(map.portals);
     if (portal) {
@@ -1501,7 +1512,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     playSfx("uiConfirm");
   }
 
-  function openMenu() { if (screen === "overworld" && !areaTransition) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
+  function openMenu() { if (screen === "overworld" && !areaTransition && !discovery) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
   function closeMenu() { setService(null); setScreen("overworld"); playSfx("uiSelect"); }
 
   function toggleSetting(key: "music" | "sfx") {
@@ -1740,6 +1751,11 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       {areaTransition ? <div className={styles.areaTransition} data-phase={areaTransition.phase} data-kind={areaTransition.targetKind} role="status" aria-live="polite">
         <span>{areaTransition.phase === "depart" ? "TRAVEL" : "AREA"}</span><strong>{areaTransition.targetName}</strong><small>{areaTransition.label}</small>
       </div> : null}
+      {discovery ? <div className={styles.discoveryOverlay} data-kind={discovery.kind} onPointerDown={(event) => { event.preventDefault(); setDiscovery(null); playSfx("uiSelect"); }}>
+        <div className={styles.discoveryCard} data-kind={discovery.kind}>
+          <span>{discovery.kicker}</span><i aria-hidden="true">{discovery.kind === "gold" ? "G" : discovery.kind === "equipment" ? "E" : "I"}</i><strong>{discovery.name}</strong><p>{discovery.detail}</p><small>A / TAP • CONTINUE</small>
+        </div>
+      </div> : null}
       <header className={styles.hud}>
         <div><span>RPG MODE</span><strong>{map.name}</strong></div>
         <div><span>LV {save.level}</span><strong>HP {save.hp}/{save.maxHp}</strong></div>
@@ -1809,7 +1825,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         <span className={styles.resultEyebrow}>RPG MODE • BATTLE REPORT</span>
         <strong>{result.title}</strong>
         <div className={styles.resultStatus}><i><small>LV</small><b>{save.level}</b></i><i><small>HP</small><b>{save.hp}/{save.maxHp}</b></i><i><small>GOLD</small><b>{save.gold}</b></i></div>
-        <div className={styles.resultLines}>{result.lines.map((line, index) => <p data-kind={resultLineKind(line)} style={{ "--result-index": index } as Record<string, number>} key={`${index}-${line}`}>{line}</p>)}</div>
+        <div className={styles.resultLines}>{result.lines.map((line, index) => <p data-kind={resultLineKind(line)} data-acquire={resultLineKind(line) === "acquire" ? resultAcquireKind(line) : undefined} style={{ "--result-index": index } as Record<string, number>} key={`${index}-${line}`}>{line}</p>)}</div>
         <button type="button" onClick={closeResult}>A • CONTINUE</button>
       </div></div> : null}
 
