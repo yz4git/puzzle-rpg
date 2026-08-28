@@ -26,6 +26,7 @@ type ServiceState =
   | { kind: "save"; title: string }
   | null;
 type ResultState = { title: string; lines: string[]; ending?: boolean } | null;
+type AreaTransitionState = { phase: "depart" | "arrive"; targetName: string; targetKind: string; label: string } | null;
 
 const TILE = 16;
 const VIEW_W = 15;
@@ -1193,6 +1194,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [battle, setBattle] = useState<BattleContext | null>(null);
   const [result, setResult] = useState<ResultState>(null);
   const [fieldReturn, setFieldReturn] = useState(false);
+  const [areaTransition, setAreaTransition] = useState<AreaTransitionState>(null);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
@@ -1200,6 +1202,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const atlasImages = useRef<Partial<Record<AtlasImageKey, HTMLImageElement>>>({});
   const afterDialogue = useRef<null | (() => void)>(null);
   const heldTimer = useRef<number | null>(null);
+  const transitionTimer = useRef<number | null>(null);
+  const arrivalTimer = useRef<number | null>(null);
   const importRef = useRef<HTMLInputElement | null>(null);
   const saveRef = useRef(save);
 
@@ -1246,7 +1250,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function move(direction: Direction) {
-    if (screen !== "overworld" || service || battle || result) return;
+    if (screen !== "overworld" || service || battle || result || areaTransition) return;
     const current = saveRef.current;
     const delta = DIR_DELTA[direction];
     const nextPosition = { x: current.position.x + delta.x, y: current.position.y + delta.y };
@@ -1305,6 +1309,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function interact() {
+    if (areaTransition) return;
     if (screen === "dialogue" || screen === "event") { advanceDialogue(); return; }
     if (screen !== "overworld") return;
     const npc = findAt(mapNpcs);
@@ -1338,14 +1343,22 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
   function transitionMap(targetMap: string, position: Vec2, label: string) {
     const destination = MAPS[targetMap];
-    if (!destination) return;
+    if (!destination || areaTransition) return;
     primeAudio(); playSfx("door");
-    const isTown = destination.kind === "town";
-    commit((current) => {
-      const next = { ...current, mapId: targetMap, position, direction: "up" as Direction, encounterMeter: encounterReset(current), lastInn: isTown ? { mapId: targetMap, position } : current.lastInn };
-      saveGame(next); return next;
-    });
-    setNotice(label);
+    const visual = { targetName: destination.name, targetKind: destination.kind, label };
+    setAreaTransition({ ...visual, phase: "depart" });
+    if (transitionTimer.current) window.clearTimeout(transitionTimer.current);
+    if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current);
+    transitionTimer.current = window.setTimeout(() => {
+      const isTown = destination.kind === "town";
+      commit((current) => {
+        const next = { ...current, mapId: targetMap, position, direction: "up" as Direction, encounterMeter: encounterReset(current), lastInn: isTown ? { mapId: targetMap, position } : current.lastInn };
+        saveGame(next); return next;
+      });
+      setNotice(label);
+      setAreaTransition({ ...visual, phase: "arrive" });
+      arrivalTimer.current = window.setTimeout(() => setAreaTransition(null), 420);
+    }, 180);
   }
 
   function startBattle(enemyId: string, context: Omit<BattleContext, "enemyId"> = {}) {
@@ -1488,7 +1501,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     playSfx("uiConfirm");
   }
 
-  function openMenu() { if (screen === "overworld") { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
+  function openMenu() { if (screen === "overworld" && !areaTransition) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
   function closeMenu() { setService(null); setScreen("overworld"); playSfx("uiSelect"); }
 
   function toggleSetting(key: "music" | "sfx") {
@@ -1713,7 +1726,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     context.setTransform(1, 0, 0, 1, 0, 0);
   }, [atlasVersion, map, mapNpcs, save, visibleFixed, walkFrame]);
 
-  useEffect(() => () => { stopHold(); stopRpgMusic(); setSfxEnabled(true); }, []);
+  useEffect(() => () => { stopHold(); if (transitionTimer.current) window.clearTimeout(transitionTimer.current); if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current); stopRpgMusic(); setSfxEnabled(true); }, []);
 
   const nearPortal = findAt(map.portals);
   const terrainLabel = isRoadTile(currentTile) ? "ROAD • SAFE" : isDangerTile(currentTile) ? "DANGER • HIGH ENCOUNTER" : map.kind === "town" ? "TOWN • SAFE" : map.kind === "training" ? "TRAINING • SAFE" : "FIELD • ENCOUNTER";
@@ -1723,7 +1736,10 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const endingLines = save.releasedEnemies && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 4 ? STORY_TEXT.endingMercy : STORY_TEXT.endingForce;
 
   return (
-    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-returning={fieldReturn ? "true" : "false"}>
+    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-returning={fieldReturn ? "true" : "false"} data-area-phase={areaTransition?.phase ?? "none"}>
+      {areaTransition ? <div className={styles.areaTransition} data-phase={areaTransition.phase} data-kind={areaTransition.targetKind} role="status" aria-live="polite">
+        <span>{areaTransition.phase === "depart" ? "TRAVEL" : "AREA"}</span><strong>{areaTransition.targetName}</strong><small>{areaTransition.label}</small>
+      </div> : null}
       <header className={styles.hud}>
         <div><span>RPG MODE</span><strong>{map.name}</strong></div>
         <div><span>LV {save.level}</span><strong>HP {save.hp}/{save.maxHp}</strong></div>

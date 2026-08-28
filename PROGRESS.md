@@ -243,3 +243,9 @@ are complete.
 - Added presentation-only story/page data attributes so event dialogue can be staged differently from ordinary conversations without touching dialogue order, callbacks or save flags.
 - Rebuilt the ending into a dedicated SFC finale scene with pixel horizon, framed narrative page, stronger ENDING/THE END hierarchy and a distinct final-state treatment.
 - Opening text, dialogue content/order, mercy/force ending selection, ending progression, title return and save behavior remain unchanged.
+
+## SFC Visual Reconstruction Pass 25 — Area transitions
+- Replaced instant portal swaps with a presentation-only 180ms departure shutter, map commit, then a 420ms arrival plate showing the destination name and existing portal label.
+- Added destination-type accenting for towns, training schools, dungeons and the world map while keeping the field renderer and map data unchanged.
+- Locked movement, interaction and menu input only during the short transition window to prevent double portal activation or accidental post-transition inputs.
+- Portal requirements, target coordinates, encounter reset, last-inn updates, save behavior, map topology and progression flags remain unchanged.
