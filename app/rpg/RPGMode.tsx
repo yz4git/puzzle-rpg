@@ -1750,8 +1750,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         </div>
       </section>
 
-      {(screen === "dialogue" || screen === "event") && dialogue.length ? <div className={styles.dialogueOverlay} onPointerDown={(event) => { event.preventDefault(); advanceDialogue(); }}>
-        <div className={styles.dialogueBox} data-portrait={Boolean(speakerNpcCell)}>
+      {(screen === "dialogue" || screen === "event") && dialogue.length ? <div className={styles.dialogueOverlay} data-story={screen === "event" ? "event" : "dialogue"} data-page={`${dialogueIndex + 1}/${dialogue.length}`} onPointerDown={(event) => { event.preventDefault(); advanceDialogue(); }}>
+        <div className={styles.dialogueBox} data-story={screen === "event" ? "event" : "dialogue"} data-portrait={Boolean(speakerNpcCell)}>
           {speakerNpcCell ? <i className={styles.dialoguePortrait} aria-hidden="true" data-sprite={speakerNpc?.sprite} style={{
             backgroundImage: `url(${RPG_ASSETS.npcs})`,
             // The field atlas stores complete 96x128 actors. Dialogue uses a centered
@@ -1797,7 +1797,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         <button type="button" onClick={closeResult}>A • CONTINUE</button>
       </div></div> : null}
 
-      {screen === "ending" ? <div className={styles.ending}><span>PRISM ROAD</span><strong>{endingIndex < endingLines.length ? "ENDING" : "THE END"}</strong><p>{endingLines[Math.min(endingIndex, endingLines.length - 1)]}</p>{endingIndex < endingLines.length - 1 ? <button type="button" onClick={() => setEndingIndex((index) => index + 1)}>A • NEXT</button> : <button type="button" onClick={() => { commit((current) => ({ ...current, flags: addUnique(current.flags, "ending:seen") }), true); onExit(); }}>TITLEへ</button>}<small>LV {save.level} • {Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0)} RELEASES • {Math.floor(save.playSeconds / 60)} MIN</small></div> : null}
+      {screen === "ending" ? <div className={styles.ending} data-stage={endingIndex < endingLines.length - 1 ? "story" : "final"}><span>PRISM ROAD</span><strong>{endingIndex < endingLines.length ? "ENDING" : "THE END"}</strong><p>{endingLines[Math.min(endingIndex, endingLines.length - 1)]}</p>{endingIndex < endingLines.length - 1 ? <button type="button" onClick={() => setEndingIndex((index) => index + 1)}>A • NEXT</button> : <button type="button" onClick={() => { commit((current) => ({ ...current, flags: addUnique(current.flags, "ending:seen") }), true); onExit(); }}>TITLEへ</button>}<small>LV {save.level} • {Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0)} RELEASES • {Math.floor(save.playSeconds / 60)} MIN</small></div> : null}
     </main>
   );
 }

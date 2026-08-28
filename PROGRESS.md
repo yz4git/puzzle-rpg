@@ -236,3 +236,10 @@ are complete.
 - Converted RPG MODE and CHAPTER BATTLE from stacked web buttons into two numbered game-mode slots with distinct gold/cyan identity and stronger press feedback.
 - Rebuilt the RPG continue/new-game screen as a save-slot window with CONTINUE visually prioritized while preserving the existing save metadata and mode flow.
 - Title music, save loading, mode selection, Chapter Battle entry and RPG initialization remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 24 — Story presentation
+- Split story presentation into two visual languages without changing text or progression: regular NPC dialogue remains field-anchored with stronger portrait/name hierarchy, while the opening EVENT becomes a centered chapter-style story window.
+- Added presentation-only story/page data attributes so event dialogue can be staged differently from ordinary conversations without touching dialogue order, callbacks or save flags.
+- Rebuilt the ending into a dedicated SFC finale scene with pixel horizon, framed narrative page, stronger ENDING/THE END hierarchy and a distinct final-state treatment.
+- Opening text, dialogue content/order, mercy/force ending selection, ending progression, title return and save behavior remain unchanged.
