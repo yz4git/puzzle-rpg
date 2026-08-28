@@ -5,6 +5,7 @@ on:
     branches:
       - visual/reconstruction-pass-sfc4
     paths:
+      - app/rpg/assets.ts
       - scripts/apply-sfc-visual-pass4-landmarks.py
       - .github/workflows/visual-reconstruction-sfc4-landmarks.yml
 
