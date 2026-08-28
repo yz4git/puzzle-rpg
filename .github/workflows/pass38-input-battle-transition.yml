@@ -1,0 +1,57 @@
+name: RPG Input and Battle Transition Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pass38_input_battle_transition.py'
+      - '.github/workflows/pass38-input-battle-transition.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-commit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply input and transition fix
+        run: python3 scripts/pass38_input_battle_transition.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Input lifecycle regression tests
+        run: node --import tsx --test tests/rpg-field-input-stability.test.ts tests/rpg-lifecycle-stability.test.ts
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Install browser QA runtime
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start local game
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/input-qa-vite.log 2>&1 &
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/input-qa-vite.log
+          exit 1
+      - name: iPhone D-pad and battle transition QA
+        run: node scripts/pass38_input_qa.mjs
+      - name: Commit verified fix
+        run: |
+          printf '%s\n' '' '## RPG Field Control / Battle Entry Usability Pass' '- Enlarged the field D-pad to 50px cardinal touch cells on normal portrait screens and never below 44px on short iPhones.' '- Added a synchronous movement lock so the exact encounter-triggering step cancels held repeat before the delayed battle cue; stale callbacks cannot move the player behind combat.' '- Fixed startHold so it cannot recreate a repeat interval after move() synchronously rolls an encounter.' '- Strengthened field-to-battle presentation with full-screen pixel shutters, a prism cross burst and longer encounter-class-specific timing while preserving battle rules.' '- Added source regression tests and an iPhone-size real-pointer browser QA that holds UP through a forced encounter and verifies the saved position remains exactly on the triggering tile.' '- Encounter odds, map topology, enemy stats, rewards, save format and puzzle battle math remain unchanged.' >> PROGRESS.md
+          rm -f scripts/pass38_input_battle_transition.py scripts/pass38_input_qa.mjs .github/workflows/pass38-input-battle-transition.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Improve RPG field controls and battle entry'
+          git push
