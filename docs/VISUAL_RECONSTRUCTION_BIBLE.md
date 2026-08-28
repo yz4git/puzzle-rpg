@@ -45,3 +45,12 @@ Original late-16-bit console JRPG pixel art, SNES-era visual richness, strict pi
 4. Town facade/prop pack.
 5. Dedicated pixel battle background strips replacing CSS prototype scenery.
 6. TALK reaction frames for high-value enemies and bosses.
+
+
+## Phase 2 asset reconstruction
+- Battle backdrops are dedicated 384x96 nearest-neighbor PNG strips, not CSS placeholder scenery.
+- Seven scene identities: field, town, marsh, tower, fortress, dungeon, prism citadel.
+- Overworld gets a second-pass edge stitch for road shoulders, water shore highlights, forest walls, and danger-ground rims.
+- Town facade reuse is broken up with deterministic signboard/window details.
+- Hero/NPC display silhouettes are slightly larger while collision remains anchored to the original 16x16 gameplay tile.
+- TALK forces the enemy reaction frame and a short stepped reaction motion.

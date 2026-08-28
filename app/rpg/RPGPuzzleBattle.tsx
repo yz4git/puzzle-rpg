@@ -134,9 +134,10 @@ function useOne(inventory: InventoryStack[], index: number) {
 function delay(ms: number) { return new Promise<void>((resolve) => window.setTimeout(resolve, ms)); }
 
 function battleScene(mapId: string) {
+  if (/prismCitadel/i.test(mapId)) return "citadel";
   if (/crimson|marsh|reed/i.test(mapId)) return "marsh";
   if (/mirror|hour|spire|tower/i.test(mapId)) return "tower";
-  if (/iron|citadel/i.test(mapId)) return "fortress";
+  if (/iron/i.test(mapId)) return "fortress";
   if (/temple|void/i.test(mapId)) return "dungeon";
   if (/village|town|hamlet|hearth/i.test(mapId)) return "town";
   return "field";
@@ -522,8 +523,10 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     }
   }, [effectiveEnemy.hp, enemy.boss, enemy.phaseDialogue, enemyHp, phase, save.equipment.armor, training]);
 
-  const enemyFrame: EnemySpriteFrame = phase > 1
-    ? "phase"
+  const enemyFrame: EnemySpriteFrame = talkOverlay
+    ? "reaction"
+    : phase > 1
+      ? "phase"
     : feedback.includes("HP")
       ? "attack"
       : feedback.startsWith("-")
@@ -539,7 +542,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   } : undefined;
 
   return (
-    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"} data-scene={battleScene(save.mapId)}>
+    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"} data-scene={battleScene(save.mapId)} data-talking={talkOverlay ? "true" : "false"}>
       <div className={styles.battleBackdrop} aria-hidden="true"><i /><i /><i /></div>
       {talkOverlay ? <div className={styles.talkMoment}><span>{talkOverlay.speaker}</span><p>{talkOverlay.text}</p><small>TALK</small></div> : null}
       {feedback ? <div className={styles.feedback}>{feedback}</div> : null}
