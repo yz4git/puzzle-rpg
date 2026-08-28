@@ -175,3 +175,8 @@ are complete.
 - Enlarged normal/boss enemy presentation without reducing the 360px short-screen puzzle board.
 - Reframed enemy information as a denser in-world window and added a stepped TALK reaction treatment driven by the existing reaction sprite state.
 - Battle math, panel rules, NEXT queues, intents, save data and encounter tables are unchanged.
+
+## SFC Visual Reconstruction Pass 14 — Enemy reaction readability
+- Reframed TALK as a high-contrast ENEMY REACTION window with larger text, a scene-tinted accent rail and stronger SFC window hierarchy.
+- Temporarily dims NOW/NEXT and status panels only while the existing 900ms TALK reaction is visible, then restores them unchanged.
+- TALK turn cost, duration, enemy response, alternate-resolution rules and battle math are unchanged.
