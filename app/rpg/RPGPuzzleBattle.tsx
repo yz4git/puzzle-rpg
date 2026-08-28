@@ -171,6 +171,8 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   const [talkOverlay, setTalkOverlay] = useState<{ speaker: string; text: string } | null>(null);
   const finished = useRef(false);
   const feedbackSeq = useRef(0);
+  const finishTimer = useRef<number | null>(null);
+  const feedbackTimer = useRef<number | null>(null);
 
   const hasTechnique = (id: TechniqueId) => save.techniques.includes(id);
   const intent = useMemo(() => adjustedIntent(intentStep, enemyHp, hp), [intentStep, enemyHp, hp, drainWeakened, phase]);
@@ -205,17 +207,21 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (finished.current) return;
     finished.current = true;
     setResolving(true);
-    window.setTimeout(() => onFinish({
-      outcome,
-      enemyId: enemy.id,
-      hp: Math.max(0, nextHp),
-      inventory: nextInventory,
-      exp: !training ? outcome === "victory" ? enemy.exp : outcome === "release" ? Math.max(1, Math.floor(enemy.exp * .35)) : 0 : 0,
-      gold: !training ? outcome === "victory" ? enemy.gold : outcome === "release" ? Math.floor(enemy.gold * .2) : 0 : 0,
-      setFlags: [],
-      stats: nextStats,
-      ...options,
-    }), outcome === "release" ? 620 : outcome === "victory" ? 480 : outcome === "defeat" ? 420 : 360);
+    if (finishTimer.current !== null) window.clearTimeout(finishTimer.current);
+    finishTimer.current = window.setTimeout(() => {
+      finishTimer.current = null;
+      onFinish({
+        outcome,
+        enemyId: enemy.id,
+        hp: Math.max(0, nextHp),
+        inventory: nextInventory,
+        exp: !training ? outcome === "victory" ? enemy.exp : outcome === "release" ? Math.max(1, Math.floor(enemy.exp * .35)) : 0 : 0,
+        gold: !training ? outcome === "victory" ? enemy.gold : outcome === "release" ? Math.floor(enemy.gold * .2) : 0 : 0,
+        setFlags: [],
+        stats: nextStats,
+        ...options,
+      });
+    }, outcome === "release" ? 620 : outcome === "victory" ? 480 : outcome === "defeat" ? 420 : 360);
   }
 
   function showEffect(text: string, kind: BattleImpact = "skill", duration = 620) {
@@ -223,7 +229,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     const seq = feedbackSeq.current;
     setFeedback(text);
     setImpact(kind);
-    window.setTimeout(() => {
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = window.setTimeout(() => {
+      feedbackTimer.current = null;
       if (feedbackSeq.current !== seq) return;
       setFeedback("");
       setImpact(null);
@@ -519,6 +527,11 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     };
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
+  }, []);
+
+  useEffect(() => () => {
+    if (finishTimer.current !== null) window.clearTimeout(finishTimer.current);
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
   }, []);
 
   useEffect(() => {

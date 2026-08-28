@@ -326,3 +326,10 @@ are complete.
 - Hardened save normalization: blocked/water coordinates recover to the nearest walkable tile; duplicate inventory stacks are merged; invalid/duplicate item, equipment, technique, flag, chest and encounter data are sanitized and bounded.
 - Added a permanent targeted RPG save-integrity regression test covering corrupted-primary recovery, future-version protection, backup rotation and storage-write failure safety.
 - Safari/private-mode/quota write failures remain non-fatal; gameplay balance, encounter tables, rewards, map topology and battle math are unchanged.
+
+## Release Candidate Pass 37 — Long Session / Timer Stability
+- Added explicit ownership for delayed field encounter, held-input, battle finish and battle feedback timers so transient callbacks cannot outlive their owning RPG screen.
+- Safari pagehide/hidden lifecycle now releases held d-pad repeat immediately, while play-time accumulation pauses when the document is backgrounded.
+- Replaced per-render RPG keyboard listener churn with one stable listener backed by a current handler ref, and release atlas image onload handlers/references on RPGMode unmount.
+- Added targeted lifecycle regression tests plus a Chromium iPhone-size soak covering repeated menu cycles, 120 real touch taps, pagehide during a held touch and 12 RPG mount/unmount cycles with interval and heap-growth checks.
+- Gameplay balance, encounter odds, map topology, rewards, save progression and battle math remain unchanged.

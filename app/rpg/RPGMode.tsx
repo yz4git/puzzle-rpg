@@ -1472,6 +1472,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const arrivalTimer = useRef<number | null>(null);
   const encounterTimer = useRef<number | null>(null);
   const dangerTimer = useRef<number | null>(null);
+  const stepEncounterTimer = useRef<number | null>(null);
+  const keyboardHandlerRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
   const importRef = useRef<HTMLInputElement | null>(null);
   const saveRef = useRef(save);
 
@@ -1546,7 +1548,10 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     if (enteringDanger) {
       setDangerWarning(map.kind === "danger" ? map.name : "DANGER ZONE");
       if (dangerTimer.current) window.clearTimeout(dangerTimer.current);
-      dangerTimer.current = window.setTimeout(() => setDangerWarning(null), 760);
+      dangerTimer.current = window.setTimeout(() => {
+        dangerTimer.current = null;
+        setDangerWarning(null);
+      }, 760);
     }
     const safe = isRoadTile(code) || map.kind === "town" || map.kind === "training";
     let nextMeter = current.encounterMeter;
@@ -1557,7 +1562,11 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     playSfx("step");
     if (shouldEncounter) {
       saveGame(updated);
-      window.setTimeout(() => startBattle(chooseEncounter(nextPosition, danger), {}, danger ? "danger" : "wild"), 90);
+      if (stepEncounterTimer.current !== null) window.clearTimeout(stepEncounterTimer.current);
+      stepEncounterTimer.current = window.setTimeout(() => {
+        stepEncounterTimer.current = null;
+        startBattle(chooseEncounter(nextPosition, danger), {}, danger ? "danger" : "wild");
+      }, 90);
     }
   }
 
@@ -1639,6 +1648,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     if (transitionTimer.current) window.clearTimeout(transitionTimer.current);
     if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current);
     transitionTimer.current = window.setTimeout(() => {
+      transitionTimer.current = null;
       const isTown = destination.kind === "town";
       commit((current) => {
         const next = { ...current, mapId: targetMap, position, direction: "up" as Direction, encounterMeter: encounterReset(current), lastInn: isTown ? { mapId: targetMap, position } : current.lastInn };
@@ -1646,7 +1656,10 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       });
       setNotice(label);
       setAreaTransition({ ...visual, phase: "arrive" });
-      arrivalTimer.current = window.setTimeout(() => setAreaTransition(null), 420);
+      arrivalTimer.current = window.setTimeout(() => {
+        arrivalTimer.current = null;
+        setAreaTransition(null);
+      }, 420);
     }, 180);
   }
 
@@ -1660,6 +1673,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     primeAudio(); playSfx("battleStart"); saveGame(saveRef.current); setResult(null); setEncounterCue({ enemyId, kind, title, subtitle, context });
     if (encounterTimer.current) window.clearTimeout(encounterTimer.current);
     encounterTimer.current = window.setTimeout(() => {
+      encounterTimer.current = null;
       setEncounterCue(null); setBattle({ enemyId, ...context }); setScreen("battle");
     }, delay);
   }
@@ -1813,22 +1827,33 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
   function stopHold() { if (heldTimer.current !== null) window.clearInterval(heldTimer.current); heldTimer.current = null; }
 
+  keyboardHandlerRef.current = (event: KeyboardEvent) => {
+    const key = event.key.toLowerCase();
+    if (screen === "dialogue" || screen === "event") { if (["enter", " ", "a"].includes(key)) { event.preventDefault(); advanceDialogue(); } return; }
+    if (screen === "result" && key === "enter") { closeResult(); return; }
+    if (screen !== "overworld") { if (key === "escape" || key === "b") closeMenu(); return; }
+    const direction = key === "arrowup" || key === "w" ? "up" : key === "arrowdown" || key === "s" ? "down" : key === "arrowleft" ? "left" : key === "arrowright" || key === "d" ? "right" : null;
+    if (direction) { event.preventDefault(); move(direction); }
+    else if (key === "a" || key === "enter" || key === " ") { event.preventDefault(); interact(); }
+    else if (key === "b" || key === "escape") { event.preventDefault(); openMenu(); }
+  };
+
   useEffect(() => {
     saveRef.current = save;
   }, [save]);
 
   useEffect(() => {
     // iOS Safari may suspend or discard a tab without another gameplay event.
-    // Persist the latest in-memory save at lifecycle boundaries; pagehide also
-    // fires on reload/navigation, while visibilitychange covers app switching.
+    // Persist the latest state and release held input before backgrounding.
     const persistCurrentSave = () => saveGame(saveRef.current);
+    const handlePageHide = () => { stopHold(); persistCurrentSave(); };
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") persistCurrentSave();
+      if (document.visibilityState === "hidden") { stopHold(); persistCurrentSave(); }
     };
-    window.addEventListener("pagehide", persistCurrentSave);
+    window.addEventListener("pagehide", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
-      window.removeEventListener("pagehide", persistCurrentSave);
+      window.removeEventListener("pagehide", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
@@ -1852,7 +1877,11 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       image.src = src;
       atlasImages.current[key] = image;
     }
-    return () => { active = false; };
+    return () => {
+      active = false;
+      for (const image of Object.values(atlasImages.current)) if (image) image.onload = null;
+      atlasImages.current = {};
+    };
   }, []);
 
   useEffect(() => {
@@ -1880,24 +1909,22 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }, [screen, map.id, map.kind]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => commit((current) => ({ ...current, playSeconds: current.playSeconds + 10 })), 10_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      commit((current) => ({ ...current, playSeconds: current.playSeconds + 10 }));
+    }, 10_000);
     return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    const listener = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase();
-      if (screen === "dialogue" || screen === "event") { if (["enter", " ", "a"].includes(key)) { event.preventDefault(); advanceDialogue(); } return; }
-      if (screen === "result" && key === "enter") { closeResult(); return; }
-      if (screen !== "overworld") { if (key === "escape" || key === "b") closeMenu(); return; }
-      const direction = key === "arrowup" || key === "w" ? "up" : key === "arrowdown" || key === "s" ? "down" : key === "arrowleft" ? "left" : key === "arrowright" || key === "d" ? "right" : null;
-      if (direction) { event.preventDefault(); move(direction); }
-      else if (key === "a" || key === "enter" || key === " ") { event.preventDefault(); interact(); }
-      else if (key === "b" || key === "escape") { event.preventDefault(); openMenu(); }
-    };
+    if (screen !== "overworld" || areaTransition || discovery || encounterCue) stopHold();
+  }, [areaTransition, discovery, encounterCue, screen]);
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => keyboardHandlerRef.current(event);
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
-  });
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -2095,7 +2122,16 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     context.setTransform(1, 0, 0, 1, 0, 0);
   }, [atlasVersion, dungeonLifeFrame, fieldEnemyFrame, map, mapNpcs, save, townLifeFrame, visibleFixed, walkFrame]);
 
-  useEffect(() => () => { stopHold(); if (transitionTimer.current) window.clearTimeout(transitionTimer.current); if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current); if (encounterTimer.current) window.clearTimeout(encounterTimer.current); if (dangerTimer.current) window.clearTimeout(dangerTimer.current); stopRpgMusic(); setSfxEnabled(true); }, []);
+  useEffect(() => () => {
+    stopHold();
+    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current);
+    if (arrivalTimer.current !== null) window.clearTimeout(arrivalTimer.current);
+    if (encounterTimer.current !== null) window.clearTimeout(encounterTimer.current);
+    if (dangerTimer.current !== null) window.clearTimeout(dangerTimer.current);
+    if (stepEncounterTimer.current !== null) window.clearTimeout(stepEncounterTimer.current);
+    stopRpgMusic();
+    setSfxEnabled(true);
+  }, []);
 
   const nearPortal = findAt(map.portals);
   const terrainLabel = isRoadTile(currentTile) ? "ROAD • SAFE" : isDangerTile(currentTile) ? "DANGER • HIGH ENCOUNTER" : map.kind === "town" ? "TOWN • SAFE" : map.kind === "training" ? "TRAINING • SAFE" : "FIELD • ENCOUNTER";
