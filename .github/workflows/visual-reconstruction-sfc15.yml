@@ -1,0 +1,33 @@
+name: SFC Visual Reconstruction Pass 15
+on:
+  push:
+    branches: [visual/reconstruction-pass-sfc15]
+permissions:
+  contents: write
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply Pass 15 prism board housing
+        run: python scripts/apply-sfc-visual-pass15.py
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Review diff
+        run: git diff --check && git diff --stat
+      - name: Save Pass 15 implementation
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/rpg/RPGPuzzleBattle.module.css PROGRESS.md
+          git commit -m "Implement SFC visual reconstruction pass 15"
+          git push
