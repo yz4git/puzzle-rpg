@@ -28,7 +28,7 @@ jobs:
       - name: Apply landmark correction
         run: python scripts/apply-sfc-visual-pass4-landmarks.py
       - name: TypeScript check
-        run: npm run typecheck
+        run: npx tsc --noEmit
       - name: Vinext production build
         run: npm run build
       - name: Review diff
