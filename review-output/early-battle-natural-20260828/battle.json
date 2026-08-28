@@ -1,0 +1,123 @@
+{
+  "records": [
+    {
+      "before": {
+        "enemyName": "THORN BAT",
+        "turn": 1,
+        "enemyHp": {
+          "current": 14,
+          "max": 14
+        },
+        "playerHp": {
+          "current": 20,
+          "max": 20
+        },
+        "nowLabel": "WING CUT",
+        "nowPower": 2,
+        "nowDetail": "通常攻撃"
+      },
+      "largest": {
+        "ATK": 4,
+        "HEAL": 2,
+        "BAR": 4,
+        "SKIP": 6
+      },
+      "chosen": {
+        "type": "ATK",
+        "count": 4
+      },
+      "elapsedMs": 545,
+      "after": {
+        "enemyName": "",
+        "turn": 2,
+        "enemyHp": {
+          "current": 10,
+          "max": 14
+        },
+        "playerHp": {
+          "current": 18,
+          "max": 20
+        },
+        "nowLabel": "POLLEN SHIFT",
+        "nowPower": 2,
+        "nowDetail": "攻撃＋2枚変色"
+      },
+      "stillBattle": true
+    }
+  ],
+  "errors": [],
+  "finalSave": {
+    "version": 1,
+    "playerName": "LIO",
+    "level": 1,
+    "exp": 0,
+    "hp": 20,
+    "maxHp": 20,
+    "gold": 18,
+    "mapId": "oldTemple",
+    "position": {
+      "x": 8,
+      "y": 11
+    },
+    "direction": "down",
+    "lastInn": {
+      "mapId": "hearthVillage",
+      "position": {
+        "x": 8,
+        "y": 10
+      }
+    },
+    "inventory": [
+      {
+        "id": "herb",
+        "count": 2
+      },
+      {
+        "id": "smoke",
+        "count": 1
+      }
+    ],
+    "inventorySlots": 4,
+    "equipmentOwned": [
+      "travellerCoat"
+    ],
+    "equipment": {
+      "weapon": null,
+      "armor": null,
+      "charm": null
+    },
+    "techniques": [],
+    "techniqueSlots": 2,
+    "memos": [
+      {
+        "id": "journey",
+        "title": "最初の旅",
+        "text": "村の長から北のOld Templeについて聞く。",
+        "read": false
+      },
+      {
+        "id": "old-temple",
+        "title": "古寺の橋印",
+        "text": "Hearth Villageの北、Old Templeに崩れた橋を起こす印がある。",
+        "read": false
+      }
+    ],
+    "flags": [
+      "story:openingSeen",
+      "story:begun"
+    ],
+    "openedChests": [],
+    "defeatedEncounters": [],
+    "defeatedEnemies": {},
+    "releasedEnemies": {},
+    "battleLog": [],
+    "steps": 39,
+    "playSeconds": 0,
+    "encounterMeter": 14,
+    "settings": {
+      "music": true,
+      "sfx": true
+    }
+  },
+  "finalText": "ENCOUNTER\nTHORN BAT\nTURN 2\nTHORN BAT\nHP 10/14\n森の影へ隠れ、盤面の色を乱す。\nNOW\n<>\nPOLLEN SHIFT\n2\n攻撃＋2枚変色\nNEXT\n!\nWING CUT\n2\n通常攻撃\nHP\n18/20\nBAR\n0/30\nFREE\n0\nENEMY WAIT\nNEXT DROP MAP\n◆\n▲\n1▼\n▲\nⅡ\n2▼\nⅡ\n▲\n3▼\n◆\n♥\n4▼\n♥\n▲\n5▼\n◆\n♥\n6▼\n♥\nHEAL\n◆\nBAR\n▲\nATK\n▲\nATK\n♥\nHEAL\n◆\nBAR\n♥\nHEAL\n◆\nBAR\nⅡ\nSKIP\n♥\nHEAL\n◆\nBAR\n◆\nBAR\n▲\nATK\nⅡ\nSKIP\n♥\nHEAL\n▲\nATK\n♥\nHEAL\n◆\nBAR\n◆\nBAR\nⅡ\nSKIP\n▲\nATK\n♥\nHEAL\nⅡ\nSKIP\n♥\nHEAL\nⅡ\nSKIP\n◆\nBAR\nⅡ\nSKIP\n◆\nBAR\nⅡ\nSKIP\n♥\nHEAL\n◆\nBAR\nⅡ\nSKIP\nⅡ\nSKIP\nⅡ\nSKIP\n▲\nATK\n▲\nATK\nATK ×2\nHEAL ×2\nBAR ×4\nSKIP ×4\nB • RPG COMMAND"
+}
