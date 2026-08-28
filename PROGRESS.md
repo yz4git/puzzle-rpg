@@ -341,3 +341,12 @@ are complete.
 - Strengthened field-to-battle presentation with full-screen pixel shutters, a prism cross burst and longer encounter-class-specific timing while preserving battle rules.
 - Added source regression tests and an iPhone-size real-pointer browser QA that holds UP through a forced encounter and verifies the saved position remains exactly on the triggering tile.
 - Encounter odds, map topology, enemy stats, rewards, save format and puzzle battle math remain unchanged.
+\n\n## Early-game play review improvements — items 1–5
+- Reframed field exploration from a 15x13 landscape-leaning camera to a 13x13 portrait-friendly camera, making the visible field about 15% taller on iPhone without scaling or blurring the pixel art.
+- Rebuilt the oversized lower control deck into a fixed compact controller plus a useful field-status area. Primary iPhone direction cells remain 50px; smaller/shorter screens retain 44px+ targets.
+- Dialogue and event scenes now hide the field-status/controller layers behind the dialogue presentation so conversations no longer stack three competing UI bands.
+- Added compact NEXT GOAL / NEXT LV / ARMOR / ENCOUNTER field information to use the recovered portrait space with RPG-relevant information rather than empty controller chrome.
+- Old Temple no longer rolls HOLLOW MONK as a normal encounter; its early table is now MOSS SLIME / THORN BAT / COPPER BEETLE. Later dungeons retain HOLLOW MONK.
+- New games start with TRAVELLER COAT equipped and HP/MAX HP 22, making starter gear explicit and reducing the first-dungeon punishment spike.
+- Removed the title screen's large hero-to-mode-select dead zone while preserving the existing title art and touch target sizes.
+- No story flags, map collision/topology, boss placement, reward logic, battle rules, Chapter Battle logic, or existing-save format were changed.

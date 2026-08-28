@@ -32,7 +32,7 @@ type EncounterCueKind = "wild" | "danger" | "fixed" | "boss" | "trial";
 type EncounterCueState = { enemyId: string; kind: EncounterCueKind; title: string; subtitle: string; context: Omit<BattleContext, "enemyId"> } | null;
 
 const TILE = 16;
-const VIEW_W = 15;
+const VIEW_W = 13;
 const VIEW_H = 13;
 const WORLD_RENDER_SCALE = 2;
 type AtlasImageKey = "hero" | "npcs" | "field" | "town" | "dungeon" | "ui" | "enemyA" | "enemyB" | "bosses";
@@ -2153,13 +2153,16 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
   const nearPortal = findAt(map.portals);
   const terrainLabel = isRoadTile(currentTile) ? "ROAD • SAFE" : isDangerTile(currentTile) ? "DANGER • HIGH ENCOUNTER" : map.kind === "town" ? "TOWN • SAFE" : map.kind === "training" ? "TRAINING • SAFE" : "FIELD • ENCOUNTER";
+  const activeMemo = save.memos.find((memo) => !memo.read) ?? save.memos[save.memos.length - 1];
+  const armorLabel = save.equipment.armor ? EQUIPMENT[save.equipment.armor].name : "NO ARMOR";
+  const encounterLabel = map.kind === "town" || map.kind === "training" || isRoadTile(currentTile) ? "SAFE" : `${save.encounterMeter} STEP`;
 
   if (battle) return <RPGPuzzleBattle enemy={ENEMIES[battle.enemyId]!} save={save} training={battle.training} onFinish={finishBattle} />;
 
   const endingLines = save.releasedEnemies && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 4 ? STORY_TEXT.endingMercy : STORY_TEXT.endingForce;
 
   return (
-    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-returning={fieldReturn ? "true" : "false"} data-area-phase={areaTransition?.phase ?? "none"} data-encounter={encounterCue?.kind ?? "none"}>
+    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-screen={screen} data-returning={fieldReturn ? "true" : "false"} data-area-phase={areaTransition?.phase ?? "none"} data-encounter={encounterCue?.kind ?? "none"}>
       {areaTransition ? <div className={styles.areaTransition} data-phase={areaTransition.phase} data-kind={areaTransition.targetKind} role="status" aria-live="polite">
         <span>{areaTransition.phase === "depart" ? "TRAVEL" : "AREA"}</span><strong>{areaTransition.targetName}</strong><small>{areaTransition.label}</small>
       </div> : null}
@@ -2186,6 +2189,15 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         </div> : null}
       </div>
       <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>JOURNEY • {save.steps} STEPS</strong></div>
+
+      <section className={styles.fieldBrief} aria-label="Field status">
+        <div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{activeMemo?.title ?? map.name}</strong><small>{activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。"}</small></div>
+        <div className={styles.fieldQuick}>
+          <div><span>NEXT LV</span><strong>{Math.max(0, expForNextLevel(save.level) - save.exp)} EXP</strong></div>
+          <div><span>ARMOR</span><strong>{armorLabel}</strong></div>
+          <div><span>ENCOUNTER</span><strong>{encounterLabel}</strong></div>
+        </div>
+      </section>
 
       <section className={styles.controls} aria-label="RPG touch controls">
         <div className={styles.dpad}>

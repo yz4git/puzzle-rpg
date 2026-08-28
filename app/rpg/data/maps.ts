@@ -163,7 +163,7 @@ function dungeon(id: string, name: string, returnPosition: Vec2, enemyId: string
       { id: `${id}-chest-b`, x: 16, y: 14, item: "boardBell" },
     ],
     fixedEncounters: [{ id: `${id}-boss`, x: 10, y: 3, enemyId, defeatedFlag }],
-    encounterTable: ["thornBat", "copperBeetle", "hollowMonk"], dangerEncounterTable: ["mirrorMote", "gateMimic"], music: "dungeon",
+    encounterTable: id === "oldTemple" ? ["mossSlime", "thornBat", "copperBeetle"] : ["thornBat", "copperBeetle", "hollowMonk"], dangerEncounterTable: ["mirrorMote", "gateMimic"], music: "dungeon",
   };
 }
 
