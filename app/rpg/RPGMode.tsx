@@ -126,6 +126,73 @@ function drawWorldRoute(context: CanvasRenderingContext2D, map: MapDefinition, c
 }
 
 
+
+function drawGroundMacro(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  if (map.id !== "world" || code !== "g") return;
+  const macro = stableVisualIndex("ground-macro", Math.floor(worldX / 3), Math.floor(worldY / 3));
+  context.save();
+  context.globalAlpha = .055;
+  context.fillStyle = macro % 3 === 0 ? "#d7d96d" : macro % 3 === 1 ? "#153d26" : "#72a548";
+  context.fillRect(x, y, TILE, TILE);
+  context.globalAlpha = 1;
+  const seed = stableVisualIndex("ground-detail", worldX, worldY);
+  if (seed % 11 === 0) {
+    context.fillStyle = "#245f30";
+    context.fillRect(x + 4 + seed % 7, y + 5 + (seed >> 3) % 6, 1, 2);
+    context.fillStyle = "#75b655";
+    context.fillRect(x + 5 + seed % 7, y + 5 + (seed >> 3) % 6, 1, 1);
+  }
+  context.restore();
+}
+
+
+
+function drawAtlasSpan(context: CanvasRenderingContext2D, image: HTMLImageElement, cell: AtlasCell, x: number, y: number, drawWidth: number, drawHeight: number, cropBottom = 0) {
+  const { width, height } = RPG_ATLAS_METRICS.terrain;
+  const inset = 2;
+  const sourceHeight = height - inset * 2 - cropBottom;
+  context.drawImage(image, cell.col * width + inset, cell.row * height + inset, width - inset * 2, sourceHeight, x, y, drawWidth, drawHeight);
+}
+
+function drawWorldForestLayer(context: CanvasRenderingContext2D, image: HTMLImageElement, map: MapDefinition, cameraX: number, cameraY: number) {
+  if (map.id !== "world") return;
+  const covered = new Set<string>();
+  const dense: AtlasCell[] = [
+    // Interior canopy cells deliberately avoid the trunk-heavy variants.
+    { atlas: "field", col: 6, row: 0 },
+    { atlas: "field", col: 0, row: 1 },
+  ];
+  const edge: AtlasCell[] = [
+    { atlas: "field", col: 8, row: 0 }, { atlas: "field", col: 9, row: 0 },
+    { atlas: "field", col: 2, row: 1 }, { atlas: "field", col: 3, row: 1 },
+  ];
+  for (let viewY = 0; viewY < VIEW_H; viewY += 1) {
+    for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      const key = `${worldX}:${worldY}`;
+      if (covered.has(key) || tileAt(map, worldX, worldY) !== "f") continue;
+      const block = viewX < VIEW_W - 1 && viewY < VIEW_H - 1
+        && tileAt(map, worldX + 1, worldY) === "f"
+        && tileAt(map, worldX, worldY + 1) === "f"
+        && tileAt(map, worldX + 1, worldY + 1) === "f";
+      const seed = stableVisualIndex("forest-meta", worldX, worldY);
+      if (block) {
+        // Four gameplay tiles become one illustrated canopy cell. This removes
+        // three quarters of the visible 16px source-cell seams in forest masses.
+        // Crop the dark trunk/shadow band from the source tile so a 32px forest
+        // block reads as continuous canopy instead of a row of enlarged tree bases.
+        drawAtlasSpan(context, image, dense[seed % dense.length]!, viewX * TILE - 1, viewY * TILE - 1, TILE * 2 + 2, TILE * 2 + 2, 10);
+        covered.add(`${worldX + 1}:${worldY}`);
+        covered.add(`${worldX}:${worldY + 1}`);
+        covered.add(`${worldX + 1}:${worldY + 1}`);
+      } else {
+        drawAtlasSpan(context, image, edge[seed % edge.length]!, viewX * TILE, viewY * TILE, TILE, TILE);
+      }
+      covered.add(key);
+    }
+  }
+}
+
 function drawWorldLandmark(context: CanvasRenderingContext2D, targetMap: string, x: number, y: number, locked: boolean) {
   context.save();
   context.globalAlpha = locked ? .44 : 1;
@@ -682,17 +749,23 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       const code = tileAt(map, worldX, worldY);
       // World roads and danger routes receive a grass foundation; a connected
       // metatile route is painted afterward. Bridges keep their dedicated atlas art.
-      const baseCode = map.id === "world" && (code === "r" || code === "d") ? "g" : code;
+      const baseCode = map.id === "world" && (code === "r" || code === "d" || code === "f") ? "g" : code;
       const cell = terrainAtlasCell(map, baseCode, worldX, worldY);
       const atlas = atlasImages.current[cell.atlas];
       if (atlas?.complete && atlas.naturalWidth) drawAtlasTile(context, atlas, cell, viewX * TILE, viewY * TILE);
       else drawTile(context, baseCode, viewX * TILE, viewY * TILE, worldX, worldY);
     }
 
+    // Forest is composited as greedy 2x2 metatiles over a grass foundation.
+    // Edge cells remain single-tree illustrations for a readable silhouette.
+    const fieldAtlas = atlasImages.current.field;
+    if (fieldAtlas?.complete && fieldAtlas.naturalWidth) drawWorldForestLayer(context, fieldAtlas, map, cameraX, cameraY);
+
     // A lightweight autotile edge pass stitches roads, shores, forest walls and danger ground together.
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
       const code = tileAt(map, worldX, worldY);
+      drawGroundMacro(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
       drawTerrainEdge(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
       drawWorldRoute(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
     }

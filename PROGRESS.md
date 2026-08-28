@@ -106,3 +106,14 @@ are complete.
 - Identified the apparent legacy roads as oversized portal-atlas landmark cells, not terrain.
 - Replaced world-map portal atlas cells with compact target-specific pixel landmarks so roads and destinations read as separate layers.
 - Preserved existing portal collision, progression gates and non-world portal rendering.
+
+## SFC Visual Reconstruction Pass 5 — Forest / ground continuity
+- Rebalanced world grass atlas selection so plain field cells dominate and decorative flower/stone cards become sparse accents.
+- Forest atlas selection now depends on neighbouring forest tiles: dense canopy inside, single trees/clearings at the perimeter.
+- Added forest seam stitching and low-frequency 3x3 ground macro tinting without changing map collision or encounter data.
+
+### Pass 5 correction — Forest metatile compositor
+- Rejected the straight seam-fill prototype after visual audit because it created a bright grid.
+- World forest now uses a greedy 2x2 canopy compositor over grass, reducing 16px seams while keeping single-tree edge silhouettes.
+
+- SFC Visual Reconstruction Pass 5: cropped trunk-heavy lower source area from 2x2 interior forest metatiles and restricted dense variants to canopy-first cells.
