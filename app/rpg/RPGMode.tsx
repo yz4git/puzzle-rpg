@@ -127,6 +127,37 @@ function drawWorldRoute(context: CanvasRenderingContext2D, map: MapDefinition, c
 
 
 
+
+function drawWorldDangerMass(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  if (map.id !== "world" || code !== "d") return;
+  const up = tileAt(map, worldX, worldY - 1) === "d";
+  const right = tileAt(map, worldX + 1, worldY) === "d";
+  const down = tileAt(map, worldX, worldY + 1) === "d";
+  const left = tileAt(map, worldX - 1, worldY) === "d";
+  // Only filled danger regions become corruption fields. One-tile danger roads
+  // keep their connected route treatment from Pass 6.
+  if (!(up || down) || !(left || right)) return;
+  const seed = stableVisualIndex("danger-mass", worldX, worldY);
+  context.fillStyle = seed % 3 === 0 ? "#6e2035" : seed % 3 === 1 ? "#79263a" : "#642031";
+  context.fillRect(x, y, TILE, TILE);
+  context.fillStyle = "#421627";
+  if (!up) context.fillRect(x, y, TILE, 2);
+  if (!down) context.fillRect(x, y + TILE - 2, TILE, 2);
+  if (!left) context.fillRect(x, y, 2, TILE);
+  if (!right) context.fillRect(x + TILE - 2, y, 2, TILE);
+  context.fillStyle = "#a63643";
+  context.fillRect(x + 2 + seed % 7, y + 4 + (seed >> 3) % 7, 5 + seed % 4, 1);
+  if (seed % 3 === 0) context.fillRect(x + 4, y + 11, 2, 2);
+  context.fillStyle = "#df5b53";
+  if (seed % 5 === 0) context.fillRect(x + 10, y + 3, 2, 1);
+  // Jagged tendrils break the original rectangular biome edge without touching collision.
+  context.fillStyle = "#812a3d";
+  if (!up && seed % 2 === 0) { context.fillRect(x + 4, y - 2, 5, 2); context.fillRect(x + 6, y - 3, 2, 1); }
+  if (!down && seed % 3 === 0) { context.fillRect(x + 8, y + TILE, 4, 2); context.fillRect(x + 9, y + TILE + 2, 1, 1); }
+  if (!left && seed % 2 === 1) context.fillRect(x - 2, y + 7, 2, 4);
+  if (!right && seed % 4 === 0) context.fillRect(x + TILE, y + 5, 2, 5);
+}
+
 function drawGroundMacro(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
   if (map.id !== "world" || code !== "g") return;
   const macro = stableVisualIndex("ground-macro", Math.floor(worldX / 3), Math.floor(worldY / 3));
@@ -580,8 +611,8 @@ function drawWorldLandmarkV2(context: CanvasRenderingContext2D, targetMap: strin
     context.fillRect(x + 3, y + 12, 5, 9);
   }
 
-  if (locked) drawWorldSeal(context, x + 12, y - 6);
   context.restore();
+  if (locked) drawWorldSeal(context, x + 12, y - 6);
 }
 
 function drawWorldLandmarkGround(context: CanvasRenderingContext2D, targetMap: string, x: number, y: number, locked: boolean) {
@@ -1197,6 +1228,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       drawGroundMacro(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
       drawTerrainEdge(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
       drawWorldRoute(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
+      drawWorldDangerMass(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
     }
 
     // A connected two-row house block is reconstructed from complete facade
