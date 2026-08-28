@@ -256,3 +256,10 @@ are complete.
 - Added discovery input locking so movement/menu actions cannot fire underneath the acquisition card; the next A/TAP dismisses it and immediately returns control to exploration.
 - Split battle-result acquisition rows into ITEM, EQUIPMENT and TECHNIQUE materials so training rewards and boss technique unlocks no longer read as identical text rows.
 - Chest contents, inventory limits, equipment ownership, reward formulas, technique grants, save data, encounter logic and Chapter Battle remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 27 — Encounter warning & boss approach
+- Split pre-battle presentation into WILD ENCOUNTER, DANGER ENCOUNTER, fixed GUARDIAN, training TRIAL and BOSS APPROACH cues using the existing enemy/context data.
+- Added a short non-blocking warning when stepping from normal terrain into a danger tile so high-encounter regions announce themselves before the next fight.
+- Boss fixed encounters now use a distinct gold warning marker and a longer stepped approach shutter, while ordinary fixed enemies keep a shorter guardian cue.
+- Encounter meter math, encounter tables, fixed-enemy coordinates, boss flags, battle rules, rewards, save data and Chapter Battle remain unchanged.

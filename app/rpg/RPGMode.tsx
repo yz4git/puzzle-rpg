@@ -28,6 +28,8 @@ type ServiceState =
 type ResultState = { title: string; lines: string[]; ending?: boolean } | null;
 type AreaTransitionState = { phase: "depart" | "arrive"; targetName: string; targetKind: string; label: string } | null;
 type DiscoveryState = { kind: "gold" | "item" | "equipment"; kicker: string; name: string; detail: string } | null;
+type EncounterCueKind = "wild" | "danger" | "fixed" | "boss" | "trial";
+type EncounterCueState = { enemyId: string; kind: EncounterCueKind; title: string; subtitle: string; context: Omit<BattleContext, "enemyId"> } | null;
 
 const TILE = 16;
 const VIEW_W = 15;
@@ -1147,10 +1149,10 @@ function drawNpcRoleProp(context: CanvasRenderingContext2D, npc: NPCDefinition, 
   context.restore();
 }
 
-type InteractionMarkerKind = "talk" | "treasure" | "danger" | "exit";
+type InteractionMarkerKind = "talk" | "treasure" | "danger" | "boss" | "exit";
 
 function drawInteractionMarker(context: CanvasRenderingContext2D, x: number, y: number, kind: InteractionMarkerKind) {
-  const accent = kind === "danger" ? "#ff6a66" : kind === "treasure" ? "#ffd765" : kind === "exit" ? "#7ee8ef" : "#f1d06a";
+  const accent = kind === "boss" ? "#ffe784" : kind === "danger" ? "#ff6a66" : kind === "treasure" ? "#ffd765" : kind === "exit" ? "#7ee8ef" : "#f1d06a";
   context.save();
   context.fillStyle = "#0a0910"; context.fillRect(x + 7, y - 22, 8, 9);
   context.fillStyle = accent; context.fillRect(x + 8, y - 21, 6, 7);
@@ -1159,8 +1161,9 @@ function drawInteractionMarker(context: CanvasRenderingContext2D, x: number, y: 
     context.fillRect(x + 10, y - 19, 2, 1); context.fillRect(x + 9, y - 18, 1, 4); context.fillRect(x + 12, y - 18, 1, 4); context.fillRect(x + 10, y - 17, 2, 1);
   } else if (kind === "treasure") {
     context.fillRect(x + 10, y - 19, 2, 4); context.fillRect(x + 9, y - 18, 4, 2);
-  } else if (kind === "danger") {
+  } else if (kind === "danger" || kind === "boss") {
     context.fillRect(x + 10, y - 20, 2, 4); context.fillRect(x + 10, y - 15, 2, 1);
+    if (kind === "boss") { context.fillRect(x + 8, y - 22, 1, 2); context.fillRect(x + 13, y - 22, 1, 2); }
   } else {
     context.fillRect(x + 10, y - 20, 2, 4); context.fillRect(x + 9, y - 17, 4, 1); context.fillRect(x + 10, y - 16, 2, 1);
   }
@@ -1202,6 +1205,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [fieldReturn, setFieldReturn] = useState(false);
   const [areaTransition, setAreaTransition] = useState<AreaTransitionState>(null);
   const [discovery, setDiscovery] = useState<DiscoveryState>(null);
+  const [encounterCue, setEncounterCue] = useState<EncounterCueState>(null);
+  const [dangerWarning, setDangerWarning] = useState<string | null>(null);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
@@ -1211,6 +1216,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const heldTimer = useRef<number | null>(null);
   const transitionTimer = useRef<number | null>(null);
   const arrivalTimer = useRef<number | null>(null);
+  const encounterTimer = useRef<number | null>(null);
+  const dangerTimer = useRef<number | null>(null);
   const importRef = useRef<HTMLInputElement | null>(null);
   const saveRef = useRef(save);
 
@@ -1257,7 +1264,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function move(direction: Direction) {
-    if (screen !== "overworld" || service || battle || result || areaTransition || discovery) return;
+    if (screen !== "overworld" || service || battle || result || areaTransition || discovery || encounterCue) return;
     const current = saveRef.current;
     const delta = DIR_DELTA[direction];
     const nextPosition = { x: current.position.x + delta.x, y: current.position.y + delta.y };
@@ -1270,6 +1277,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     }
     const code = tileAt(map, nextPosition.x, nextPosition.y);
     const danger = isDangerTile(code);
+    const enteringDanger = danger && !isDangerTile(tileAt(map, current.position.x, current.position.y));
+    if (enteringDanger) {
+      setDangerWarning(map.kind === "danger" ? map.name : "DANGER ZONE");
+      if (dangerTimer.current) window.clearTimeout(dangerTimer.current);
+      dangerTimer.current = window.setTimeout(() => setDangerWarning(null), 760);
+    }
     const safe = isRoadTile(code) || map.kind === "town" || map.kind === "training";
     let nextMeter = current.encounterMeter;
     if (!safe) nextMeter -= danger ? 2 : 1;
@@ -1279,7 +1292,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     playSfx("step");
     if (shouldEncounter) {
       saveGame(updated);
-      window.setTimeout(() => startBattle(chooseEncounter(nextPosition, danger)), 120);
+      window.setTimeout(() => startBattle(chooseEncounter(nextPosition, danger), {}, danger ? "danger" : "wild"), 90);
     }
   }
 
@@ -1317,7 +1330,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
   function interact() {
     if (discovery) { setDiscovery(null); playSfx("uiSelect"); return; }
-    if (areaTransition) return;
+    if (areaTransition || encounterCue) return;
     if (screen === "dialogue" || screen === "event") { advanceDialogue(); return; }
     if (screen !== "overworld") return;
     const npc = findAt(mapNpcs);
@@ -1372,9 +1385,18 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     }, 180);
   }
 
-  function startBattle(enemyId: string, context: Omit<BattleContext, "enemyId"> = {}) {
-    if (!ENEMIES[enemyId]) return;
-    primeAudio(); playSfx("battleStart"); saveGame(save); setBattle({ enemyId, ...context }); setScreen("battle"); setResult(null);
+  function startBattle(enemyId: string, context: Omit<BattleContext, "enemyId"> = {}, requestedKind?: EncounterCueKind) {
+    const enemy = ENEMIES[enemyId];
+    if (!enemy || encounterCue) return;
+    const kind: EncounterCueKind = requestedKind ?? (context.training ? "trial" : enemy.boss ? "boss" : context.fixedId ? "fixed" : "wild");
+    const title = kind === "boss" ? "BOSS APPROACH" : kind === "trial" ? "TRIAL" : kind === "fixed" ? "GUARDIAN" : kind === "danger" ? "DANGER ENCOUNTER" : "ENCOUNTER";
+    const subtitle = kind === "boss" ? "A POWERFUL PRESENCE" : kind === "trial" ? "MASTER'S TEST" : kind === "fixed" ? "PATH BLOCKED" : kind === "danger" ? "HOSTILE TERRITORY" : "WILD FOE";
+    const delay = kind === "boss" ? 620 : kind === "trial" ? 460 : kind === "fixed" ? 420 : kind === "danger" ? 320 : 240;
+    primeAudio(); playSfx("battleStart"); saveGame(saveRef.current); setResult(null); setEncounterCue({ enemyId, kind, title, subtitle, context });
+    if (encounterTimer.current) window.clearTimeout(encounterTimer.current);
+    encounterTimer.current = window.setTimeout(() => {
+      setEncounterCue(null); setBattle({ enemyId, ...context }); setScreen("battle");
+    }, delay);
   }
 
   function giveItem(current: RPGSaveData, itemId: ItemId) {
@@ -1512,7 +1534,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     playSfx("uiConfirm");
   }
 
-  function openMenu() { if (screen === "overworld" && !areaTransition && !discovery) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
+  function openMenu() { if (screen === "overworld" && !areaTransition && !discovery && !encounterCue) { primeAudio(); playSfx("uiSelect"); setService(null); setScreen("menu"); } }
   function closeMenu() { setService(null); setScreen("overworld"); playSfx("uiSelect"); }
 
   function toggleSetting(key: "music" | "sfx") {
@@ -1731,13 +1753,13 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     if (markerTarget) {
       const markerX = (markerTarget.x - cameraX) * TILE;
       const markerY = (markerTarget.y - cameraY) * TILE;
-      const markerKind: InteractionMarkerKind = frontNpc ? "talk" : frontChest ? "treasure" : frontFixed ? "danger" : "exit";
+      const markerKind: InteractionMarkerKind = frontNpc ? "talk" : frontChest ? "treasure" : frontFixed ? (ENEMIES[frontFixed.enemyId]?.boss ? "boss" : "danger") : "exit";
       drawInteractionMarker(context, markerX, markerY, markerKind);
     }
     context.setTransform(1, 0, 0, 1, 0, 0);
   }, [atlasVersion, map, mapNpcs, save, visibleFixed, walkFrame]);
 
-  useEffect(() => () => { stopHold(); if (transitionTimer.current) window.clearTimeout(transitionTimer.current); if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current); stopRpgMusic(); setSfxEnabled(true); }, []);
+  useEffect(() => () => { stopHold(); if (transitionTimer.current) window.clearTimeout(transitionTimer.current); if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current); if (encounterTimer.current) window.clearTimeout(encounterTimer.current); if (dangerTimer.current) window.clearTimeout(dangerTimer.current); stopRpgMusic(); setSfxEnabled(true); }, []);
 
   const nearPortal = findAt(map.portals);
   const terrainLabel = isRoadTile(currentTile) ? "ROAD • SAFE" : isDangerTile(currentTile) ? "DANGER • HIGH ENCOUNTER" : map.kind === "town" ? "TOWN • SAFE" : map.kind === "training" ? "TRAINING • SAFE" : "FIELD • ENCOUNTER";
@@ -1747,9 +1769,13 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const endingLines = save.releasedEnemies && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 4 ? STORY_TEXT.endingMercy : STORY_TEXT.endingForce;
 
   return (
-    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-returning={fieldReturn ? "true" : "false"} data-area-phase={areaTransition?.phase ?? "none"}>
+    <main className={styles.rpg} data-map={map.id} data-kind={map.kind} data-returning={fieldReturn ? "true" : "false"} data-area-phase={areaTransition?.phase ?? "none"} data-encounter={encounterCue?.kind ?? "none"}>
       {areaTransition ? <div className={styles.areaTransition} data-phase={areaTransition.phase} data-kind={areaTransition.targetKind} role="status" aria-live="polite">
         <span>{areaTransition.phase === "depart" ? "TRAVEL" : "AREA"}</span><strong>{areaTransition.targetName}</strong><small>{areaTransition.label}</small>
+      </div> : null}
+      {dangerWarning && !encounterCue ? <div className={styles.dangerWarning} role="status" aria-live="polite"><span>WARNING</span><strong>{dangerWarning}</strong><small>ENCOUNTER RATE UP</small></div> : null}
+      {encounterCue ? <div className={styles.encounterCue} data-kind={encounterCue.kind} role="status" aria-live="assertive">
+        <span>{encounterCue.subtitle}</span><strong>{encounterCue.title}</strong><b>{ENEMIES[encounterCue.enemyId]?.name ?? encounterCue.enemyId}</b><i aria-hidden="true" />
       </div> : null}
       {discovery ? <div className={styles.discoveryOverlay} data-kind={discovery.kind} onPointerDown={(event) => { event.preventDefault(); setDiscovery(null); playSfx("uiSelect"); }}>
         <div className={styles.discoveryCard} data-kind={discovery.kind}>
