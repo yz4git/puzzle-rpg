@@ -1742,7 +1742,13 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
       {(screen === "dialogue" || screen === "event") && dialogue.length ? <div className={styles.dialogueOverlay} onPointerDown={(event) => { event.preventDefault(); advanceDialogue(); }}>
         <div className={styles.dialogueBox} data-portrait={Boolean(speakerNpcCell)}>
-          {speakerNpcCell ? <i className={styles.dialoguePortrait} aria-hidden="true" style={{ backgroundImage: `url(${RPG_ASSETS.npcs})`, backgroundSize: "192px 192px", backgroundPosition: `${-speakerNpcCell.col * 48}px ${-speakerNpcCell.row * 64}px` }} /> : null}
+          {speakerNpcCell ? <i className={styles.dialoguePortrait} aria-hidden="true" data-sprite={speakerNpc?.sprite} style={{
+            backgroundImage: `url(${RPG_ASSETS.npcs})`,
+            // The field atlas stores complete 96x128 actors. Dialogue uses a centered
+            // upper-body crop so faces read at conversation scale without a second asset.
+            backgroundSize: "288px 288px",
+            backgroundPosition: `${-(speakerNpcCell.col * 72 + 12)}px ${-(speakerNpcCell.row * 96 + (speakerNpc?.sprite === "child" ? 8 : 4))}px`,
+          }} /> : null}
           <span>{speaker}</span><p>{dialogue[dialogueIndex]}</p><small>A / TAP ▼</small>
         </div>
       </div> : null}

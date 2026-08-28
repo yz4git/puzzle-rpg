@@ -159,3 +159,8 @@ are complete.
 - Moved interaction glyphs to the final canvas layer so large hero/NPC sprites cannot hide them.
 - Reduced the marker footprint and added contextual front-tile glyphs for TALK, treasure, fixed encounters and exits.
 - Interaction rules, collision, map data, progression and save format are unchanged.
+
+## SFC Visual Reconstruction Pass 11 — Dialogue portrait crop
+- Reframed NPC dialogue portraits from full-body thumbnails to centered upper-body crops using the existing high-resolution NPC atlas.
+- Kept story/system dialogue portrait-free and preserved all dialogue logic and NPC actions.
+- Added a restrained inner portrait-frame highlight/shadow without adding new production assets.
