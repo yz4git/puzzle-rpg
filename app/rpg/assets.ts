@@ -64,7 +64,12 @@ export function terrainAtlasCell(map: MapDefinition, code: string, x: number, y:
   const seed = stableSeed(x, y);
   if (map.id === "world") {
     if (code === "g") return { atlas: "field", col: seed % 6, row: 0 };
-    if (code === "f") return { atlas: "field", col: 6 + seed % 4, row: seed % 3 === 0 ? 0 : 1 };
+    if (code === "f") {
+      const variant = seed % 8;
+      return variant < 4
+        ? { atlas: "field", col: 6 + variant, row: 0 }
+        : { atlas: "field", col: variant - 4, row: 1 };
+    }
     if (code === "r") return roadCell(map, x, y);
     if (code === "d" || code === "x") return { atlas: "field", col: seed % 10, row: 2 };
     if (code === "w") return { atlas: "field", col: seed % 4, row: 3 };

@@ -80,6 +80,145 @@ function drawGroundShadow(context: CanvasRenderingContext2D, x: number, y: numbe
   context.restore();
 }
 
+function sameRoute(map: MapDefinition, route: "road" | "danger", x: number, y: number) {
+  const code = tileAt(map, x, y);
+  return route === "road" ? code === "r" || code === "b" : code === "d" || code === "x";
+}
+
+function drawWorldRoute(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  if (map.id !== "world" || (code !== "r" && code !== "d")) return;
+  const route = code === "r" ? "road" : "danger";
+  const up = sameRoute(map, route, worldX, worldY - 1);
+  const right = sameRoute(map, route, worldX + 1, worldY);
+  const down = sameRoute(map, route, worldX, worldY + 1);
+  const left = sameRoute(map, route, worldX - 1, worldY);
+  const edge = route === "road" ? "#6e5538" : "#371421";
+  const base = route === "road" ? "#b99861" : "#772536";
+  const light = route === "road" ? "#d0b271" : "#b83a45";
+  const dark = route === "road" ? "#8f7049" : "#501a2a";
+  // Build one connected 10px-wide metatile path. Arms meet adjacent cells at the
+  // exact edge, removing the card-like square road tiles from the source atlas.
+  context.fillStyle = edge;
+  context.fillRect(x + 3, y + 3, 10, 10);
+  if (up) context.fillRect(x + 3, y, 10, 8);
+  if (down) context.fillRect(x + 3, y + 8, 10, 8);
+  if (left) context.fillRect(x, y + 3, 8, 10);
+  if (right) context.fillRect(x + 8, y + 3, 8, 10);
+  context.fillStyle = base;
+  context.fillRect(x + 4, y + 4, 8, 8);
+  if (up) context.fillRect(x + 4, y, 8, 9);
+  if (down) context.fillRect(x + 4, y + 7, 8, 9);
+  if (left) context.fillRect(x, y + 4, 9, 8);
+  if (right) context.fillRect(x + 7, y + 4, 9, 8);
+  const seed = stableVisualIndex(route, worldX, worldY);
+  context.fillStyle = light;
+  context.fillRect(x + 5 + seed % 4, y + 5 + (seed >> 2) % 4, route === "road" ? 2 : 1, 1);
+  context.fillStyle = dark;
+  context.fillRect(x + 4 + (seed >> 4) % 6, y + 7 + (seed >> 6) % 3, 1, 1);
+  if (route === "danger") {
+    // Corruption leaks beyond the route edges in deterministic pixel tendrils.
+    context.fillStyle = "#9a2e3d";
+    if (seed % 3 === 0) { context.fillRect(x + 1, y + 5, 3, 1); context.fillRect(x + 1, y + 4, 1, 1); }
+    if (seed % 4 === 0) { context.fillRect(x + 12, y + 10, 3, 1); context.fillRect(x + 14, y + 11, 1, 1); }
+    context.fillStyle = "#e45b4d";
+    if (seed % 5 === 0) context.fillRect(x + 7, y + 2, 1, 2);
+  }
+}
+
+
+function drawWorldLandmark(context: CanvasRenderingContext2D, targetMap: string, x: number, y: number, locked: boolean) {
+  context.save();
+  context.globalAlpha = locked ? .44 : 1;
+  drawGroundShadow(context, x - 2, y + TILE, 20);
+  const outline = "#16121b";
+  const stone = "#d0b879";
+  const stoneDark = "#6f5a3d";
+  const roof = "#a8453e";
+  const blue = "#58a8bd";
+  const violet = "#8c71bd";
+  const crimson = "#b13a49";
+  const gold = "#e7c55f";
+  context.fillStyle = outline;
+  context.fillRect(x + 2, y + 11, 12, 4);
+  context.fillStyle = stoneDark;
+  context.fillRect(x + 3, y + 12, 10, 2);
+
+  if (["hearthVillage", "lakeVillage", "reedHamlet", "ironCity", "mirrorTown"].includes(targetMap)) {
+    const city = targetMap === "ironCity";
+    context.fillStyle = outline;
+    context.fillRect(x + 3, y + 5, 10, 7);
+    context.fillStyle = city ? "#77879b" : stone;
+    context.fillRect(x + 4, y + 6, 8, 6);
+    context.fillStyle = city ? "#a9c4d7" : roof;
+    context.fillRect(x + 3, y + 4, 10, 3);
+    context.fillRect(x + 5, y + 2, 6, 2);
+    context.fillStyle = "#2b2530";
+    context.fillRect(x + 7, y + 9, 2, 3);
+    if (targetMap === "lakeVillage") { context.fillStyle = blue; context.fillRect(x + 4, y + 4, 8, 2); }
+    if (targetMap === "mirrorTown") { context.fillStyle = violet; context.fillRect(x + 8, y + 3, 2, 2); }
+  } else if (["emberShrine", "quietBower", "ironHall", "hourSpire"].includes(targetMap)) {
+    context.fillStyle = outline;
+    context.fillRect(x + 4, y + 6, 8, 7);
+    context.fillStyle = stone;
+    context.fillRect(x + 5, y + 7, 6, 5);
+    context.fillStyle = targetMap === "emberShrine" ? "#ef7a3a" : targetMap === "hourSpire" ? violet : targetMap === "ironHall" ? "#9eb7c7" : "#6fad68";
+    context.fillRect(x + 6, y + 3, 4, 5);
+    context.fillRect(x + 7, y + 1, 2, 2);
+    context.fillStyle = "#fff0a8";
+    context.fillRect(x + 7, y + 4, 2, 2);
+  } else if (targetMap === "oldTemple") {
+    context.fillStyle = "#37323b";
+    context.fillRect(x + 3, y + 4, 3, 8);
+    context.fillRect(x + 10, y + 4, 3, 8);
+    context.fillStyle = "#a79a7f";
+    context.fillRect(x + 4, y + 5, 2, 6);
+    context.fillRect(x + 10, y + 5, 2, 6);
+    context.fillRect(x + 4, y + 3, 8, 2);
+  } else if (targetMap === "crimsonMarsh") {
+    context.fillStyle = "#4f1725";
+    context.fillRect(x + 3, y + 7, 10, 5);
+    context.fillStyle = crimson;
+    context.fillRect(x + 4, y + 5, 2, 5);
+    context.fillRect(x + 8, y + 3, 2, 7);
+    context.fillRect(x + 11, y + 6, 2, 4);
+    context.fillStyle = "#ed6a58";
+    context.fillRect(x + 8, y + 3, 1, 2);
+  } else if (["mirrorTower", "voidPass"].includes(targetMap)) {
+    context.fillStyle = outline;
+    context.fillRect(x + 5, y + 2, 6, 11);
+    context.fillStyle = targetMap === "mirrorTower" ? violet : "#3f6674";
+    context.fillRect(x + 6, y + 3, 4, 9);
+    context.fillStyle = targetMap === "mirrorTower" ? "#d5bfff" : "#70d6e6";
+    context.fillRect(x + 7, y + 4, 2, 3);
+    if (targetMap === "voidPass") { context.fillStyle = "#0b0b11"; context.fillRect(x + 7, y + 8, 2, 4); }
+  } else if (targetMap === "prismCitadel") {
+    context.fillStyle = outline;
+    context.fillRect(x + 2, y + 5, 12, 8);
+    context.fillStyle = violet;
+    context.fillRect(x + 3, y + 6, 10, 6);
+    context.fillStyle = gold;
+    context.fillRect(x + 3, y + 3, 3, 4);
+    context.fillRect(x + 10, y + 3, 3, 4);
+    context.fillRect(x + 7, y + 1, 2, 5);
+    context.fillStyle = "#fff1a2";
+    context.fillRect(x + 7, y + 4, 2, 2);
+  } else {
+    context.fillStyle = stone;
+    context.fillRect(x + 5, y + 5, 6, 7);
+    context.fillStyle = gold;
+    context.fillRect(x + 7, y + 2, 2, 4);
+  }
+
+  if (locked) {
+    context.fillStyle = "#17151c";
+    context.fillRect(x + 10, y + 10, 5, 5);
+    context.fillStyle = "#d9c56f";
+    context.fillRect(x + 11, y + 12, 3, 2);
+    context.fillRect(x + 12, y + 10, 1, 2);
+  }
+  context.restore();
+}
+
 function drawTerrainEdge(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
   const up = tileAt(map, worldX, worldY - 1), right = tileAt(map, worldX + 1, worldY), down = tileAt(map, worldX, worldY + 1), left = tileAt(map, worldX - 1, worldY);
   const road = code === "r" || code === "b";
@@ -541,16 +680,21 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
       const code = tileAt(map, worldX, worldY);
-      const cell = terrainAtlasCell(map, code, worldX, worldY);
+      // World roads and danger routes receive a grass foundation; a connected
+      // metatile route is painted afterward. Bridges keep their dedicated atlas art.
+      const baseCode = map.id === "world" && (code === "r" || code === "d") ? "g" : code;
+      const cell = terrainAtlasCell(map, baseCode, worldX, worldY);
       const atlas = atlasImages.current[cell.atlas];
       if (atlas?.complete && atlas.naturalWidth) drawAtlasTile(context, atlas, cell, viewX * TILE, viewY * TILE);
-      else drawTile(context, code, viewX * TILE, viewY * TILE, worldX, worldY);
+      else drawTile(context, baseCode, viewX * TILE, viewY * TILE, worldX, worldY);
     }
 
     // A lightweight autotile edge pass stitches roads, shores, forest walls and danger ground together.
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
-      drawTerrainEdge(context, map, tileAt(map, worldX, worldY), worldX, worldY, viewX * TILE, viewY * TILE);
+      const code = tileAt(map, worldX, worldY);
+      drawTerrainEdge(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
+      drawWorldRoute(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
     }
 
     // A connected two-row house block is reconstructed from complete facade
@@ -589,13 +733,18 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     map.portals.forEach((portal, portalIndex) => {
       const x = (portal.x - cameraX) * TILE, y = (portal.y - cameraY) * TILE;
       if (x < -TILE || y < -TILE || x >= VIEW_W * TILE || y >= VIEW_H * TILE) return;
+      const locked = Boolean(portal.requireFlag && !hasFlag(save, portal.requireFlag));
+      if (map.id === "world") {
+        drawWorldLandmark(context, portal.targetMap, x, y, locked);
+        return;
+      }
       const atlas = atlasImages.current.field;
       if (atlas?.complete && atlas.naturalWidth) {
-        context.globalAlpha = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? .42 : 1;
+        context.globalAlpha = locked ? .42 : 1;
         context.drawImage(atlas, (portalIndex % 10) * 64, 9 * 64, 64, 64, x - 6, y - 12, 28, 28);
         context.globalAlpha = 1;
       } else {
-        context.fillStyle = portal.requireFlag && !hasFlag(save, portal.requireFlag) ? "#55515d" : "#ffe060";
+        context.fillStyle = locked ? "#55515d" : "#ffe060";
         context.fillRect(x + 3, y + 4, 10, 9); context.fillStyle = "#11111a"; context.fillRect(x + 6, y + 8, 4, 5);
       }
     });
