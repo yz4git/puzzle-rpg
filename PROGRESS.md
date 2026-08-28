@@ -284,3 +284,10 @@ are complete.
 - Added dungeon-specific viewport grading/vignettes, with a stronger final-dungeon bezel and scan texture.
 - Ambient redraw runs at a restrained 430ms cadence only while actively exploring dungeon/danger maps; battle, menu and town screens do not pay this cost.
 - Collision, portal targets, treasure rewards, enemy tables, boss flags, save data and Chapter Battle remain unchanged.
+
+## SFC Visual Reconstruction Pass 31 — Boss rooms and setpieces
+- Rebuilt important fixed-encounter locations as presentation-only setpieces around their existing map coordinates, leaving collision and encounter data untouched.
+- Added a collapsed altar for Old Temple, a ritual pool for Crimson Marsh, reflective sanctum panels for Mirror Tower, paired void monoliths for Void Pass and an iron throne platform for Iron City.
+- Reconstructed the Prism Sovereign approach as a five-tile ceremonial throne dais with a pulsing prism crown and flanking lights, while preserving the existing final-boss coordinate and progression flag.
+- Setpiece animation reuses the low-frequency dungeon ambience frame and remains behind actors, enemies, chests and interaction markers.
+- Boss conditions, enemy IDs, rewards, map topology, portal destinations, save data and Chapter Battle remain unchanged.
