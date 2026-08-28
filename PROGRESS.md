@@ -129,3 +129,12 @@ are complete.
 - Pass 6 ridge meta correction: replaced the remaining 16px repeated mountain cadence with a two-pass continuous rock foundation plus 2-tile-wide overlapping metapeaks.
 
 - Pass 6 natural ridge correction: removed the remaining full-width lower rock band; metapeaks now extend across both mountain rows with broken polygon toes while the lower row uses sparse foothill/scree shapes.
+
+
+## SFC Visual Reconstruction Pass 7
+- Rebuilt world-map portals as 2-4 tile landmark silhouettes instead of single-tile symbols.
+- Added distinct village clusters, Iron City fortress, four master schools, Old Temple, Mirror Tower, Void Pass, Crimson Marsh and Prism Citadel art.
+- Added irregular landmark aprons/approaches and locked-gate seal markers without changing map collision, portal coordinates or encounter data.
+- Preserved the Pass 6 continuous water, bridge, mountain, forest and route reconstruction.
+- Pass 7 audit correction: dense danger blocks now render as continuous corruption fields; locked major landmarks keep an opaque seal marker.
+- Pass 7C: Crimson Marsh corruption boundary gains irregular grass bites, moss islands and deep pools to remove the rectangular biome silhouette.
