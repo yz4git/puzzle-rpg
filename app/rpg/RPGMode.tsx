@@ -1228,6 +1228,98 @@ function drawTownAmbient(context: CanvasRenderingContext2D, map: MapDefinition, 
   context.restore();
 }
 
+function drawDungeonAmbient(context: CanvasRenderingContext2D, map: MapDefinition, cameraX: number, cameraY: number, frame: number, player: Vec2) {
+  if (map.kind !== "dungeon" && map.kind !== "danger") return;
+  const phase = frame % 8;
+  context.save();
+
+  if (map.id === "oldTemple") {
+    // Slow dust and old torch embers keep the first dungeon ancient rather than busy.
+    for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      if (tileAt(map, worldX, worldY) === "#") continue;
+      const seed = stableVisualIndex("temple-dust", worldX, worldY);
+      if ((seed + phase) % 19 !== 0) continue;
+      context.globalAlpha = .28; context.fillStyle = phase % 2 ? "#d8c996" : "#8fa076";
+      context.fillRect(viewX * TILE + 2 + (seed + phase) % 10, viewY * TILE + 3 + (phase % 6), 1, 1);
+    }
+    context.globalAlpha = .5;
+    for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      if (tileAt(map, worldX, worldY) !== "#" || tileAt(map, worldX, worldY + 1) === "#") continue;
+      const seed = stableVisualIndex("temple-ember", worldX, worldY);
+      if ((seed + phase) % 7 !== 0) continue;
+      const x = viewX * TILE + 6 + seed % 5, y = viewY * TILE + 11 - phase % 3;
+      context.fillStyle = phase % 2 ? "#f4c85d" : "#c86a3e"; context.fillRect(x, y, 2, 2);
+    }
+  } else if (map.id === "crimsonMarsh") {
+    // Hazard cells breathe with bubbles while sparse fog crosses the walkable floor.
+    for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      const code = tileAt(map, worldX, worldY);
+      const seed = stableVisualIndex("marsh-bubble", worldX, worldY);
+      if (code === "x" && (seed + phase) % 4 === 0) {
+        const x = viewX * TILE + 3 + seed % 9, y = viewY * TILE + 10 - phase % 5;
+        context.globalAlpha = .68; context.fillStyle = phase % 2 ? "#ef755f" : "#a52d4f";
+        context.fillRect(x, y, 3, 1); context.fillRect(x + 1, y - 1, 1, 3);
+      } else if (code !== "#" && (seed + phase) % 31 === 0) {
+        context.globalAlpha = .18; context.fillStyle = "#d5a1b4";
+        context.fillRect(viewX * TILE - 3 + phase * 3, viewY * TILE + 5 + seed % 6, 14, 2);
+      }
+    }
+  } else if (map.id === "mirrorTower") {
+    // Thin moving mirror streaks imply reflections without changing collision readability.
+    for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      const code = tileAt(map, worldX, worldY);
+      const seed = stableVisualIndex("mirror-shine", worldX, worldY);
+      if (code === "#" || (seed + phase) % 11 !== 0) continue;
+      const x = viewX * TILE + 2 + (phase * 2 + seed) % 9, y = viewY * TILE + 3 + seed % 8;
+      context.globalAlpha = .62; context.fillStyle = phase % 2 ? "#d8f7f2" : "#c9b8ff";
+      context.fillRect(x, y, 5, 1); context.fillRect(x + 2, y - 2, 1, 5);
+    }
+  } else if (map.id === "voidPass") {
+    // Wind cuts across the pass in stepped bands; dark flecks move the opposite way.
+    context.globalAlpha = .24; context.fillStyle = "#9baab6";
+    for (let lane = 0; lane < 5; lane += 1) {
+      const y = 18 + lane * 34 + ((lane + phase) % 3) * 3;
+      const x = -24 + ((phase * 29 + lane * 41) % (VIEW_W * TILE + 48));
+      context.fillRect(x, y, 22 + (lane % 2) * 10, 1);
+      context.fillRect(x + 8, y + 2, 9, 1);
+    }
+    context.globalAlpha = .34; context.fillStyle = "#10131b";
+    for (let lane = 0; lane < 4; lane += 1) {
+      const x = VIEW_W * TILE - ((phase * 19 + lane * 53) % (VIEW_W * TILE + 28));
+      context.fillRect(x, 29 + lane * 42, 7, 2);
+    }
+  } else if (map.id === "prismCitadel") {
+    // The final dungeon pulses harder toward the throne, making progression feel oppressive.
+    const approach = clamp(1 - player.y / Math.max(1, map.height - 1), 0, 1);
+    const pulseAlpha = .15 + approach * .24 + (phase % 2 ? .05 : 0);
+    context.globalAlpha = pulseAlpha;
+    for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      const code = tileAt(map, worldX, worldY);
+      const seed = stableVisualIndex("citadel-vein", worldX, worldY);
+      if (code === "#") {
+        if ((seed + phase) % 6 !== 0) continue;
+        context.fillStyle = phase % 2 ? "#d7c46f" : "#9f7dd4";
+        context.fillRect(viewX * TILE + 3 + seed % 7, viewY * TILE + 10, 5, 1);
+      } else if ((seed + phase) % 17 === 0) {
+        context.fillStyle = phase % 2 ? "#d9b7ff" : "#f2dc86";
+        const x = viewX * TILE + 4 + seed % 6, y = viewY * TILE + 4 + phase % 5;
+        context.fillRect(x, y, 2, 2); context.fillRect(x - 2, y + 1, 6, 1);
+      }
+    }
+    context.globalAlpha = .08 + approach * .12;
+    context.fillStyle = phase % 2 ? "#6f4c92" : "#b0934b";
+    const sweepY = (phase * 31 + Math.floor(approach * 17)) % (VIEW_H * TILE);
+    context.fillRect(0, sweepY, VIEW_W * TILE, 2);
+  }
+
+  context.restore();
+}
+
 type InteractionMarkerKind = "talk" | "treasure" | "danger" | "boss" | "exit";
 
 function drawInteractionMarker(context: CanvasRenderingContext2D, x: number, y: number, kind: InteractionMarkerKind) {
@@ -1288,6 +1380,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [dangerWarning, setDangerWarning] = useState<string | null>(null);
   const [fieldEnemyFrame, setFieldEnemyFrame] = useState(0);
   const [townLifeFrame, setTownLifeFrame] = useState(0);
+  const [dungeonLifeFrame, setDungeonLifeFrame] = useState(0);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
@@ -1682,6 +1775,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }, [screen, map.id, map.kind]);
 
   useEffect(() => {
+    if (screen !== "overworld" || (map.kind !== "dungeon" && map.kind !== "danger")) return;
+    const timer = window.setInterval(() => setDungeonLifeFrame((frame) => (frame + 1) % 24), 430);
+    return () => window.clearInterval(timer);
+  }, [screen, map.id, map.kind]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => commit((current) => ({ ...current, playSeconds: current.playSeconds + 10 })), 10_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -1785,6 +1884,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     }
 
     drawTownAmbient(context, map, cameraX, cameraY, townLifeFrame);
+    drawDungeonAmbient(context, map, cameraX, cameraY, dungeonLifeFrame, save.position);
 
     map.portals.forEach((portal, portalIndex) => {
       const x = (portal.x - cameraX) * TILE, y = (portal.y - cameraY) * TILE;
@@ -1893,7 +1993,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       drawInteractionMarker(context, markerX, markerY, markerKind);
     }
     context.setTransform(1, 0, 0, 1, 0, 0);
-  }, [atlasVersion, fieldEnemyFrame, map, mapNpcs, save, townLifeFrame, visibleFixed, walkFrame]);
+  }, [atlasVersion, dungeonLifeFrame, fieldEnemyFrame, map, mapNpcs, save, townLifeFrame, visibleFixed, walkFrame]);
 
   useEffect(() => () => { stopHold(); if (transitionTimer.current) window.clearTimeout(transitionTimer.current); if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current); if (encounterTimer.current) window.clearTimeout(encounterTimer.current); if (dangerTimer.current) window.clearTimeout(dangerTimer.current); stopRpgMusic(); setSfxEnabled(true); }, []);
 
@@ -1924,7 +2024,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
         <div><span><RPGIcon name="gold" size={10} /> GOLD</span><strong>{save.gold}</strong></div>
       </header>
       <section className={styles.locationBar}><span>{terrainLabel}</span><strong>{nearPortal ? `A • ${nearPortal.label}` : notice}</strong></section>
-      <div className={styles.worldFrame}>
+      <div className={styles.worldFrame} data-atmosphere={map.id === "prismCitadel" ? "citadel" : map.id === "voidPass" ? "void" : map.kind === "dungeon" ? "dungeon" : "none"}>
         <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE * WORLD_RENDER_SCALE} height={VIEW_H * TILE * WORLD_RENDER_SCALE} aria-label={`${map.name} exploration map`} />
         <div className={styles.worldGloss} aria-hidden="true" />
         {nearbyThreat ? <div className={styles.fieldThreat} data-boss={ENEMIES[nearbyThreat.entry.enemyId]?.boss ? "true" : "false"} data-alert={nearbyThreat.distance <= 1 ? "true" : "false"}>

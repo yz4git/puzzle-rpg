@@ -276,3 +276,11 @@ are complete.
 - Added role-specific NPC micro-actions and one-pixel idle motion for merchants, soldiers, priests, scholars, elders, travellers, masters, mystery figures and children without changing NPC positions or interaction hit areas.
 - Added distinct ambient motion to all five towns: Hearth Village chimney smoke, Lake Village water glints, Iron City forge sparks, Reed Hamlet drifting motes and Mirror Town reflective window flashes.
 - NPC collision, dialogue, services, shops, story flags, map geometry, portals, save data and Chapter Battle remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 30 — Dungeon atmosphere
+- Added low-frequency ambient animation to dungeon/danger exploration only: temple dust and embers, Crimson Marsh bubbles/fog, Mirror Tower reflection streaks, Void Pass crosswinds/shadows, and Prism Citadel prism veins/sweeps.
+- Prism Citadel atmosphere now increases visually as the hero approaches the throne while leaving map coordinates, encounter logic and progression untouched.
+- Added dungeon-specific viewport grading/vignettes, with a stronger final-dungeon bezel and scan texture.
+- Ambient redraw runs at a restrained 430ms cadence only while actively exploring dungeon/danger maps; battle, menu and town screens do not pay this cost.
+- Collision, portal targets, treasure rewards, enemy tables, boss flags, save data and Chapter Battle remain unchanged.
