@@ -1,7 +1,51 @@
 from pathlib import Path
-p = Path('scripts/pass37_soak_qa.mjs')
+
+p = Path("scripts/pass37_soak_qa.mjs")
 s = p.read_text()
-old = '''const withHold = await intervalCount();\nawait page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));\nawait page.waitForTimeout(80);\nconst afterPageHide = await intervalCount();\nif (afterPageHide >= withHold) throw new Error(`pagehide did not release held movement: held=${withHold} after=${afterPageHide}`);\nawait up.dispatchEvent("pointerup", { pointerId: 900, pointerType: "touch", isPrimary: true, buttons: 0 });\n'''
-new = '''const withHold = await intervalCount();\nawait page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));\nawait page.waitForTimeout(80);\nconst afterPageHide = await intervalCount();\n// Playwright synthetic pointer dispatch does not always establish pointer capture/repeat on\n// mobile emulation. Only compare counts when the probe actually created an interval; the\n// targeted source regression separately guarantees pagehide calls stopHold().\nif (withHold > fieldBaseline && afterPageHide >= withHold) throw new Error(`pagehide did not release held movement: baseline=${fieldBaseline} held=${withHold} after=${afterPageHide}`);\nawait up.dispatchEvent("pointerup", { pointerId: 900, pointerType: "touch", isPrimary: true, buttons: 0 });\n'''
-if old not in s: raise SystemExit('pass37 QA hold anchor missing')
-p.write_text(s.replace(old, new, 1))
+
+old_hold = '''const up = page.getByRole("button", { name: "Move up" });
+await up.dispatchEvent("pointerdown", { pointerId: 900, pointerType: "touch", isPrimary: true, buttons: 1 });
+await page.waitForTimeout(220);
+const withHold = await intervalCount();
+await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));
+await page.waitForTimeout(80);
+const afterPageHide = await intervalCount();
+if (afterPageHide >= withHold) throw new Error(`pagehide did not release held movement: held=${withHold} after=${afterPageHide}`);
+await up.dispatchEvent("pointerup", { pointerId: 900, pointerType: "touch", isPrimary: true, buttons: 0 });
+'''
+new_hold = '''const up = page.getByRole("button", { name: "Move up" });
+const upBox = await up.boundingBox();
+if (!upBox) throw new Error("Move up button has no touchable bounds");
+const cdp = await page.context().newCDPSession(page);
+const touchPoint = { x: upBox.x + upBox.width / 2, y: upBox.y + upBox.height / 2, radiusX: 2, radiusY: 2, force: 1 };
+await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touchPoint] });
+await page.waitForTimeout(220);
+const withHold = await intervalCount();
+if (withHold <= fieldBaseline) throw new Error(`real touch hold did not create repeat interval: baseline=${fieldBaseline} held=${withHold}`);
+await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));
+await page.waitForTimeout(80);
+const afterPageHide = await intervalCount();
+if (afterPageHide >= withHold) throw new Error(`pagehide did not release held movement: baseline=${fieldBaseline} held=${withHold} after=${afterPageHide}`);
+await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+'''
+if old_hold not in s:
+    raise SystemExit("pass37 real-touch hold anchor missing")
+s = s.replace(old_hold, new_hold, 1)
+
+old_moves = '''for (let i = 0; i < 120; i += 1) {
+  const button = i % 2 ? left : right;
+  const pointerId = 1000 + i;
+  await button.dispatchEvent("pointerdown", { pointerId, pointerType: "touch", isPrimary: true, buttons: 1 });
+  await button.dispatchEvent("pointerup", { pointerId, pointerType: "touch", isPrimary: true, buttons: 0 });
+}
+'''
+new_moves = '''for (let i = 0; i < 120; i += 1) {
+  const button = i % 2 ? left : right;
+  await button.tap();
+}
+'''
+if old_moves not in s:
+    raise SystemExit("pass37 tap soak anchor missing")
+s = s.replace(old_moves, new_moves, 1)
+
+p.write_text(s)
