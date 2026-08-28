@@ -192,3 +192,8 @@ are complete.
 - Reframed current enemy power as a compact high-contrast threat badge and reduced NEXT saturation/typographic weight to prevent the second action from competing with the immediate action.
 - Rebuilt HP, BAR and FREE as distinct SFC-style status meters and reframed the message line as a scene-accented battle log.
 - Preserved all row heights, board size, touch layout, intent order, status values, combat rules and Chapter Battle behavior.
+
+## SFC Visual Reconstruction Pass 17 — RPG command window
+- Rebuilt the command overlay as a scene-tinted SFC battle window instead of a generic mobile modal.
+- Added a strong title band, pixel pointer rails, stepped press feedback, denser STATUS framing and clearer disabled-command treatment while keeping touch targets large.
+- ITEM scrolling, TALK/ITEM/STATUS/RUN behavior, close/back behavior, turn costs and combat logic are unchanged.
