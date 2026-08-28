@@ -147,3 +147,10 @@ are complete.
 - Map data, NPC coordinates, encounter rules, boss conditions and saves remain unchanged.
 
 - Pass 8B audit correction: removed dungeon walkable-floor road stamping, grouped floors into 2x2 macro palettes, rebuilt training altar rows as connected dais structures, added sparse exposed-wall pillars, and changed Void floor from repeated hazard stamps to dark fractured rock.
+
+
+## SFC Visual Reconstruction Pass 9 — Character / dialogue presentation
+- Added role-specific environmental props behind merchants, soldiers, priests, scholars, elders, masters, mystery NPCs and children.
+- Added a pixel talk marker only for the NPC directly in front of the hero and contextual bump text (`NPC name • Aで話す`).
+- Added crisp 48x64 atlas portraits to NPC dialogue windows while keeping story/system dialogue portrait-free.
+- Dialogue behavior and NPC actions are unchanged.
