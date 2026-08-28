@@ -1207,6 +1207,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const [discovery, setDiscovery] = useState<DiscoveryState>(null);
   const [encounterCue, setEncounterCue] = useState<EncounterCueState>(null);
   const [dangerWarning, setDangerWarning] = useState<string | null>(null);
+  const [fieldEnemyFrame, setFieldEnemyFrame] = useState(0);
   const [walkFrame, setWalkFrame] = useState(0);
   const [endingIndex, setEndingIndex] = useState(0);
   const [atlasVersion, setAtlasVersion] = useState(0);
@@ -1227,6 +1228,14 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const speakerNpcCell = speakerNpc ? npcAtlasCell(speakerNpc.sprite) : null;
   const visibleFixed = useMemo(() => map.fixedEncounters.filter((entry) => hasFlag(save, entry.requireFlag) && !save.defeatedEncounters.includes(entry.id)), [map, save]);
   const currentTile = tileAt(map, save.position.x, save.position.y);
+  const nearbyThreat = useMemo(() => {
+    let closest: { entry: (typeof visibleFixed)[number]; distance: number } | null = null;
+    for (const entry of visibleFixed) {
+      const distance = Math.abs(entry.x - save.position.x) + Math.abs(entry.y - save.position.y);
+      if (!closest || distance < closest.distance) closest = { entry, distance };
+    }
+    return closest && closest.distance <= 3 ? closest : null;
+  }, [visibleFixed, save.position.x, save.position.y]);
 
   function commit(mutator: (current: RPGSaveData) => RPGSaveData, autosave = false) {
     setSave((current) => {
@@ -1581,6 +1590,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }, [map.music, save.settings.music, save.settings.sfx, screen]);
 
   useEffect(() => {
+    if (screen !== "overworld" || !visibleFixed.length) return;
+    const timer = window.setInterval(() => setFieldEnemyFrame((frame) => (frame + 1) % 4), 360);
+    return () => window.clearInterval(timer);
+  }, [screen, map.id, visibleFixed.length]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => commit((current) => ({ ...current, playSeconds: current.playSeconds + 10 })), 10_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -1717,17 +1732,46 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     });
     visibleFixed.forEach((entry) => {
       const x = (entry.x - cameraX) * TILE, y = (entry.y - cameraY) * TILE;
-      const sprite = enemySpriteCell(entry.enemyId, "idle");
+      const enemy = ENEMIES[entry.enemyId];
+      const boss = Boolean(enemy?.boss);
+      const proximity = Math.abs(entry.x - save.position.x) + Math.abs(entry.y - save.position.y);
+      const alerted = proximity <= 2;
+      const pulse = fieldEnemyFrame % 2;
+      const frame = alerted && pulse ? "reaction" : !boss && pulse ? "reaction" : "idle";
+      const sprite = enemySpriteCell(entry.enemyId, frame);
       const atlasKey: AtlasImageKey | null = !sprite ? null : sprite.src === RPG_ASSETS.enemyA ? "enemyA" : sprite.src === RPG_ASSETS.enemyB ? "enemyB" : "bosses";
       const atlas = atlasKey ? atlasImages.current[atlasKey] : null;
+      const size = boss ? 38 : 28;
+      const bob = pulse ? -1 : 0;
+
+      context.save();
+      context.globalAlpha = boss ? .76 : alerted ? .58 : .34;
+      context.fillStyle = boss ? "#b559d1" : alerted ? "#ff5a60" : "#9d3545";
+      const aura = boss ? 27 : alerted ? 21 : 17;
+      const auraX = x + 8 - Math.floor(aura / 2), auraY = y + 13 - Math.floor(aura / 2);
+      context.fillRect(auraX, auraY + 5, aura, 2);
+      context.fillRect(auraX + 5, auraY, 2, aura);
+      context.fillRect(auraX + aura - 7, auraY, 2, aura);
+      context.fillRect(auraX, auraY + aura - 7, aura, 2);
+      if (boss || alerted) {
+        context.fillStyle = boss ? "#f1c76b" : "#ffaba4";
+        const spark = (fieldEnemyFrame + stableVisualIndex(entry.id, entry.x, entry.y)) % 4;
+        context.fillRect(x - 3 + spark * 6, y - 5 - (spark % 2) * 2, 2, 3);
+        context.fillRect(x + 17 - spark * 3, y + 1 + spark * 3, 2, 2);
+      }
+      context.restore();
+
       if (sprite && atlas?.complete && atlas.naturalWidth) {
         const sourceWidth = atlas.naturalWidth / sprite.columns;
         const sourceHeight = atlas.naturalHeight / sprite.rows;
-        const size = ENEMIES[entry.enemyId]?.boss ? 32 : 26;
         drawGroundShadow(context, x + (TILE - size) / 2, y + TILE, size);
-        context.drawImage(atlas, sprite.col * sourceWidth, sprite.row * sourceHeight, sourceWidth, sourceHeight, x + (TILE - size) / 2, y + TILE - size, size, size);
+        context.drawImage(atlas, sprite.col * sourceWidth, sprite.row * sourceHeight, sourceWidth, sourceHeight, x + (TILE - size) / 2, y + TILE - size + bob, size, size);
       } else {
-        context.fillStyle = "#08080d"; context.fillRect(x + 2, y + 2, 12, 12); context.fillStyle = "#ff4f64"; context.fillRect(x + 5, y + 4, 6, 7);
+        context.fillStyle = "#08080d"; context.fillRect(x + 2, y + 2 + bob, 12, 12); context.fillStyle = "#ff4f64"; context.fillRect(x + 5, y + 4 + bob, 6, 7);
+      }
+      if (alerted) {
+        context.fillStyle = "#09070b"; context.fillRect(x + 5, y - (boss ? 18 : 13), 7, 8);
+        context.fillStyle = boss ? "#ffd86a" : "#ff6868"; context.fillRect(x + 7, y - (boss ? 17 : 12), 3, 4); context.fillRect(x + 7, y - (boss ? 12 : 7), 3, 2);
       }
     });
     const heroAtlas = atlasImages.current.hero;
@@ -1757,7 +1801,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       drawInteractionMarker(context, markerX, markerY, markerKind);
     }
     context.setTransform(1, 0, 0, 1, 0, 0);
-  }, [atlasVersion, map, mapNpcs, save, visibleFixed, walkFrame]);
+  }, [atlasVersion, fieldEnemyFrame, map, mapNpcs, save, visibleFixed, walkFrame]);
 
   useEffect(() => () => { stopHold(); if (transitionTimer.current) window.clearTimeout(transitionTimer.current); if (arrivalTimer.current) window.clearTimeout(arrivalTimer.current); if (encounterTimer.current) window.clearTimeout(encounterTimer.current); if (dangerTimer.current) window.clearTimeout(dangerTimer.current); stopRpgMusic(); setSfxEnabled(true); }, []);
 
@@ -1791,6 +1835,9 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       <div className={styles.worldFrame}>
         <canvas ref={canvasRef} className={styles.world} width={VIEW_W * TILE * WORLD_RENDER_SCALE} height={VIEW_H * TILE * WORLD_RENDER_SCALE} aria-label={`${map.name} exploration map`} />
         <div className={styles.worldGloss} aria-hidden="true" />
+        {nearbyThreat ? <div className={styles.fieldThreat} data-boss={ENEMIES[nearbyThreat.entry.enemyId]?.boss ? "true" : "false"} data-alert={nearbyThreat.distance <= 1 ? "true" : "false"}>
+          <span>{ENEMIES[nearbyThreat.entry.enemyId]?.boss ? "BOSS" : "HOSTILE"}</span><strong>{ENEMIES[nearbyThreat.entry.enemyId]?.name ?? nearbyThreat.entry.enemyId}</strong><small>{nearbyThreat.distance <= 1 ? "A • CONFRONT" : `${nearbyThreat.distance} TILES`}</small>
+        </div> : null}
       </div>
       <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>JOURNEY • {save.steps} STEPS</strong></div>
 

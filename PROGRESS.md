@@ -263,3 +263,10 @@ are complete.
 - Added a short non-blocking warning when stepping from normal terrain into a danger tile so high-encounter regions announce themselves before the next fight.
 - Boss fixed encounters now use a distinct gold warning marker and a longer stepped approach shutter, while ordinary fixed enemies keep a shorter guardian cue.
 - Encounter meter math, encounter tables, fixed-enemy coordinates, boss flags, battle rules, rewards, save data and Chapter Battle remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 28 — Field enemy presence
+- Animated fixed field enemies with a low-frequency stepped idle cadence using existing enemy frames, plus subtle bobbing and deterministic pixel aura/spark accents.
+- Added proximity reactions within two tiles, including reaction frames and an alert glyph; bosses use a larger silhouette, gold/purple threat aura and stronger approach presence.
+- Added a compact in-world threat plaque within three tiles so HOSTILE/BOSS identity and A • CONFRONT state are readable before interaction.
+- Enemy coordinates, collision, fixed encounter flags, boss conditions, encounter tables, battle timing, rewards and save data are unchanged.
