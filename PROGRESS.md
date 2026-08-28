@@ -101,3 +101,8 @@ are complete.
 - Replaced rectangular red danger tile strips with a connected CRIMSON SCAR route plus deterministic corruption tendrils.
 - Bridges, collision, encounter danger flags, portals and map topology remain unchanged.
 - Required validation: Prism Road 402x690 screenshot, route continuity near intersections, natural encounter, battle and Chapter regression.
+
+## SFC Visual Reconstruction Pass 4 — Landmark correction
+- Identified the apparent legacy roads as oversized portal-atlas landmark cells, not terrain.
+- Replaced world-map portal atlas cells with compact target-specific pixel landmarks so roads and destinations read as separate layers.
+- Preserved existing portal collision, progression gates and non-world portal rendering.
