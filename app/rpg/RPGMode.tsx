@@ -52,14 +52,21 @@ function encounterReset(save: RPGSaveData) {
 function drawAtlasTile(context: CanvasRenderingContext2D, image: HTMLImageElement, cell: AtlasCell, x: number, y: number) {
   const { width, height } = RPG_ATLAS_METRICS.terrain;
   const rotation = cell.rotation ?? 0;
+  // Generated atlas cells carry a small presentation rim. Crop two source pixels
+  // so adjacent 16x16 gameplay tiles read as continuous SNES terrain instead of cards.
+  const inset = 2;
+  const sourceX = cell.col * width + inset;
+  const sourceY = cell.row * height + inset;
+  const sourceWidth = width - inset * 2;
+  const sourceHeight = height - inset * 2;
   if (!rotation) {
-    context.drawImage(image, cell.col * width, cell.row * height, width, height, x, y, TILE, TILE);
+    context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, TILE, TILE);
     return;
   }
   context.save();
   context.translate(x + TILE / 2, y + TILE / 2);
   context.rotate(rotation * Math.PI / 2);
-  context.drawImage(image, cell.col * width, cell.row * height, width, height, -TILE / 2, -TILE / 2, TILE, TILE);
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, -TILE / 2, -TILE / 2, TILE, TILE);
   context.restore();
 }
 
