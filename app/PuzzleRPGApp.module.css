@@ -38,3 +38,13 @@
 .continuePanel button{min-height:54px;padding-block:6px;}
 .title footer{margin-top:0;padding:3px 6px;opacity:.72;}
 @media(max-height:700px){.title{gap:3px}.hero{width:min(27vw,100px);height:min(13dvh,94px)}.modeGrid button{min-height:62px}.modeGrid strong{font-size:12px}.modeGrid small{font-size:5px}}
+
+/* SFC visual reconstruction pass 33 — iPhone portrait final polish */
+.title{box-sizing:border-box;width:min(100%,460px);height:100dvh;min-height:100dvh;padding-top:max(10px,env(safe-area-inset-top));padding-right:max(10px,env(safe-area-inset-right));padding-bottom:max(9px,env(safe-area-inset-bottom));padding-left:max(10px,env(safe-area-inset-left));overscroll-behavior:none}
+.modeGrid,.continuePanel,.title footer{max-width:100%;box-sizing:border-box}
+.modeGrid button,.continuePanel button{box-sizing:border-box;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.continuePanel .back{min-height:44px}
+.modeGrid strong,.modeGrid small,.continuePanel b,.continuePanel small{overflow-wrap:anywhere}
+@media(max-width:380px){.title{padding-left:max(7px,env(safe-area-inset-left));padding-right:max(7px,env(safe-area-inset-right))}.modeGrid{gap:5px}.modeGrid button{padding-inline:7px}.modeGrid strong{font-size:13px}.modeGrid small{font-size:5.5px}.continuePanel{padding:6px}}
+@media(max-height:667px){.title{gap:3px}.logo{font-size:clamp(36px,10.8vw,46px)}.logo::after{margin-top:4px}.subtitle{padding-block:2px}.hero{width:min(25vw,92px);height:min(13dvh,86px)}.title:has(.continuePanel) .hero{width:min(23vw,82px);height:min(11dvh,76px)}.modeGrid button{min-height:62px}.continuePanel button{min-height:46px}.continuePanel .back{min-height:42px}}
+@media(max-height:600px){.hero{width:64px;height:54px}.modeGrid button{min-height:52px}.modeGrid strong{font-size:10.5px}.modeGrid small{font-size:5px}.title footer{display:none}}

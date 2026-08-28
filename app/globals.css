@@ -9,3 +9,9 @@
 html, body { width: 100%; height: 100%; margin: 0; min-width: 320px; overflow: hidden; background: #061018; }
 body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
 button { font: inherit; cursor: pointer; }
+
+/* SFC visual reconstruction pass 33 — iPhone portrait final polish */
+:root{-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior:none}
+html,body{width:100%;min-height:100%;overflow:hidden;overscroll-behavior:none;background:#050509}
+button,[role="button"]{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+img,canvas{-webkit-user-drag:none}

@@ -298,3 +298,10 @@ are complete.
 - Reduced excess vertical chrome and secondary-copy weight while preserving the world map and 6x6 battle board as the dominant visual surfaces on iPhone portrait displays.
 - Normalized frame density, typography hierarchy, touch-control proportions, menu row heights and modal spacing without changing gameplay, reward values, map data, battle logic, save data or progression.
 - Added short-height overrides so the same hierarchy survives smaller Safari viewports instead of hiding primary information.
+
+## SFC Visual Reconstruction Pass 33 — iPhone portrait final polish
+- Hardened all title, RPG field, dialogue/menu/result, Chapter Battle and reward surfaces against iPhone safe-area clipping, short portrait heights and narrow displays without changing game logic.
+- Raised undersized menu/navigation touch targets, disabled tap highlight/double-tap style browser gestures on controls, and added contained momentum scrolling only where long menus or reward cards need it.
+- Added dedicated 380px-wide, 667px-tall and 590px-tall portrait breakpoints so world/board play space remains primary while secondary labels collapse before core interaction does.
+- Added overflow wrapping and ellipsis rules for long Japanese/English labels plus symmetric left/right safe-area padding for Dynamic Island/notch landscape-to-portrait transitions.
+- Viewport metadata, battle math, encounter logic, reward values, maps, story flags, save format and Chapter Battle rules remain unchanged.

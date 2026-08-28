@@ -612,3 +612,17 @@
 .message{width:min(92vw,374px);min-height:17px;padding:3px 5px;font-size:7.5px}.ruleLine{width:min(92vw,374px);font-size:6px;opacity:.74;}
 .introCard,.clearCard,.gameOverCard{width:min(92vw,386px);gap:7px;padding:11px}.introCard>strong{font-size:16px}.dialogue{font-size:13px;line-height:1.45}.hint{font-size:10px;line-height:1.42}.introCard small{font-size:8px}.clearCard strong,.gameOverCard strong{font-size:26px;}
 @media(max-height:760px){.shell{gap:2px}.enemyStage{min-height:69px;grid-template-columns:74px 1fr}.enemySprite{width:70px;height:63px}.board{width:min(90vw,40dvh,336px)}.playerStatus>div{min-height:32px}.nextStrip{min-height:31px}}
+
+/* SFC visual reconstruction pass 33 — iPhone portrait final polish */
+.shell,.titleScreen{box-sizing:border-box;width:100%;height:100dvh;min-height:100dvh;overscroll-behavior:none}
+.shell{padding-top:max(5px,env(safe-area-inset-top));padding-right:max(7px,env(safe-area-inset-right));padding-bottom:max(6px,env(safe-area-inset-bottom));padding-left:max(7px,env(safe-area-inset-left))}
+.shell button,.overlay button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.topBar,.enemyStage,.intentRow,.playerStatus,.nextStrip,.boardZone,.clusterReadout,.message,.ruleLine{min-width:0;max-width:100%;box-sizing:border-box}
+.enemyInfo strong,.enemyInfo span,.enemyInfo small,.intentNow strong,.intentNext strong,.intentNow small,.intentNext small,.freeMoves small{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.overlay{box-sizing:border-box;padding-top:max(14px,env(safe-area-inset-top));padding-right:max(12px,env(safe-area-inset-right));padding-bottom:max(14px,env(safe-area-inset-bottom));padding-left:max(12px,env(safe-area-inset-left));overscroll-behavior:contain}
+.introCard,.clearCard,.gameOverCard{box-sizing:border-box;max-height:calc(100dvh - max(22px,env(safe-area-inset-top)) - max(22px,env(safe-area-inset-bottom)));overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.introCard button,.clearCard button,.gameOverCard button{min-height:44px;min-width:44px}
+.dialogue,.hint,.clearCard p,.gameOverCard p{overflow-wrap:anywhere;word-break:break-word}
+@media(max-width:380px){.shell{padding-right:max(5px,env(safe-area-inset-right));padding-left:max(5px,env(safe-area-inset-left))}.enemyStage{grid-template-columns:78px 1fr}.enemySprite{width:74px}.intentNow,.intentNext{padding-inline:4px}.playerStatus>div{padding-inline:4px}.board{width:min(94vw,41dvh,360px)}}
+@media(max-height:667px){.shell{gap:2px}.topBar{min-height:27px}.enemyStage{min-height:66px;grid-template-columns:72px 1fr;padding-block:3px}.enemySprite{width:70px;height:61px}.enemyInfo small{display:none}.intentNow,.intentNext{padding-block:3px}.playerStatus>div{min-height:31px}.nextStrip{min-height:31px}.board{width:min(92vw,40dvh,342px)}.message{min-height:14px;padding-block:2px}.ruleLine{font-size:6px}.introCard,.clearCard,.gameOverCard{gap:6px;padding:10px}.introCard>img{width:112px;height:94px}}
+@media(max-height:590px){.topBar{min-height:24px}.enemyStage{min-height:58px;grid-template-columns:62px 1fr}.enemySprite{width:60px;height:53px}.enemyInfo>span{font-size:7px}.intentNow>small,.intentNext>small,.ruleLine{display:none}.playerStatus>div{min-height:28px}.nextStrip{min-height:27px}.board{width:min(90vw,38dvh,300px)}.message{font-size:7px}.clusterReadout span{padding-block:2px}}
