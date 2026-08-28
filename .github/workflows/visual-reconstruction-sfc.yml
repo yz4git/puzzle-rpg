@@ -29,7 +29,17 @@ jobs:
         run: npm ci
 
       - name: Apply visual reconstruction
-        run: node scripts/apply-sfc-visual-pass.mjs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-sfc-visual-pass.mjs')
+          lines = path.read_text().splitlines()
+          for index, line in enumerate(lines):
+              if 'progress +=' in line:
+                  lines[index] = "  progress += '\\n\\n' + marker + '\\n- Restore point: restore/pre-visual-reconstruction-pass\\n- Target: late-SNES-inspired 16bit+ presentation.\\n- Phase 1 implementation: denser field layout, larger hero/NPC silhouettes, regional UI palettes, compact field menu, scene-specific battle backdrops, grounded enemies, 340-388px RPG battle board, SNES-styled battle frame, dedicated TALK reaction window.\\n- Validation required: TypeScript, production build, iPhone 402x690 visual audit, Chapter Battle regression check.\\n- Next asset phase: replace prototype CSS battle scenery with dedicated pixel background strips and expand region-specific terrain/autotiles.\\n';"
+          path.write_text('\n'.join(lines) + '\n')
+          PY
+          node scripts/apply-sfc-visual-pass.mjs
 
       - name: TypeScript check
         run: npx tsc -p tsconfig.puzzle.json --noEmit
