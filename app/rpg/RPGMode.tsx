@@ -73,6 +73,33 @@ function drawGroundShadow(context: CanvasRenderingContext2D, x: number, y: numbe
   context.restore();
 }
 
+function drawTerrainEdge(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  const up = tileAt(map, worldX, worldY - 1), right = tileAt(map, worldX + 1, worldY), down = tileAt(map, worldX, worldY + 1), left = tileAt(map, worldX - 1, worldY);
+  const road = code === "r" || code === "b";
+  if (road) {
+    context.fillStyle = "rgba(64,45,28,.58)";
+    if (!(up === "r" || up === "b")) context.fillRect(x, y, TILE, 1);
+    if (!(down === "r" || down === "b")) context.fillRect(x, y + TILE - 1, TILE, 1);
+    if (!(left === "r" || left === "b")) context.fillRect(x, y, 1, TILE);
+    if (!(right === "r" || right === "b")) context.fillRect(x + TILE - 1, y, 1, TILE);
+  }
+  if (code === "w") {
+    context.fillStyle = "rgba(157,215,203,.70)";
+    if (up !== "w") context.fillRect(x, y, TILE, 1);
+    if (down !== "w") context.fillRect(x, y + TILE - 1, TILE, 1);
+    if (left !== "w") context.fillRect(x, y, 1, TILE);
+    if (right !== "w") context.fillRect(x + TILE - 1, y, 1, TILE);
+  }
+  if (code === "f") {
+    context.fillStyle = "rgba(7,29,16,.52)";
+    if (up !== "f") context.fillRect(x, y, TILE, 2);
+    if (left !== "f") context.fillRect(x, y + 2, 2, TILE - 2);
+    context.fillStyle = "rgba(91,139,66,.32)";
+    if (down !== "f") context.fillRect(x + 2, y + TILE - 2, TILE - 2, 2);
+  }
+  if ((code === "d" || code === "x") && !["d","x"].includes(up)) { context.fillStyle = "rgba(239,110,95,.42)"; context.fillRect(x, y, TILE, 1); }
+}
+
 function drawTile(context: CanvasRenderingContext2D, code: string, x: number, y: number, worldX: number, worldY: number) {
   const palettes: Record<string, [string, string]> = {
     g: ["#2e6336", "#62a34f"], f: ["#183a24", "#356d38"], r: ["#a78e58", "#d1b675"], d: ["#6e2530", "#b43a3d"],
@@ -513,6 +540,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       else drawTile(context, code, viewX * TILE, viewY * TILE, worldX, worldY);
     }
 
+    // A lightweight autotile edge pass stitches roads, shores, forest walls and danger ground together.
+    for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+      const worldX = cameraX + viewX, worldY = cameraY + viewY;
+      drawTerrainEdge(context, map, tileAt(map, worldX, worldY), worldX, worldY, viewX * TILE, viewY * TILE);
+    }
+
     // A connected two-row house block is reconstructed from complete facade
     // sprites instead of repeating random wall fragments on every tile.
     const townAtlas = atlasImages.current.town;
@@ -533,6 +566,14 @@ export default function RPGMode({ initialSave, onExit }: Props) {
             const drawWidth = Math.min(2, width) * TILE;
             const drawHeight = Math.max(2, height) * TILE;
             context.drawImage(townAtlas, col * 64, 64, 64, 64, drawX, drawY, drawWidth, drawHeight);
+            // Distinct signboards / window glints keep repeated facades from reading as one stamped asset.
+            if (drawWidth >= TILE * 2) {
+              const detail = stableVisualIndex(map.id, worldX + offset, worldY + buildingIndex);
+              const signColors = ["#e2aa4f", "#6ec4c7", "#cf6c69", "#a68bd4"];
+              context.fillStyle = "#2b1b17"; context.fillRect(drawX + drawWidth - 8, drawY + drawHeight - 15, 7, 6);
+              context.fillStyle = signColors[detail % signColors.length]!; context.fillRect(drawX + drawWidth - 7, drawY + drawHeight - 14, 5, 4);
+              context.fillStyle = "rgba(255,230,145,.78)"; context.fillRect(drawX + 4, drawY + drawHeight - 13, 3, 3);
+            }
           });
         }
       }
@@ -567,8 +608,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       if (x < -TILE * 2 || y < -TILE * 2 || x >= VIEW_W * TILE + TILE || y >= VIEW_H * TILE + TILE) return;
       if (npcAtlas?.complete && npcAtlas.naturalWidth) {
         const cell = npcAtlasCell(npc.sprite);
-        drawGroundShadow(context, x - 4, y + TILE, 24);
-        context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 4, y - 16, 24, 32);
+        drawGroundShadow(context, x - 5, y + TILE, 26);
+        context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 5, y - 18, 26, 34);
       } else drawPerson(context, x, y, npcColors[npc.palette % npcColors.length]!, "down", 0);
     });
     visibleFixed.forEach((entry) => {
@@ -590,8 +631,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     const heroX = (save.position.x - cameraX) * TILE, heroY = (save.position.y - cameraY) * TILE;
     if (heroAtlas?.complete && heroAtlas.naturalWidth) {
       const cell = heroAtlasCell(save.direction, walkFrame);
-      drawGroundShadow(context, heroX - 5, heroY + TILE, 27);
-      context.drawImage(heroAtlas, cell.col * 96, cell.row * 96, 96, 96, heroX - 5, heroY - 14, 26, 30);
+      drawGroundShadow(context, heroX - 6, heroY + TILE, 29);
+      context.drawImage(heroAtlas, cell.col * 96, cell.row * 96, 96, 96, heroX - 6, heroY - 16, 28, 32);
     } else drawPerson(context, heroX, heroY, "#f0c85a", save.direction, walkFrame, true);
 
     context.setTransform(1, 0, 0, 1, 0, 0);

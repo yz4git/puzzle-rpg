@@ -82,3 +82,9 @@ are complete.
 - Phase 1 implementation: denser field layout, larger hero/NPC silhouettes, regional UI palettes, compact field menu, scene-specific battle backdrops, grounded enemies, 340-388px RPG battle board, SNES-styled battle frame, dedicated TALK reaction window.
 - Validation required: TypeScript, production build, iPhone 402x690 visual audit, Chapter Battle regression check.
 - Next asset phase: replace prototype CSS battle scenery with dedicated pixel background strips and expand region-specific terrain/autotiles.
+
+
+## Visual Reconstruction Pass 2 — dedicated scene assets
+- Added dedicated pixel battle background strips for field/town/marsh/tower/fortress/dungeon/citadel.
+- Added terrain edge stitching, richer town facade details, stronger hero/NPC field presence, and TALK reaction frame animation.
+- Required validation: TypeScript, vinext build, 402x690 DPR3 screenshots, Chapter Battle regression.
