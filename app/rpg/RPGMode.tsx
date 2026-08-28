@@ -193,6 +193,154 @@ function drawWorldForestLayer(context: CanvasRenderingContext2D, image: HTMLImag
   }
 }
 
+
+function drawWorldWaterLayer(context: CanvasRenderingContext2D, map: MapDefinition, cameraX: number, cameraY: number) {
+  if (map.id !== "world") return;
+  const waterLike = (x: number, y: number) => {
+    const code = tileAt(map, x, y);
+    return code === "w" || code === "b";
+  };
+  for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+    const worldX = cameraX + viewX, worldY = cameraY + viewY;
+    if (tileAt(map, worldX, worldY) !== "w") continue;
+    const x = viewX * TILE, y = viewY * TILE;
+    const seed = stableVisualIndex("world-water", worldX, worldY);
+    const macro = stableVisualIndex("world-water-macro", Math.floor(worldX / 3), Math.floor(worldY / 2));
+    context.fillStyle = macro % 3 === 0 ? "#1b5269" : macro % 3 === 1 ? "#205d73" : "#23596d";
+    context.fillRect(x, y, TILE, TILE);
+
+    // Sparse horizontal highlights read as one continuous SNES water surface,
+    // rather than repeating one illustrated 16px card per gameplay tile.
+    context.fillStyle = "#4b91a0";
+    const waveY = y + 4 + (seed % 7);
+    context.fillRect(x + 2 + (seed % 4), waveY, 7 + (seed % 4), 1);
+    if (seed % 4 === 0) {
+      context.fillStyle = "#78b7b5";
+      context.fillRect(x + 8, y + 11, 5, 1);
+    }
+    context.fillStyle = "#123f57";
+    if (seed % 5 === 0) context.fillRect(x + 1, y + 14, 6, 1);
+
+    const up = waterLike(worldX, worldY - 1), right = waterLike(worldX + 1, worldY);
+    const down = waterLike(worldX, worldY + 1), left = waterLike(worldX - 1, worldY);
+    // Shorelines are two-tone and only exist where water actually meets land.
+    // Bridge cells count as water so banks connect cleanly into bridge art.
+    context.fillStyle = "#0e3144";
+    if (!up) context.fillRect(x, y, TILE, 2);
+    if (!down) context.fillRect(x, y + TILE - 2, TILE, 2);
+    if (!left) context.fillRect(x, y, 2, TILE);
+    if (!right) context.fillRect(x + TILE - 2, y, 2, TILE);
+    context.fillStyle = "#79aa89";
+    if (!up) context.fillRect(x + 2, y + 2, TILE - 4, 1);
+    if (!down) context.fillRect(x + 2, y + TILE - 3, TILE - 4, 1);
+    if (!left) context.fillRect(x + 2, y + 2, 1, TILE - 4);
+    if (!right) context.fillRect(x + TILE - 3, y + 2, 1, TILE - 4);
+  }
+}
+
+
+function drawWorldBridgeLayer(context: CanvasRenderingContext2D, map: MapDefinition, cameraX: number, cameraY: number) {
+  if (map.id !== "world") return;
+  for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+    const worldX = cameraX + viewX, worldY = cameraY + viewY;
+    if (tileAt(map, worldX, worldY) !== "b") continue;
+    const x = viewX * TILE, y = viewY * TILE;
+    const horizontal = tileAt(map, worldX - 1, worldY) === "b" || tileAt(map, worldX + 1, worldY) === "b";
+    const seed = stableVisualIndex("world-bridge", worldX, worldY);
+    // Repaint the bridge cell as water first so gaps beside the deck remain lake/river.
+    context.fillStyle = "#205d73";
+    context.fillRect(x, y, TILE, TILE);
+    context.fillStyle = "#4b91a0";
+    context.fillRect(x + 2, y + 3 + (seed % 9), 6, 1);
+    const rail = "#3b2a20", deck = "#8c693f", plank = "#b68c55", shine = "#d0a768";
+    if (horizontal) {
+      context.fillStyle = "#16202a"; context.fillRect(x, y + 4, TILE, 9);
+      context.fillStyle = rail; context.fillRect(x, y + 3, TILE, 2); context.fillRect(x, y + 12, TILE, 2);
+      context.fillStyle = deck; context.fillRect(x, y + 5, TILE, 7);
+      context.fillStyle = plank;
+      for (let px = x + 2; px < x + TILE; px += 5) context.fillRect(px, y + 5, 1, 7);
+      context.fillStyle = shine; context.fillRect(x + 1, y + 6, TILE - 2, 1);
+    } else {
+      context.fillStyle = "#16202a"; context.fillRect(x + 4, y, 9, TILE);
+      context.fillStyle = rail; context.fillRect(x + 3, y, 2, TILE); context.fillRect(x + 12, y, 2, TILE);
+      context.fillStyle = deck; context.fillRect(x + 5, y, 7, TILE);
+      context.fillStyle = plank;
+      for (let py = y + 2; py < y + TILE; py += 5) context.fillRect(x + 5, py, 7, 1);
+      context.fillStyle = shine; context.fillRect(x + 6, y + 1, 1, TILE - 2);
+    }
+  }
+}
+
+function drawWorldMountainLayer(context: CanvasRenderingContext2D, map: MapDefinition, cameraX: number, cameraY: number) {
+  if (map.id !== "world") return;
+
+  // Lower mountain row: sparse foothill and scree shapes only. Keeping the
+  // grass foundation visible between forms prevents the range from reading as a wall.
+  for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+    const worldX = cameraX + viewX, worldY = cameraY + viewY;
+    if (tileAt(map, worldX, worldY) !== "m" || tileAt(map, worldX, worldY - 1) !== "m") continue;
+    const x=viewX*TILE,y=viewY*TILE,seed=stableVisualIndex("ridge-foot",worldX,worldY);
+    context.fillStyle="#27313b";
+    context.beginPath();
+    context.moveTo(x-3,y+15);context.lineTo(x+2,y+9+(seed%3));context.lineTo(x+7,y+5+(seed%4));context.lineTo(x+11,y+10);context.lineTo(x+17,y+7+((seed>>3)%4));context.lineTo(x+19,y+16);context.closePath();context.fill();
+    context.fillStyle=seed%2?"#4b5660":"#56616a";
+    context.beginPath();context.moveTo(x,y+14);context.lineTo(x+7,y+7+(seed%3));context.lineTo(x+10,y+14);context.closePath();context.fill();
+    context.fillStyle="#707979";context.fillRect(x+5+(seed%5),y+10,2,2);
+    context.fillStyle="#1b232d";context.fillRect(x+12,y+12,3+(seed%3),3);
+  }
+
+  // Top row: one large 2-tile-wide mountain per pair. Peaks extend through the
+  // lower gameplay row and end in a broken polygonal toe rather than a baseline.
+  for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
+    const worldX=cameraX+viewX,worldY=cameraY+viewY;
+    if(tileAt(map,worldX,worldY)!=="m"||tileAt(map,worldX,worldY-1)==="m")continue;
+    let startX=worldX;while(tileAt(map,startX-1,worldY)==="m")startX-=1;
+    const offset=worldX-startX;if(offset%2!==0)continue;
+    const x=viewX*TILE,y=viewY*TILE,seed=stableVisualIndex("ridge-natural",worldX,worldY);
+    const pair=tileAt(map,worldX+1,worldY)==="m";const width=pair?32+(seed%5):21;const left=x-3+((seed%5)-2);const peak=left+Math.floor(width*(.38+((seed>>3)%15)/100));const toeY=y+29+(seed%3);
+    context.fillStyle="#1d2631";
+    context.beginPath();context.moveTo(left-3,toeY-2);context.lineTo(left+3,y+19);context.lineTo(left+9,y+12);context.lineTo(peak,y+1+(seed%3));context.lineTo(left+width-8,y+12);context.lineTo(left+width-2,y+20);context.lineTo(left+width+3,toeY-4);context.lineTo(left+width-3,toeY);context.lineTo(left+width-11,toeY-3);context.lineTo(left+width-18,toeY+1);context.lineTo(left+width-25,toeY-2);context.lineTo(left+4,toeY+1);context.closePath();context.fill();
+    context.fillStyle=seed%2?"#59646d":"#657078";
+    context.beginPath();context.moveTo(left+1,toeY-4);context.lineTo(left+8,y+14);context.lineTo(peak,y+4+(seed%2));context.lineTo(peak+1,toeY-5);context.lineTo(left+width-18,toeY-2);context.lineTo(left+10,toeY);context.closePath();context.fill();
+    context.fillStyle="#38434e";
+    context.beginPath();context.moveTo(peak,y+4+(seed%2));context.lineTo(left+width-8,y+13);context.lineTo(left+width-1,toeY-5);context.lineTo(peak+1,toeY-5);context.closePath();context.fill();
+    context.fillStyle="#a0a49e";context.fillRect(peak-1,y+5,2,5);if(width>25)context.fillRect(left+8+(seed%6),y+16,2,2);
+    context.fillStyle="#202a34";context.fillRect(left+width-12,y+20,4,5);
+  }
+}
+
+function drawWorldLandmarkGround(context: CanvasRenderingContext2D, targetMap: string, x: number, y: number, locked: boolean) {
+  context.save();
+  context.globalAlpha = locked ? .38 : 1;
+  const towns = ["hearthVillage", "lakeVillage", "reedHamlet", "ironCity", "mirrorTown"];
+  const schools = ["emberShrine", "quietBower", "ironHall", "hourSpire"];
+  let dark = "#574733", base = "#9f875c", light = "#c4aa70";
+  if (targetMap === "crimsonMarsh") { dark = "#3e1521"; base = "#76263a"; light = "#aa3a49"; }
+  else if (["mirrorTower", "voidPass"].includes(targetMap)) { dark = "#303544"; base = "#586477"; light = "#8793a5"; }
+  else if (targetMap === "prismCitadel") { dark = "#51456d"; base = "#8f7db1"; light = "#d7c588"; }
+  else if (targetMap === "oldTemple") { dark = "#393536"; base = "#746c5b"; light = "#a99a76"; }
+  else if (schools.includes(targetMap)) { dark = "#4b4031"; base = "#897452"; light = "#b79a63"; }
+  else if (towns.includes(targetMap)) { dark = "#574733"; base = "#9f875c"; light = "#c4aa70"; }
+
+  // A small plaza / corrupted clearing / stone apron visually separates the
+  // destination from the road tile underneath and gives every landmark a footprint.
+  context.fillStyle = dark;
+  context.fillRect(x - 3, y + 7, 22, 10);
+  context.fillStyle = base;
+  context.fillRect(x - 2, y + 7, 20, 8);
+  context.fillStyle = light;
+  context.fillRect(x + 1, y + 8, 5, 1);
+  context.fillRect(x + 11, y + 12, 4, 1);
+  context.fillStyle = dark;
+  context.fillRect(x + 7, y + 14, 3, 3);
+  if (targetMap === "crimsonMarsh") {
+    context.fillStyle = "#cf514b";
+    context.fillRect(x - 4, y + 10, 3, 1);
+    context.fillRect(x + 17, y + 8, 3, 1);
+  }
+  context.restore();
+}
+
 function drawWorldLandmark(context: CanvasRenderingContext2D, targetMap: string, x: number, y: number, locked: boolean) {
   context.save();
   context.globalAlpha = locked ? .44 : 1;
@@ -296,7 +444,7 @@ function drawTerrainEdge(context: CanvasRenderingContext2D, map: MapDefinition, 
     if (!(left === "r" || left === "b")) context.fillRect(x, y, 1, TILE);
     if (!(right === "r" || right === "b")) context.fillRect(x + TILE - 1, y, 1, TILE);
   }
-  if (code === "w") {
+  if (code === "w" && map.id !== "world") {
     context.fillStyle = "rgba(157,215,203,.70)";
     if (up !== "w") context.fillRect(x, y, TILE, 1);
     if (down !== "w") context.fillRect(x, y + TILE - 1, TILE, 1);
@@ -749,12 +897,18 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       const code = tileAt(map, worldX, worldY);
       // World roads and danger routes receive a grass foundation; a connected
       // metatile route is painted afterward. Bridges keep their dedicated atlas art.
-      const baseCode = map.id === "world" && (code === "r" || code === "d" || code === "f") ? "g" : code;
+      const baseCode = map.id === "world" && (code === "r" || code === "d" || code === "f" || code === "w" || code === "m") ? "g" : code;
       const cell = terrainAtlasCell(map, baseCode, worldX, worldY);
       const atlas = atlasImages.current[cell.atlas];
       if (atlas?.complete && atlas.naturalWidth) drawAtlasTile(context, atlas, cell, viewX * TILE, viewY * TILE);
       else drawTile(context, baseCode, viewX * TILE, viewY * TILE, worldX, worldY);
     }
+
+    // World water and mountains are reconstructed as continuous terrain masses
+    // before the forest canopy and route overlays are added.
+    drawWorldWaterLayer(context, map, cameraX, cameraY);
+    drawWorldBridgeLayer(context, map, cameraX, cameraY);
+    drawWorldMountainLayer(context, map, cameraX, cameraY);
 
     // Forest is composited as greedy 2x2 metatiles over a grass foundation.
     // Edge cells remain single-tree illustrations for a readable silhouette.
@@ -808,6 +962,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       if (x < -TILE || y < -TILE || x >= VIEW_W * TILE || y >= VIEW_H * TILE) return;
       const locked = Boolean(portal.requireFlag && !hasFlag(save, portal.requireFlag));
       if (map.id === "world") {
+        drawWorldLandmarkGround(context, portal.targetMap, x, y, locked);
         drawWorldLandmark(context, portal.targetMap, x, y, locked);
         return;
       }

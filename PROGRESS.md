@@ -117,3 +117,15 @@ are complete.
 - World forest now uses a greedy 2x2 canopy compositor over grass, reducing 16px seams while keeping single-tree edge silhouettes.
 
 - SFC Visual Reconstruction Pass 5: cropped trunk-heavy lower source area from 2x2 interior forest metatiles and restricted dense variants to canopy-first cells.
+
+## SFC Visual Reconstruction Pass 6 — Water / ridge / landmark ground
+- Reconstructed world lake and river tiles as one continuous procedural 16-bit water surface with bridge-aware shorelines.
+- Reconstructed mountain tiles into connected ridgelines and cliff faces instead of isolated atlas cards.
+- Added destination-specific landmark ground footprints/plazas so towns, schools, dungeons and the citadel visually connect to the road network.
+- Map collision, encounters, portals and progression data are unchanged.
+
+- Pass 6 visual correction: rejected the first rectangular ridge because it read as a fortress wall. Replaced it with overlapping stepped peaks/foothills and added a dedicated bridge compositor over the continuous water layer.
+
+- Pass 6 ridge meta correction: replaced the remaining 16px repeated mountain cadence with a two-pass continuous rock foundation plus 2-tile-wide overlapping metapeaks.
+
+- Pass 6 natural ridge correction: removed the remaining full-width lower rock band; metapeaks now extend across both mountain rows with broken polygon toes while the lower row uses sparse foothill/scree shapes.
