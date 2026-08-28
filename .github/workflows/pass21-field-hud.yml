@@ -1,0 +1,40 @@
+name: SFC Pass 21 Field HUD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/pass21-field-hud.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply field HUD pass
+        run: python scripts/pass21_patch.py
+      - name: Install dependencies
+        run: npm ci
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Commit pass
+        shell: bash
+        run: |
+          rm .github/workflows/pass21-field-hud.yml scripts/pass21_patch.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/rpg/RPGMode.module.css PROGRESS.md .github/workflows/pass21-field-hud.yml scripts/pass21_patch.py
+          git commit -m "Implement SFC visual reconstruction pass 21"
+          git push origin HEAD:main
