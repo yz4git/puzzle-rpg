@@ -75,4 +75,17 @@ await waitTitle();
 if old not in q:
     raise SystemExit("QA mode-return anchor missing")
 q = q.replace(old, new, 1)
+
+old_chapter = '''await page.getByRole("button", { name: /CHAPTER BATTLE/ }).click();
+await page.getByRole("button", { name: /◀ MODE/ }).click();
+await waitTitle();
+'''
+new_chapter = '''await page.getByRole("button", { name: /CHAPTER BATTLE/ }).click();
+await page.getByRole("button", { name: /BATTLE START/ }).click();
+await page.getByRole("button", { name: /◀ MODE/ }).click();
+await waitTitle();
+'''
+if old_chapter not in q:
+    raise SystemExit("QA chapter transition anchor missing")
+q = q.replace(old_chapter, new_chapter, 1)
 qa.write_text(q)
