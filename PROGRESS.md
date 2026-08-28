@@ -127,3 +127,5 @@ are complete.
 - Pass 6 visual correction: rejected the first rectangular ridge because it read as a fortress wall. Replaced it with overlapping stepped peaks/foothills and added a dedicated bridge compositor over the continuous water layer.
 
 - Pass 6 ridge meta correction: replaced the remaining 16px repeated mountain cadence with a two-pass continuous rock foundation plus 2-tile-wide overlapping metapeaks.
+
+- Pass 6 natural ridge correction: removed the remaining full-width lower rock band; metapeaks now extend across both mountain rows with broken polygon toes while the lower row uses sparse foothill/scree shapes.
