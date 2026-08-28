@@ -1,0 +1,44 @@
+name: SFC Visual Reconstruction Pass 4 Landmarks
+
+on:
+  push:
+    branches:
+      - visual/reconstruction-pass-sfc4
+    paths:
+      - scripts/apply-sfc-visual-pass4-landmarks.py
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: visual/reconstruction-pass-sfc4
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply landmark correction
+        run: python scripts/apply-sfc-visual-pass4-landmarks.py
+      - name: TypeScript check
+        run: npm run typecheck
+      - name: Vinext production build
+        run: npm run build
+      - name: Review diff
+        run: |
+          git diff --check
+          git status --short
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/rpg/RPGMode.tsx PROGRESS.md
+          git diff --cached --quiet && exit 0
+          git commit -m "Correct world landmarks for SFC pass 4"
+          git push origin HEAD:visual/reconstruction-pass-sfc4
