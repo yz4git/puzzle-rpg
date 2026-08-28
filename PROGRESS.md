@@ -180,3 +180,9 @@ are complete.
 - Reframed TALK as a high-contrast ENEMY REACTION window with larger text, a scene-tinted accent rail and stronger SFC window hierarchy.
 - Temporarily dims NOW/NEXT and status panels only while the existing 900ms TALK reaction is visible, then restores them unchanged.
 - TALK turn cost, duration, enemy response, alternate-resolution rules and battle math are unchanged.
+
+## SFC Visual Reconstruction Pass 15 — Cluster board readability
+- Rebuilt the 6×6 board material treatment with stronger SFC bevels, scene-tinted framing and distinct ATK/HEAL/BAR/SKIP surface language without changing board dimensions.
+- During touch preview, non-selected panels now recede while the selected connected cluster rises forward; the corresponding NEXT DROP columns receive matching emphasis.
+- Replaced the generic clear shrink with a stepped cluster-break effect and strengthened the cluster-count banner.
+- Touch hit areas, panel generation, collapse timing, battle math, NEXT queue order and Chapter Battle remain unchanged.
