@@ -599,3 +599,16 @@
     letter-spacing: 2px;
   }
 }
+
+/* SFC visual reconstruction pass 32 — battle consistency audit */
+.shell{gap:3px;padding:max(5px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));}
+.topBar{min-height:29px;padding-bottom:2px;}.topBar span{font-size:7px}.topBar strong{font-size:11px}.turnBox{padding:3px 5px;font-size:9px;}
+.enemyStage{min-height:80px;grid-template-columns:88px 1fr;gap:5px;padding:4px 6px;}.enemySprite{width:84px;height:74px}.enemyInfo strong{font-size:12px}.enemyInfo>span{font-size:8px}.enemyInfo small{font-size:7px;}
+.intentRow{gap:3px}.intentNow,.intentNext{padding:4px 5px;column-gap:3px}.intentNow>span,.intentNext>span{font-size:6.5px}.intentNow>strong,.intentNext>strong{font-size:8.5px}.intentNow>small,.intentNext>small{font-size:6.5px;}
+.playerStatus{gap:3px}.playerStatus>div{min-height:36px;padding:3px 4px}.playerStatus span{font-size:6.5px}.playerStatus strong{font-size:10px}.freeMoves small{font-size:6px;}
+.nextStrip{min-height:35px}.nextStrip{grid-template-columns:32px 1fr}.nextLabel{font-size:6.5px}.nextColumns{gap:1px;padding:2px}.miniPanel{font-size:5.5px}.nextColumn strong{font-size:6.5px;}
+.board{width:min(92vw,43dvh,374px);border-color:#8f8b98;}.groupPreview{top:6px;padding:4px 9px}.groupPreview strong{font-size:16px;}
+.clusterReadout{width:min(92vw,374px);gap:2px}.clusterReadout span{padding:2px;font-size:6.5px}.clusterReadout strong{font-size:9px;}
+.message{width:min(92vw,374px);min-height:17px;padding:3px 5px;font-size:7.5px}.ruleLine{width:min(92vw,374px);font-size:6px;opacity:.74;}
+.introCard,.clearCard,.gameOverCard{width:min(92vw,386px);gap:7px;padding:11px}.introCard>strong{font-size:16px}.dialogue{font-size:13px;line-height:1.45}.hint{font-size:10px;line-height:1.42}.introCard small{font-size:8px}.clearCard strong,.gameOverCard strong{font-size:26px;}
+@media(max-height:760px){.shell{gap:2px}.enemyStage{min-height:69px;grid-template-columns:74px 1fr}.enemySprite{width:70px;height:63px}.board{width:min(90vw,40dvh,336px)}.playerStatus>div{min-height:32px}.nextStrip{min-height:31px}}

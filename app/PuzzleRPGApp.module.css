@@ -18,3 +18,23 @@
 @media(max-height:700px){.title{gap:4px}.logo{font-size:clamp(40px,11.5vw,52px)}.logo::after{margin-top:5px}.subtitle{font-size:7px;padding-block:2px}.hero{width:min(29vw,108px);height:min(15dvh,104px);margin-top:-1px}.title:has(.continuePanel) .hero{width:min(26vw,94px);height:min(13dvh,90px)}.modeGrid{gap:5px}.modeGrid button{min-height:66px;padding:7px 7px 6px}.modeGrid button::before{width:16px;height:16px;left:6px;top:5px;font-size:7px}.modeGrid button::after{top:27px}.modeGrid strong{font-size:12px}.modeGrid small{font-size:5px}.continuePanel button{min-height:48px}.title footer{padding-block:2px}}
 @media(max-height:580px){.title{padding-top:5px}.logo{font-size:36px}.hero{width:66px;height:58px}.modeGrid button{min-height:54px}.modeGrid strong{font-size:11px}.continuePanel{padding:5px}.continuePanel>strong{font-size:13px}.continuePanel button{min-height:42px}.title footer{display:none}}
 @media(prefers-reduced-motion:reduce){.logo,.hero,.continuePanel{animation-duration:1ms!important;animation-iteration-count:1!important}}
+
+/* SFC visual reconstruction pass 32 — title consistency audit */
+.title{gap:5px;padding:max(9px,env(safe-area-inset-top)) 9px max(8px,env(safe-area-inset-bottom));}
+.logo{margin-top:0;font-size:clamp(46px,13.6vw,68px);line-height:.79;}
+.logo::after{margin-top:6px;height:2px;}
+.subtitle{padding:3px 10px;font-size:7px;letter-spacing:.22em;}
+.hero{width:min(46vw,184px);height:min(24dvh,176px);margin-top:-1px;}
+.title:has(.continuePanel) .hero{width:min(36vw,142px);height:min(18dvh,132px);}
+.modeGrid{gap:5px;margin-bottom:1px;}
+.modeGrid button{min-height:88px;padding:9px 9px 8px;border-width:3px;}
+.modeGrid button::before{width:18px;height:18px;top:6px;left:7px;font-size:8px;}
+.modeGrid button::after{top:31px;}
+.modeGrid span{font-size:5.5px;color:#9e99a5;}
+.modeGrid strong{font-size:15px;line-height:1;}
+.modeGrid small{font-size:5.5px;line-height:1.3;color:#a9a5b1;}
+.continuePanel{gap:4px;padding:7px;margin-bottom:2px;}
+.continuePanel>strong{padding-bottom:5px;font-size:15px;}
+.continuePanel button{min-height:54px;padding-block:6px;}
+.title footer{margin-top:0;padding:3px 6px;opacity:.72;}
+@media(max-height:700px){.title{gap:3px}.hero{width:min(27vw,100px);height:min(13dvh,94px)}.modeGrid button{min-height:62px}.modeGrid strong{font-size:12px}.modeGrid small{font-size:5px}}

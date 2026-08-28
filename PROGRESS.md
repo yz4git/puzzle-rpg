@@ -291,3 +291,10 @@ are complete.
 - Reconstructed the Prism Sovereign approach as a five-tile ceremonial throne dais with a pulsing prism crown and flanking lights, while preserving the existing final-boss coordinate and progression flag.
 - Setpiece animation reuses the low-frequency dungeon ambience frame and remains behind actors, enemies, chests and interaction markers.
 - Boss conditions, enemy IDs, rewards, map topology, portal destinations, save data and Chapter Battle remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 32 — Visual consistency audit
+- Audited title/mode select, RPG field HUD, dialogue, field menu, discovery/reward overlays, Chapter Battle HUD and chapter reward screens against one compact SFC presentation grammar.
+- Reduced excess vertical chrome and secondary-copy weight while preserving the world map and 6x6 battle board as the dominant visual surfaces on iPhone portrait displays.
+- Normalized frame density, typography hierarchy, touch-control proportions, menu row heights and modal spacing without changing gameplay, reward values, map data, battle logic, save data or progression.
+- Added short-height overrides so the same hierarchy survives smaller Safari viewports instead of hiding primary information.
