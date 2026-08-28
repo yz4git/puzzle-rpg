@@ -222,3 +222,10 @@ are complete.
 - Reframed the location bar as a scene-accented navigation plaque and tightened the MEMO/JOURNEY strip into a quieter secondary information ribbon.
 - Strengthened the world-frame bezel so the reconstructed map reads as the central game viewport instead of another web panel.
 - Field controls, map rendering, collision, encounters, portal logic, save data and Chapter Battle remain unchanged.
+
+
+## SFC Visual Reconstruction Pass 22 — Field menu reconstruction
+- Rebuilt FIELD MENU as a four-part SFC command screen: framed title bar, six command slots, dedicated content window and persistent INFO footer.
+- STATUS now reads as a compact character sheet; ITEM / EQUIP / TECH / MEMO use denser role-specific rows instead of web-card styling, with equipped/new states receiving stronger pixel cues.
+- SHOP and SAVE/service panels now share the same game-window grammar, including compact currency/action framing and stepped pressed states.
+- Menu tab logic, inventory/equipment behavior, prices, save/import/export, touch targets and RPG progression remain unchanged.
