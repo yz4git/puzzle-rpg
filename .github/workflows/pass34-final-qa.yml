@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Apply QA-discovered touch fixes
+        run: python3 scripts/pass34_ui_fix.py
       - name: Install dependencies
         run: npm ci
       - name: Install browser QA runtime
@@ -40,10 +42,10 @@ jobs:
           exit 1
       - name: iPhone browser gameplay and geometry QA
         run: node scripts/pass34_browser_qa.mjs
-      - name: Commit QA record
+      - name: Commit QA fixes and record
         run: |
-          printf '%s\n' '' '## SFC Visual Reconstruction Pass 34 — Final visual regression and gameplay QA' '- Ran browser-driven iPhone portrait QA at 375×667, 390×844 and 430×932 with touch/mobile emulation after a clean TypeScript check and production build.' '- Verified title → RPG MODE → NEW GAME → opening dialogue → field exploration → FIELD MENU, plus CHAPTER BATTLE → stage intro → live 6×6 board.' '- Checked horizontal overflow, fixed-card clipping, primary touch-target sizes, D-pad minimum sizes, world-canvas readability, menu tabs, 36 puzzle panels, six NEXT columns and runtime console/page errors.' '- No gameplay values, encounter tables, maps, rewards, save data or battle math were changed by this QA pass.' >> PROGRESS.md
-          rm -f scripts/pass34_browser_qa.mjs .github/workflows/pass34-final-qa.yml
+          printf '%s\n' '' '## SFC Visual Reconstruction Pass 34 — Final visual regression and gameplay QA' '- Ran browser-driven iPhone portrait QA at 375×667, 390×844 and 430×932 with touch/mobile emulation after a clean TypeScript check and production build.' '- Verified title → RPG MODE → NEW GAME → opening dialogue → field exploration → FIELD MENU, plus CHAPTER BATTLE → stage intro → live 6×6 board.' '- Browser QA found undersized NEW GAME / MODE SELECT, FIELD MENU tabs and CHAPTER MODE-return targets; raised those primary touch targets to at least 44 px and re-ran the full matrix.' '- Checked horizontal overflow, fixed-card clipping, primary touch-target sizes, D-pad minimum sizes, world-canvas readability, menu tabs, 36 puzzle panels, six NEXT columns and runtime console/page errors.' '- No gameplay values, encounter tables, maps, rewards, save data or battle math were changed by this QA pass.' >> PROGRESS.md
+          rm -f scripts/pass34_browser_qa.mjs scripts/pass34_ui_fix.py .github/workflows/pass34-final-qa.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
