@@ -169,3 +169,9 @@ are complete.
 - Removed the soft central radial glow from the touch deck and replaced it with a crisp region-tinted prism core.
 - Renamed the decorative header to FIELD CONTROL and added MOVE / ACTION labels to make the large portrait control area visually intentional.
 - Preserved D-pad/A/B hit areas, button sizes, Pointer Events and gameplay input behavior.
+
+## SFC Visual Reconstruction Pass 13 — Battle stage composition
+- Rebuilt the enemy strip as a grounded SFC-style battle stage with a scene-tinted pixel floor band and stronger contact platform.
+- Enlarged normal/boss enemy presentation without reducing the 360px short-screen puzzle board.
+- Reframed enemy information as a denser in-world window and added a stepped TALK reaction treatment driven by the existing reaction sprite state.
+- Battle math, panel rules, NEXT queues, intents, save data and encounter tables are unchanged.
