@@ -270,3 +270,9 @@ are complete.
 - Added proximity reactions within two tiles, including reaction frames and an alert glyph; bosses use a larger silhouette, gold/purple threat aura and stronger approach presence.
 - Added a compact in-world threat plaque within three tiles so HOSTILE/BOSS identity and A • CONFRONT state are readable before interaction.
 - Enemy coordinates, collision, fixed encounter flags, boss conditions, encounter tables, battle timing, rewards and save data are unchanged.
+
+## SFC Visual Reconstruction Pass 29 — Town life and ambient motion
+- Added a low-frequency town-life animation clock that runs only while actively exploring town maps, keeping the ambient pass inexpensive on iPhone.
+- Added role-specific NPC micro-actions and one-pixel idle motion for merchants, soldiers, priests, scholars, elders, travellers, masters, mystery figures and children without changing NPC positions or interaction hit areas.
+- Added distinct ambient motion to all five towns: Hearth Village chimney smoke, Lake Village water glints, Iron City forge sparks, Reed Hamlet drifting motes and Mirror Town reflective window flashes.
+- NPC collision, dialogue, services, shops, story flags, map geometry, portals, save data and Chapter Battle remain unchanged.
