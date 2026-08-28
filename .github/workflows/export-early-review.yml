@@ -1,0 +1,20 @@
+name: Export Early Review Screenshots
+
+on:
+  push:
+    branches:
+      - review/early-game-playcheck-20260828b
+    paths:
+      - '.github/workflows/export-early-review.yml'
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: early-game-review-screenshots
+          path: review-output/early-game-20260828
+          if-no-files-found: error
+          retention-days: 7
