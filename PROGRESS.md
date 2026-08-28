@@ -180,3 +180,8 @@ are complete.
 - Reframed TALK as a high-contrast ENEMY REACTION window with larger text, a scene-tinted accent rail and stronger SFC window hierarchy.
 - Temporarily dims NOW/NEXT and status panels only while the existing 900ms TALK reaction is visible, then restores them unchanged.
 - TALK turn cost, duration, enemy response, alternate-resolution rules and battle math are unchanged.
+
+## SFC Visual Reconstruction Pass 15 — Prism board housing
+- Unified NEXT DROP MAP and the 6x6 puzzle board as one scene-tinted PRISM BOARD device using shared SFC-style housing colors.
+- Added tiny non-interactive corner rails and a PRISM ARRAY label outside the play cells; panel colors, labels and hit regions are untouched.
+- The housing brightens only during the existing cluster preview using CSS presentation state; puzzle logic and timing are unchanged.
