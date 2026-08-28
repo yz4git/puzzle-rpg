@@ -208,7 +208,9 @@
 
 /* SFC visual reconstruction pass 34 — QA menu touch target correction */
 .menuTabs button{min-height:44px}
-\n\n/* RPG field input + battle transition usability pass */
+
+
+/* RPG field input + battle transition usability pass */
 /* Large contiguous D-pad cells: no cardinal direction falls below Apple's 44px touch target. */
 .controls{min-height:142px;padding:35px 12px 6px;}
 .controls::before{top:8px;}
@@ -243,7 +245,9 @@
 @media(max-height:700px){.controls{min-height:132px;padding:33px 10px 5px}.dpad{width:138px;height:138px;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px)}.dpad button,.dpad i{min-width:46px;min-height:46px;font-size:18px}.abButtons button{width:56px;height:56px}}
 @media(max-height:620px){.controls{min-height:124px;padding:31px 8px 4px}.dpad{width:132px;height:132px;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}.dpad button,.dpad i{min-width:44px;min-height:44px;font-size:17px}.abButtons button{width:54px;height:54px}}
 @media(prefers-reduced-motion:reduce){.encounterCue,.encounterCue::before,.encounterCue::after,.encounterCue>strong,.encounterCue>i{animation-duration:1ms!important}}
-\n\n/* Early-game play review 1–5 — portrait field density and control deck */
+
+
+/* Early-game play review 1–5 — portrait field density and control deck */
 .rpg{
   grid-template-rows:auto auto auto auto minmax(44px,1fr) auto;
   gap:3px;

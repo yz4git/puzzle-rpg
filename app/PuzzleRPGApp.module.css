@@ -56,7 +56,9 @@
    during the first 360 ms. Keep the SFC stepped entrance without shrinking touch area. */
 .continuePanel{animation:savePanelOpenSafe 360ms steps(5,end) both!important}
 @keyframes savePanelOpenSafe{0%{opacity:0;transform:translateY(8px)}36%{opacity:1;transform:translateY(-2px)}100%{opacity:1;transform:translateY(0)}}
-\n\n/* Early-game play review 4 — compact title composition */
+
+
+/* Early-game play review 4 — compact title composition */
 .title:has(.modeGrid){justify-content:flex-start;gap:4px;}
 .title:has(.modeGrid) .hero{margin-top:0;margin-bottom:2px;width:min(48vw,190px);height:min(25dvh,184px);}
 .title:has(.modeGrid) .modeGrid{margin-top:7px;margin-bottom:0;}
