@@ -1,0 +1,26 @@
+name: SFC Visual Reconstruction Pass 7C
+on:
+  push:
+    branches: [visual/reconstruction-pass-sfc7c]
+permissions:
+  contents: write
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: python scripts/apply-sfc-visual-pass7c.py
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - run: git diff --check
+      - name: Save implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/rpg/RPGMode.tsx PROGRESS.md
+          if ! git diff --cached --quiet; then git commit -m "Naturalize Crimson Marsh in SFC visual pass 7" && git push; fi
