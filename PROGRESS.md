@@ -164,3 +164,8 @@ are complete.
 - Reframed NPC dialogue portraits from full-body thumbnails to centered upper-body crops using the existing high-resolution NPC atlas.
 - Kept story/system dialogue portrait-free and preserved all dialogue logic and NPC actions.
 - Added a restrained inner portrait-frame highlight/shadow without adding new production assets.
+
+## SFC Visual Reconstruction Pass 12 — Touch control deck
+- Removed the soft central radial glow from the touch deck and replaced it with a crisp region-tinted prism core.
+- Renamed the decorative header to FIELD CONTROL and added MOVE / ACTION labels to make the large portrait control area visually intentional.
+- Preserved D-pad/A/B hit areas, button sizes, Pointer Events and gameplay input behavior.
