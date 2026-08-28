@@ -1111,6 +1111,49 @@ function drawPerson(context: CanvasRenderingContext2D, x: number, y: number, col
   else if (direction === "down") { context.fillRect(x + 6, y + 4, 1, 1); context.fillRect(x + 9, y + 4, 1, 1); }
 }
 
+
+function drawNpcRoleProp(context: CanvasRenderingContext2D, npc: NPCDefinition, x: number, y: number) {
+  context.save();
+  const dark = "#17131a";
+  if (npc.sprite === "merchant") {
+    context.fillStyle = "#5b3827"; context.fillRect(x - 5, y + 9, 6, 7); context.fillRect(x + 15, y + 10, 5, 6);
+    context.fillStyle = "#c58b4d"; context.fillRect(x - 4, y + 10, 4, 2); context.fillRect(x + 16, y + 11, 3, 2);
+  } else if (npc.sprite === "soldier") {
+    context.fillStyle = dark; context.fillRect(x - 5, y + 3, 3, 13);
+    context.fillStyle = "#87929a"; context.fillRect(x - 4, y + 2, 1, 12); context.fillRect(x - 6, y + 4, 5, 2);
+  } else if (npc.sprite === "priest") {
+    context.fillStyle = "#493728"; context.fillRect(x + 14, y + 10, 5, 6);
+    context.fillStyle = "#78a85b"; context.fillRect(x + 13, y + 7, 2, 4); context.fillRect(x + 16, y + 6, 2, 5);
+  } else if (npc.sprite === "scholar") {
+    context.fillStyle = dark; context.fillRect(x - 5, y + 10, 7, 5);
+    context.fillStyle = "#b58c58"; context.fillRect(x - 4, y + 9, 5, 3);
+    context.fillStyle = "#e1d09b"; context.fillRect(x - 3, y + 9, 2, 2);
+  } else if (npc.sprite === "elder" || npc.sprite === "traveller") {
+    context.fillStyle = dark; context.fillRect(x + 16, y + 3, 2, 13);
+    context.fillStyle = "#9b7048"; context.fillRect(x + 16, y + 2, 1, 13);
+  } else if (npc.sprite === "master") {
+    context.globalAlpha = .58; context.fillStyle = "#c4a75d";
+    context.fillRect(x - 5, y + 13, 26, 2); context.fillRect(x + 7, y + 8, 2, 12);
+    context.fillStyle = "#6b4c34"; context.fillRect(x + 1, y + 11, 14, 6);
+  } else if (npc.sprite === "mystery") {
+    context.globalAlpha = .6; context.fillStyle = "#71548c";
+    context.fillRect(x - 4, y + 13, 4, 2); context.fillRect(x + 16, y + 10, 4, 2); context.fillRect(x + 1, y + 15, 15, 1);
+  } else if (npc.sprite === "child") {
+    context.fillStyle = "#b04d55"; context.fillRect(x + 15, y + 12, 4, 4);
+    context.fillStyle = "#e2ba64"; context.fillRect(x + 16, y + 13, 2, 2);
+  }
+  context.restore();
+}
+
+function drawTalkMarker(context: CanvasRenderingContext2D, x: number, y: number) {
+  context.save();
+  context.fillStyle = "#111017"; context.fillRect(x + 7, y - 24, 10, 11);
+  context.fillStyle = "#f1d06a"; context.fillRect(x + 8, y - 23, 8, 9);
+  context.fillStyle = "#231c21"; context.fillRect(x + 11, y - 21, 2, 4); context.fillRect(x + 11, y - 16, 2, 2);
+  context.fillStyle = "#f1d06a"; context.fillRect(x + 10, y - 13, 4, 2);
+  context.restore();
+}
+
 function worldEnemyTable(position: Vec2, danger: boolean) {
   if (position.x < 14) return danger ? ["copperBeetle", "forestWisp", "thornBat"] : ["mossSlime", "roadFang", "thornBat"];
   if (position.x < 28) return danger ? ["ironSentry", "ashCrow", "lostKnight"] : ["lakeImp", "copperBeetle", "ashCrow"];
@@ -1141,6 +1184,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
 
   const map = MAPS[save.mapId] ?? MAPS.hearthVillage!;
   const mapNpcs = useMemo(() => npcsForMap(map.id).filter((npc) => hasFlag(save, npc.requireFlag) && (!npc.hideAfterFlag || !hasFlag(save, npc.hideAfterFlag))), [map.id, save]);
+  const speakerNpc = useMemo(() => mapNpcs.find((npc) => npc.name === speaker) ?? null, [mapNpcs, speaker]);
+  const speakerNpcCell = speakerNpc ? npcAtlasCell(speakerNpc.sprite) : null;
   const visibleFixed = useMemo(() => map.fixedEncounters.filter((entry) => hasFlag(save, entry.requireFlag) && !save.defeatedEncounters.includes(entry.id)), [map, save]);
   const currentTile = tileAt(map, save.position.x, save.position.y);
 
@@ -1184,8 +1229,12 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     const current = saveRef.current;
     const delta = DIR_DELTA[direction];
     const nextPosition = { x: current.position.x + delta.x, y: current.position.y + delta.y };
+    const blockingNpc = mapNpcs.find((npc) => npc.x === nextPosition.x && npc.y === nextPosition.y);
+    if (blockingNpc) {
+      commit((current) => ({ ...current, direction })); setNotice(`${blockingNpc.name} • Aで話す`); playSfx("uiSelect"); return;
+    }
     if (tileBlocked(map, nextPosition)) {
-      commit((current) => ({ ...current, direction })); setNotice("道がふさがっている。・ Aで調べる"); playSfx("uiSelect"); return;
+      commit((current) => ({ ...current, direction })); setNotice("道がふさがっている • Aで調べる"); playSfx("uiSelect"); return;
     }
     const code = tileAt(map, nextPosition.x, nextPosition.y);
     const danger = isDangerTile(code);
@@ -1591,11 +1640,14 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     mapNpcs.forEach((npc) => {
       const x = (npc.x - cameraX) * TILE, y = (npc.y - cameraY) * TILE;
       if (x < -TILE * 2 || y < -TILE * 2 || x >= VIEW_W * TILE + TILE || y >= VIEW_H * TILE + TILE) return;
+      drawNpcRoleProp(context, npc, x, y);
       if (npcAtlas?.complete && npcAtlas.naturalWidth) {
         const cell = npcAtlasCell(npc.sprite);
         drawGroundShadow(context, x - 5, y + TILE, 26);
         context.drawImage(npcAtlas, cell.col * 96, cell.row * 128, 96, 128, x - 5, y - 18, 26, 34);
       } else drawPerson(context, x, y, npcColors[npc.palette % npcColors.length]!, "down", 0);
+      const delta = DIR_DELTA[save.direction];
+      if (npc.x === save.position.x + delta.x && npc.y === save.position.y + delta.y) drawTalkMarker(context, x, y);
     });
     visibleFixed.forEach((entry) => {
       const x = (entry.x - cameraX) * TILE, y = (entry.y - cameraY) * TILE;
@@ -1662,7 +1714,10 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       </section>
 
       {(screen === "dialogue" || screen === "event") && dialogue.length ? <div className={styles.dialogueOverlay} onPointerDown={(event) => { event.preventDefault(); advanceDialogue(); }}>
-        <div className={styles.dialogueBox}><span>{speaker}</span><p>{dialogue[dialogueIndex]}</p><small>A / TAP ▼</small></div>
+        <div className={styles.dialogueBox} data-portrait={Boolean(speakerNpcCell)}>
+          {speakerNpcCell ? <i className={styles.dialoguePortrait} aria-hidden="true" style={{ backgroundImage: `url(${RPG_ASSETS.npcs})`, backgroundSize: "192px 192px", backgroundPosition: `${-speakerNpcCell.col * 48}px ${-speakerNpcCell.row * 64}px` }} /> : null}
+          <span>{speaker}</span><p>{dialogue[dialogueIndex]}</p><small>A / TAP ▼</small>
+        </div>
       </div> : null}
 
       {screen === "menu" ? <div className={styles.menuOverlay}>
