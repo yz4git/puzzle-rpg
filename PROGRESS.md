@@ -106,3 +106,8 @@ are complete.
 - Identified the apparent legacy roads as oversized portal-atlas landmark cells, not terrain.
 - Replaced world-map portal atlas cells with compact target-specific pixel landmarks so roads and destinations read as separate layers.
 - Preserved existing portal collision, progression gates and non-world portal rendering.
+
+## SFC Visual Reconstruction Pass 5 — Forest / ground continuity
+- Rebalanced world grass atlas selection so plain field cells dominate and decorative flower/stone cards become sparse accents.
+- Forest atlas selection now depends on neighbouring forest tiles: dense canopy inside, single trees/clearings at the perimeter.
+- Added forest seam stitching and low-frequency 3x3 ground macro tinting without changing map collision or encounter data.

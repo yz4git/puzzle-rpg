@@ -41,6 +41,10 @@ function isRoadConnection(map: MapDefinition, x: number, y: number) {
   return code === "r" || code === "b";
 }
 
+function tileAtSafe(map: MapDefinition, x: number, y: number) {
+  return map.tiles[y]?.[x] ?? "";
+}
+
 function roadCell(map: MapDefinition, x: number, y: number): AtlasCell {
   const up = isRoadConnection(map, x, y - 1);
   const right = isRoadConnection(map, x + 1, y);
@@ -63,12 +67,28 @@ function roadCell(map: MapDefinition, x: number, y: number): AtlasCell {
 export function terrainAtlasCell(map: MapDefinition, code: string, x: number, y: number): AtlasCell {
   const seed = stableSeed(x, y);
   if (map.id === "world") {
-    if (code === "g") return { atlas: "field", col: seed % 6, row: 0 };
+    if (code === "g") {
+      // Keep broad fields calm: most cells use the two plain grass sources and
+      // flower/stone source cells become sparse accents instead of a checkerboard.
+      const variant = seed % 16;
+      if (variant < 8) return { atlas: "field", col: 0, row: 0 };
+      if (variant < 12) return { atlas: "field", col: 1, row: 0 };
+      return { atlas: "field", col: 2 + (variant - 12), row: 0 };
+    }
     if (code === "f") {
-      const variant = seed % 8;
-      return variant < 4
-        ? { atlas: "field", col: 6 + variant, row: 0 }
-        : { atlas: "field", col: variant - 4, row: 1 };
+      const neighbours = [
+        tileAtSafe(map, x, y - 1), tileAtSafe(map, x + 1, y),
+        tileAtSafe(map, x, y + 1), tileAtSafe(map, x - 1, y),
+      ].filter((value) => value === "f").length;
+      const variant = seed % 4;
+      // Forest interiors use dense canopy sources; edges use readable single-tree
+      // and clearing sources. This makes a forest mass instead of random cards.
+      if (neighbours >= 3) {
+        if (variant < 2) return { atlas: "field", col: 6 + variant, row: 0 };
+        return { atlas: "field", col: variant - 2, row: 1 };
+      }
+      if (variant < 2) return { atlas: "field", col: 8 + variant, row: 0 };
+      return { atlas: "field", col: variant, row: 1 };
     }
     if (code === "r") return roadCell(map, x, y);
     if (code === "d" || code === "x") return { atlas: "field", col: seed % 10, row: 2 };

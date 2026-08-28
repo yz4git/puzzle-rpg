@@ -126,6 +126,48 @@ function drawWorldRoute(context: CanvasRenderingContext2D, map: MapDefinition, c
 }
 
 
+
+function drawGroundMacro(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  if (map.id !== "world" || code !== "g") return;
+  const macro = stableVisualIndex("ground-macro", Math.floor(worldX / 3), Math.floor(worldY / 3));
+  context.save();
+  context.globalAlpha = .055;
+  context.fillStyle = macro % 3 === 0 ? "#d7d96d" : macro % 3 === 1 ? "#153d26" : "#72a548";
+  context.fillRect(x, y, TILE, TILE);
+  context.globalAlpha = 1;
+  const seed = stableVisualIndex("ground-detail", worldX, worldY);
+  if (seed % 11 === 0) {
+    context.fillStyle = "#245f30";
+    context.fillRect(x + 4 + seed % 7, y + 5 + (seed >> 3) % 6, 1, 2);
+    context.fillStyle = "#75b655";
+    context.fillRect(x + 5 + seed % 7, y + 5 + (seed >> 3) % 6, 1, 1);
+  }
+  context.restore();
+}
+
+function drawForestStitch(context: CanvasRenderingContext2D, map: MapDefinition, code: string, worldX: number, worldY: number, x: number, y: number) {
+  if (map.id !== "world" || code !== "f") return;
+  const up = tileAt(map, worldX, worldY - 1) === "f";
+  const right = tileAt(map, worldX + 1, worldY) === "f";
+  const down = tileAt(map, worldX, worldY + 1) === "f";
+  const left = tileAt(map, worldX - 1, worldY) === "f";
+  const seed = stableVisualIndex("forest-stitch", worldX, worldY);
+  context.save();
+  // Cover the source-cell presentation seams only where two forest cells touch.
+  // Two leaf tones keep the seam organic instead of drawing a straight green bar.
+  context.fillStyle = "#174a2b";
+  if (up) context.fillRect(x + 2, y, TILE - 4, 2);
+  if (down) context.fillRect(x + 2, y + TILE - 2, TILE - 4, 2);
+  if (left) context.fillRect(x, y + 2, 2, TILE - 4);
+  if (right) context.fillRect(x + TILE - 2, y + 2, 2, TILE - 4);
+  context.fillStyle = "#2d7136";
+  if (up) context.fillRect(x + 4 + seed % 6, y, 3, 1);
+  if (down) context.fillRect(x + 3 + (seed >> 2) % 7, y + TILE - 1, 3, 1);
+  if (left) context.fillRect(x, y + 4 + (seed >> 4) % 6, 1, 3);
+  if (right) context.fillRect(x + TILE - 1, y + 3 + (seed >> 6) % 7, 1, 3);
+  context.restore();
+}
+
 function drawWorldLandmark(context: CanvasRenderingContext2D, targetMap: string, x: number, y: number, locked: boolean) {
   context.save();
   context.globalAlpha = locked ? .44 : 1;
@@ -693,6 +735,8 @@ export default function RPGMode({ initialSave, onExit }: Props) {
     for (let viewY = 0; viewY < VIEW_H; viewY += 1) for (let viewX = 0; viewX < VIEW_W; viewX += 1) {
       const worldX = cameraX + viewX, worldY = cameraY + viewY;
       const code = tileAt(map, worldX, worldY);
+      drawGroundMacro(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
+      drawForestStitch(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
       drawTerrainEdge(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
       drawWorldRoute(context, map, code, worldX, worldY, viewX * TILE, viewY * TILE);
     }
