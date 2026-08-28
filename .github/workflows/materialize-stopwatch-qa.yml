@@ -1,0 +1,25 @@
+name: Materialize Stopwatch QA Images
+on:
+  push:
+    paths:
+      - '.github/workflows/materialize-stopwatch-qa.yml'
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode screenshot images
+        run: |
+          tr -d '\n' < qa-stopwatch-armed-wrapped.txt | base64 -d > qa-stopwatch-armed.jpg
+          tr -d '\n' < qa-stopwatch-zero-wrapped.txt | base64 -d > qa-stopwatch-zero.jpg
+          file qa-stopwatch-armed.jpg qa-stopwatch-zero.jpg
+          rm qa-stopwatch-armed-wrapped.txt qa-stopwatch-zero-wrapped.txt .github/workflows/materialize-stopwatch-qa.yml
+      - name: Commit image files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Materialize stopwatch QA screenshots'
+          git push origin main
