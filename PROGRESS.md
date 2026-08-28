@@ -117,3 +117,9 @@ are complete.
 - World forest now uses a greedy 2x2 canopy compositor over grass, reducing 16px seams while keeping single-tree edge silhouettes.
 
 - SFC Visual Reconstruction Pass 5: cropped trunk-heavy lower source area from 2x2 interior forest metatiles and restricted dense variants to canopy-first cells.
+
+## SFC Visual Reconstruction Pass 6 — Water / ridge / landmark ground
+- Reconstructed world lake and river tiles as one continuous procedural 16-bit water surface with bridge-aware shorelines.
+- Reconstructed mountain tiles into connected ridgelines and cliff faces instead of isolated atlas cards.
+- Added destination-specific landmark ground footprints/plazas so towns, schools, dungeons and the citadel visually connect to the road network.
+- Map collision, encounters, portals and progression data are unchanged.
