@@ -1,0 +1,52 @@
+name: Natural Early Battle Review
+
+on:
+  push:
+    branches:
+      - review/early-game-playcheck-20260828b
+    paths:
+      - 'scripts/early_battle_natural_review.mjs'
+      - '.github/workflows/early-battle-natural-review.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start local game
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/natural-battle-review-vite.log 2>&1 &
+          for i in {1..50}; do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/natural-battle-review-vite.log
+          exit 1
+      - name: Play natural early battle
+        run: node scripts/early_battle_natural_review.mjs
+      - name: Save review evidence
+        if: always()
+        run: |
+          if [ -d review-output/early-battle-natural-20260828 ]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add review-output/early-battle-natural-20260828
+            if ! git diff --cached --quiet; then
+              git commit -m 'Capture natural early battle playcheck'
+              git push
+            fi
+          fi
