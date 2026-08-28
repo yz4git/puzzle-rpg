@@ -68,14 +68,15 @@ jobs:
           await page.getByRole('button', { name: /TIME SAND/ }).click();
           const armed = page.locator('[aria-label="Enemy time stop 1"]');
           await armed.waitFor({ state: 'visible', timeout: 1500 });
-          const row = armed.locator('xpath=../..');
-          await row.screenshot({ path: '/tmp/stopwatch-armed.jpg', type: 'jpeg', quality: 94 });
+          const armedRow = armed.locator('xpath=../..');
+          await armedRow.screenshot({ path: '/tmp/stopwatch-armed.jpg', type: 'jpeg', quality: 94 });
           const armedBox = await armed.boundingBox();
           const spriteBox = await page.locator('[role="img"][aria-label]').first().boundingBox();
           console.log('armedBox=', JSON.stringify(armedBox), 'spriteBox=', JSON.stringify(spriteBox));
           const zero = page.locator('[aria-label="Enemy time stop 0"]');
           await zero.waitFor({ state: 'visible', timeout: 3000 });
-          await row.screenshot({ path: '/tmp/stopwatch-zero.jpg', type: 'jpeg', quality: 94 });
+          const zeroRow = zero.locator('xpath=../..');
+          await zeroRow.screenshot({ path: '/tmp/stopwatch-zero.jpg', type: 'jpeg', quality: 94 });
           console.log('zeroBox=', JSON.stringify(await zero.boundingBox()));
           await browser.close();
           NODE
