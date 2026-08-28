@@ -186,3 +186,9 @@ are complete.
 - During touch preview, non-selected panels now recede while the selected connected cluster rises forward; the corresponding NEXT DROP columns receive matching emphasis.
 - Replaced the generic clear shrink with a stepped cluster-break effect and strengthened the cluster-count banner.
 - Touch hit areas, panel generation, collapse timing, battle math, NEXT queue order and Chapter Battle remain unchanged.
+
+## SFC Visual Reconstruction Pass 16 — Battle HUD hierarchy
+- Rebalanced the Intent row so NOW owns most of the visual weight while NEXT remains visible as secondary planning information.
+- Reframed current enemy power as a compact high-contrast threat badge and reduced NEXT saturation/typographic weight to prevent the second action from competing with the immediate action.
+- Rebuilt HP, BAR and FREE as distinct SFC-style status meters and reframed the message line as a scene-accented battle log.
+- Preserved all row heights, board size, touch layout, intent order, status values, combat rules and Chapter Battle behavior.
