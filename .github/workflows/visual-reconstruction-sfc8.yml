@@ -1,0 +1,39 @@
+name: SFC Visual Reconstruction Pass 8
+
+on:
+  push:
+    branches: [visual/reconstruction-pass-sfc8]
+    paths:
+      - scripts/apply-sfc-visual-pass8.py
+      - .github/workflows/visual-reconstruction-sfc8.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: visual/reconstruction-pass-sfc8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply Pass 8 interior reconstruction
+        run: python scripts/apply-sfc-visual-pass8.py
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Review diff
+        run: git diff --check && git diff --stat
+      - name: Commit Pass 8 implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/rpg/RPGMode.tsx PROGRESS.md
+          git commit -m 'Implement SFC visual reconstruction pass 8'
+          git push origin HEAD:visual/reconstruction-pass-sfc8
