@@ -133,6 +133,15 @@ function useOne(inventory: InventoryStack[], index: number) {
 
 function delay(ms: number) { return new Promise<void>((resolve) => window.setTimeout(resolve, ms)); }
 
+function battleScene(mapId: string) {
+  if (/crimson|marsh|reed/i.test(mapId)) return "marsh";
+  if (/mirror|hour|spire|tower/i.test(mapId)) return "tower";
+  if (/iron|citadel/i.test(mapId)) return "fortress";
+  if (/temple|void/i.test(mapId)) return "dungeon";
+  if (/village|town|hamlet|hearth/i.test(mapId)) return "town";
+  return "field";
+}
+
 export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish }: Props) {
   const skipBoost = save.equipment.charm === "timeCharm";
   const effectiveEnemy = training ? { ...enemy, name: "TRAINING ECHO", hp: 120, exp: 0, gold: 0, boss: true } : enemy;
@@ -156,6 +165,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   const [nullHesitated, setNullHesitated] = useState(false);
   const [phase, setPhase] = useState(1);
   const [feedback, setFeedback] = useState("");
+  const [talkOverlay, setTalkOverlay] = useState<{ speaker: string; text: string } | null>(null);
   const finished = useRef(false);
 
   const hasTechnique = (id: TechniqueId) => save.techniques.includes(id);
@@ -422,8 +432,11 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (enemy.id === "nullExecutioner" && !nullHesitated && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => save.techniques.includes(id as TechniqueId))) {
       nextFree += 1; setFree(nextFree); setNullHesitated(true);
     }
-    setMessage(alternateReady(nextStats) ? enemy.conditionalTalk : enemy.talk);
-    await delay(520);
+    const talkLine = alternateReady(nextStats) ? enemy.conditionalTalk : enemy.talk;
+    setMessage(talkLine);
+    setTalkOverlay({ speaker: enemy.name, text: talkLine });
+    await delay(900);
+    setTalkOverlay(null);
     const result = await resolveEnemyTurn(hp, barrier, enemyHp, nextFree, nextStats);
     if (trainingComplete(result.stats)) finish("victory", result.hp, inventory, result.stats, { acquiredTechnique: training!.technique });
     setResolving(false);
@@ -526,7 +539,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   } : undefined;
 
   return (
-    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"}>
+    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"} data-scene={battleScene(save.mapId)}>
+      <div className={styles.battleBackdrop} aria-hidden="true"><i /><i /><i /></div>
+      {talkOverlay ? <div className={styles.talkMoment}><span>{talkOverlay.speaker}</span><p>{talkOverlay.text}</p><small>TALK</small></div> : null}
       {feedback ? <div className={styles.feedback}>{feedback}</div> : null}
       <header className={styles.header}>
         <span>{training ? "TRAINING" : enemy.boss ? `BOSS • PHASE ${phase}` : "ENCOUNTER"}</span>

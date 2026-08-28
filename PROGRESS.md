@@ -74,3 +74,11 @@ are complete.
 ## Known issues
 
 - No app-origin browser errors or blocking v1.0 issues are known.
+
+
+## Visual Reconstruction Pass — SFC baseline
+- Restore point: restore/pre-visual-reconstruction-pass
+- Target: late-SNES-inspired 16bit+ presentation.
+- Phase 1 implementation: denser field layout, larger hero/NPC silhouettes, regional UI palettes, compact field menu, scene-specific battle backdrops, grounded enemies, 340-388px RPG battle board, SNES-styled battle frame, dedicated TALK reaction window.
+- Validation required: TypeScript, production build, iPhone 402x690 visual audit, Chapter Battle regression check.
+- Next asset phase: replace prototype CSS battle scenery with dedicated pixel background strips and expand region-specific terrain/autotiles.
