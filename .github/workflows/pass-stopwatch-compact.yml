@@ -38,7 +38,7 @@ jobs:
           exit 1
       - name: Capture targeted stopwatch QA
         run: |
-          cat > /tmp/stopwatch-qa.mjs <<'NODE'
+          cat > .qa-stopwatch.mjs <<'NODE'
           import { chromium } from 'playwright';
           const save = {
             version: 1, playerName: 'LIO', level: 1, exp: 0, hp: 22, maxHp: 22, gold: 18,
@@ -79,7 +79,7 @@ jobs:
           console.log('zeroBox=', JSON.stringify(await zero.boundingBox()));
           await browser.close();
           NODE
-          node /tmp/stopwatch-qa.mjs
+          node .qa-stopwatch.mjs
       - name: Upload targeted screenshots
         uses: actions/upload-artifact@v4
         with:
@@ -90,6 +90,7 @@ jobs:
           retention-days: 1
       - name: Commit stopwatch polish
         run: |
+          rm -f .qa-stopwatch.mjs
           rm scripts/pass-stopwatch-compact.py .github/workflows/pass-stopwatch-compact.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
