@@ -13,6 +13,7 @@ import styles from "./RPGPuzzleBattle.module.css";
 type Tile = { id: number; type: PanelType; row: number; col: number };
 type Preview = { seed: number; ids: Set<number>; type: PanelType; count: number } | null;
 type TrainingBrief = { school: PanelType; technique: TechniqueId; objective: string };
+type BattleImpact = "enemyHit" | "playerHit" | "heal" | "barrier" | "block" | "phase" | "release" | "skill" | "item" | null;
 
 type Props = {
   enemy: EnemyDefinition;
@@ -166,8 +167,10 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   const [nullHesitated, setNullHesitated] = useState(false);
   const [phase, setPhase] = useState(1);
   const [feedback, setFeedback] = useState("");
+  const [impact, setImpact] = useState<BattleImpact>(null);
   const [talkOverlay, setTalkOverlay] = useState<{ speaker: string; text: string } | null>(null);
   const finished = useRef(false);
+  const feedbackSeq = useRef(0);
 
   const hasTechnique = (id: TechniqueId) => save.techniques.includes(id);
   const intent = useMemo(() => adjustedIntent(intentStep, enemyHp, hp), [intentStep, enemyHp, hp, drainWeakened, phase]);
@@ -215,9 +218,16 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     }), 360);
   }
 
-  function showEffect(text: string) {
+  function showEffect(text: string, kind: BattleImpact = "skill", duration = 620) {
+    feedbackSeq.current += 1;
+    const seq = feedbackSeq.current;
     setFeedback(text);
-    window.setTimeout(() => setFeedback((current) => current === text ? "" : current), 620);
+    setImpact(kind);
+    window.setTimeout(() => {
+      if (feedbackSeq.current !== seq) return;
+      setFeedback("");
+      setImpact(null);
+    }, duration);
   }
 
   function trainingComplete(nextStats: BattleStats) {
@@ -311,7 +321,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       nextEnemyHp = Math.max(0, nextEnemyHp - damage);
       setEnemyHp(nextEnemyHp);
       setMessage(`ATK×${count} → ${damage} DAMAGE${bonus ? ` • 技+${bonus}` : ""}`);
-      showEffect(`-${damage}`);
+      showEffect(`-${damage}`, "enemyHit");
       playSfx("playerAttack");
     } else if (actual.type === "heal") {
       const power = count + bonus;
@@ -323,13 +333,13 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       if (hasTechnique("vitalGuard") && count >= 6) nextBarrier = Math.min(30, nextBarrier + 2);
       setHp(nextHp); setBarrier(nextBarrier); setStats(nextStats);
       setMessage(`HEAL×${count} → HP +${gain}${nextBarrier > barrier ? ` • BAR +${nextBarrier - barrier}` : ""}`);
-      showEffect(`+${gain} HP`); playSfx("heal");
+      showEffect(`+${gain} HP`, "heal"); playSfx("heal");
     } else if (actual.type === "barrier") {
       const power = count + bonus;
       const raised = Math.min(30, nextBarrier + power);
       const gain = raised - nextBarrier;
       nextBarrier = raised;
-      setBarrier(nextBarrier); setMessage(`BAR×${count} → BAR +${gain}`); showEffect(`+${gain} BAR`); playSfx("shield");
+      setBarrier(nextBarrier); setMessage(`BAR×${count} → BAR +${gain}`); showEffect(`+${gain} BAR`, "barrier"); playSfx("shield");
     } else {
       const power = count + bonus;
       nextFree += power;
@@ -401,7 +411,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     }
     setHp(currentHp); setBarrier(currentBarrier); setEnemyHp(currentEnemyHp); setStats(nextStats); setIntentStep((step) => step + 1);
     setMessage(`${action.label} • ${damage > 0 ? `HP -${damage}` : `BLOCK ${blocked}`}`);
-    showEffect(damage > 0 ? `-${damage} HP` : "PERFECT BLOCK");
+    showEffect(damage > 0 ? `-${damage} HP` : "PERFECT BLOCK", damage > 0 ? "playerHit" : "block");
     playSfx(action.kind === "heavy" ? "enemyHeavy" : action.kind === "drain" ? "enemyDrain" : action.kind === "pierce" ? "pierce" : action.kind === "disrupt" || action.kind === "seal" ? "enemyDisrupt" : "enemyAttack");
     await delay(320);
     if (currentEnemyHp <= 0 && !training) finish("victory", currentHp, inventory, nextStats);
@@ -415,7 +425,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     const nextStats = { ...stats, turns: stats.turns + 1, talkUses: stats.talkUses + 1 };
     setStats(nextStats);
     if (enemy.alt && alternateReady(nextStats)) {
-      setMessage(enemy.conditionalTalk); showEffect("RELEASE");
+      setMessage(enemy.conditionalTalk); showEffect("RELEASE", "release", 760);
       finish("release", hp, inventory, nextStats, {
         rewardText: enemy.alt.rewardText,
         acquiredTechnique: enemy.alt.technique,
@@ -459,7 +469,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (stack.id === "boardBell") { setTiles(makeBoard(skipBoost)); setQueues(makeQueues(skipBoost)); }
     if (stack.id === "smoke" && !enemy.boss && !training) { finish("run", hp, nextInventory, nextStats); return; }
     if (stack.id === "prismDrop") { nextHp = Math.min(save.maxHp, hp + 4); nextBarrier = Math.min(30, barrier + 4); nextFree += 1; }
-    setHp(nextHp); setBarrier(nextBarrier); setFree(nextFree); setMessage(`${ITEMS[stack.id].name} USED`); showEffect(ITEMS[stack.id].description);
+    setHp(nextHp); setBarrier(nextBarrier); setFree(nextFree); setMessage(`${ITEMS[stack.id].name} USED`); showEffect(ITEMS[stack.id].description, "item");
     await delay(360);
     await resolveEnemyTurn(nextHp, nextBarrier, enemyHp, nextFree, nextStats);
     setResolving(false);
@@ -518,6 +528,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (nextPhase > phase) {
       const line = enemy.phaseDialogue?.[nextPhase - 2] ?? (nextPhase === 2 ? "構えが変わった。" : "最後の力を解き放った。");
       setPhase(nextPhase); setMessage(`${line} • ${nextPhase === 2 ? "PHASE II" : "FINAL PHASE"}`);
+      showEffect(nextPhase === 2 ? "PHASE II" : "FINAL PHASE", "phase", 760);
       if (save.equipment.armor === "prismGuard") setBarrier((value) => Math.min(30, value + 2));
       playSfx("enemyDisrupt");
     }
@@ -525,15 +536,15 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
 
   const enemyFrame: EnemySpriteFrame = talkOverlay
     ? "reaction"
-    : phase > 1
-      ? "phase"
-    : feedback.includes("HP")
-      ? "attack"
-      : feedback.startsWith("-")
-        ? "hurt"
-        : feedback
-          ? "reaction"
-          : "idle";
+    : impact === "enemyHit"
+      ? "hurt"
+      : impact === "playerHit"
+        ? "attack"
+        : impact === "phase" || phase > 1
+          ? "phase"
+          : feedback
+            ? "reaction"
+            : "idle";
   const enemySprite = enemySpriteCell(enemy.id, enemyFrame);
   const enemySpriteStyle: CSSProperties | undefined = enemySprite ? {
     backgroundImage: `url(${enemySprite.src})`,
@@ -542,10 +553,11 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   } : undefined;
 
   return (
-    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"} data-scene={battleScene(save.mapId)} data-talking={talkOverlay ? "true" : "false"}>
+    <main className={styles.battle} data-enemy={enemy.portrait} data-boss={enemy.boss || training ? "true" : "false"} data-scene={battleScene(save.mapId)} data-talking={talkOverlay ? "true" : "false"} data-impact={impact ?? "none"}>
       <div className={styles.battleBackdrop} aria-hidden="true"><i /><i /><i /></div>
+      <div className={styles.impactLayer} aria-hidden="true" />
       {talkOverlay ? <div className={styles.talkMoment}><span>{talkOverlay.speaker}</span><p>{talkOverlay.text}</p><small>TALK</small></div> : null}
-      {feedback ? <div className={styles.feedback}>{feedback}</div> : null}
+      {feedback ? <div className={styles.feedback} data-kind={impact ?? "skill"}>{feedback}</div> : null}
       <header className={styles.header}>
         <span>{training ? "TRAINING" : enemy.boss ? `BOSS • PHASE ${phase}` : "ENCOUNTER"}</span>
         <strong>{enemy.name}</strong>

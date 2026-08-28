@@ -197,3 +197,10 @@ are complete.
 - Rebuilt the command overlay as a scene-tinted SFC battle window instead of a generic mobile modal.
 - Added a strong title band, pixel pointer rails, stepped press feedback, denser STATUS framing and clearer disabled-command treatment while keeping touch targets large.
 - ITEM scrolling, TALK/ITEM/STATUS/RUN behavior, close/back behavior, turn costs and combat logic are unchanged.
+
+## SFC Visual Reconstruction Pass 18 — Battle impact language
+- Split the generic battle feedback into explicit enemy-hit, player-hit, heal, barrier, perfect-block, boss-phase, release, skill and item impact states.
+- Added a fixed impact layer above the battle HUD/board and below dialogue/command overlays so attack effects can no longer disappear behind interface panels.
+- Added target-specific stepped shakes, meter flashes and phase/release screen accents while preserving the existing 620ms feedback cadence for normal actions.
+- Damage/heal/barrier values, enemy intents, turn order, collapse timing, battle rules, touch targets and Chapter Battle remain unchanged.
+
