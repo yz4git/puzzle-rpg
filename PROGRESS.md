@@ -115,3 +115,5 @@ are complete.
 ### Pass 5 correction — Forest metatile compositor
 - Rejected the straight seam-fill prototype after visual audit because it created a bright grid.
 - World forest now uses a greedy 2x2 canopy compositor over grass, reducing 16px seams while keeping single-tree edge silhouettes.
+
+- SFC Visual Reconstruction Pass 5: cropped trunk-heavy lower source area from 2x2 interior forest metatiles and restricted dense variants to canopy-first cells.

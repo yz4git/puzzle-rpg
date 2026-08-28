@@ -147,18 +147,20 @@ function drawGroundMacro(context: CanvasRenderingContext2D, map: MapDefinition, 
 
 
 
-function drawAtlasSpan(context: CanvasRenderingContext2D, image: HTMLImageElement, cell: AtlasCell, x: number, y: number, drawWidth: number, drawHeight: number) {
+function drawAtlasSpan(context: CanvasRenderingContext2D, image: HTMLImageElement, cell: AtlasCell, x: number, y: number, drawWidth: number, drawHeight: number, cropBottom = 0) {
   const { width, height } = RPG_ATLAS_METRICS.terrain;
   const inset = 2;
-  context.drawImage(image, cell.col * width + inset, cell.row * height + inset, width - inset * 2, height - inset * 2, x, y, drawWidth, drawHeight);
+  const sourceHeight = height - inset * 2 - cropBottom;
+  context.drawImage(image, cell.col * width + inset, cell.row * height + inset, width - inset * 2, sourceHeight, x, y, drawWidth, drawHeight);
 }
 
 function drawWorldForestLayer(context: CanvasRenderingContext2D, image: HTMLImageElement, map: MapDefinition, cameraX: number, cameraY: number) {
   if (map.id !== "world") return;
   const covered = new Set<string>();
   const dense: AtlasCell[] = [
-    { atlas: "field", col: 6, row: 0 }, { atlas: "field", col: 7, row: 0 },
-    { atlas: "field", col: 0, row: 1 }, { atlas: "field", col: 1, row: 1 },
+    // Interior canopy cells deliberately avoid the trunk-heavy variants.
+    { atlas: "field", col: 6, row: 0 },
+    { atlas: "field", col: 0, row: 1 },
   ];
   const edge: AtlasCell[] = [
     { atlas: "field", col: 8, row: 0 }, { atlas: "field", col: 9, row: 0 },
@@ -177,7 +179,9 @@ function drawWorldForestLayer(context: CanvasRenderingContext2D, image: HTMLImag
       if (block) {
         // Four gameplay tiles become one illustrated canopy cell. This removes
         // three quarters of the visible 16px source-cell seams in forest masses.
-        drawAtlasSpan(context, image, dense[seed % dense.length]!, viewX * TILE - 1, viewY * TILE - 1, TILE * 2 + 2, TILE * 2 + 2);
+        // Crop the dark trunk/shadow band from the source tile so a 32px forest
+        // block reads as continuous canopy instead of a row of enlarged tree bases.
+        drawAtlasSpan(context, image, dense[seed % dense.length]!, viewX * TILE - 1, viewY * TILE - 1, TILE * 2 + 2, TILE * 2 + 2, 10);
         covered.add(`${worldX + 1}:${worldY}`);
         covered.add(`${worldX}:${worldY + 1}`);
         covered.add(`${worldX + 1}:${worldY + 1}`);
