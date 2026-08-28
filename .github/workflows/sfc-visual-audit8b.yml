@@ -1,0 +1,31 @@
+name: SFC Visual Audit 8B
+on:
+  push:
+    branches: [review/sfc-visual-audit8b-20260828]
+    paths:
+      - scripts/sfc-visual-audit8b.mjs
+      - .github/workflows/sfc-visual-audit8b.yml
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Start review server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/puzzle-rpg-vite.log 2>&1 &
+          for i in {1..240}; do
+            if curl -fsS http://127.0.0.1:5173 >/dev/null; then exit 0; fi
+            sleep .25
+          done
+          cat /tmp/puzzle-rpg-vite.log
+          exit 1
+      - run: node scripts/sfc-visual-audit8b.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-sfc-visual-audit8b
+          path: sfc-visual-audit8b
