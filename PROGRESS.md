@@ -372,3 +372,10 @@ are complete.
 - Shortened and offset the hands, reduced the crown, and kept `TIME STOP` / `TIME UP` in a separate label beneath the face.
 - Gameplay timing, FREE/SKIP values, enemy turns, battle math, and save data are unchanged.
 
+
+## Original Chapter Battle clock + shield feedback
+- Added 8-bit CSS stopwatch art to CHAPTER BATTLE SKIP panels and enemy WAIT overlay.
+- SKIP now visibly shows the full clock count, ticks on the enemy turn, shows 0 / TIME UP, then clears.
+- Added 8-bit CSS shield art to BAR panels and a large board-centered barrier impact overlay.
+- Fully blocked attacks show BLOCK; overflow attacks show SHIELD BREAK before remaining HP damage. PIERCE continues to bypass the shield.
+- Chapter battle rules, damage values, enemy intent order, BUILD effects, and reward balance are unchanged.

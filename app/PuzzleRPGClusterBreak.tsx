@@ -25,6 +25,8 @@ type FxState = { token: number; type: PanelType; count: number; rank: string; so
 type FeedbackTarget = "enemy" | "hp" | "barrier" | "free";
 type FeedbackTone = "gain" | "loss" | "special";
 type FeedbackState = { token: number; target: FeedbackTarget; text: string; tone: FeedbackTone };
+type ChapterTimeFx = { token: number; count: number; phase: "armed" | "tick" | "zero" };
+type ChapterGuardFx = { token: number; mode: "block" | "break"; blocked: number; hpDamage: number };
 type ChapterBattleProps = { embedded?: boolean; onExit?: () => void };
 
 const SIZE = 6;
@@ -149,6 +151,8 @@ function drawRewardChoices(owned: RewardId[]): RewardId[] {
 let tileId = 1;
 let fxToken = 1;
 let feedbackToken = 1;
+let chapterTimeFxToken = 1;
+let chapterGuardFxToken = 1;
 function nextId() {
   tileId += 1;
   return tileId;
@@ -439,6 +443,8 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
   const [buildOpen, setBuildOpen] = useState(false);
   const [fx, setFx] = useState<FxState | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState[]>([]);
+  const [chapterTimeFx, setChapterTimeFx] = useState<ChapterTimeFx | null>(null);
+  const [chapterGuardFx, setChapterGuardFx] = useState<ChapterGuardFx | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const enemySpriteRef = useRef<HTMLImageElement | null>(null);
   const hpRef = useRef<HTMLDivElement | null>(null);
@@ -495,6 +501,8 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
     setPreview(null);
     setFx(null);
     setFeedback([]);
+    setChapterTimeFx(null);
+    setChapterGuardFx(null);
     setMessage("STAGE 1");
   }
 
@@ -529,6 +537,8 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
     setPreview(null);
     setFx(null);
     setFeedback([]);
+    setChapterTimeFx(null);
+    setChapterGuardFx(null);
     setMessage(`CHAPTER 1 • STAGE ${next}/${CHAPTER_LENGTH}`);
   }
 
@@ -699,6 +709,8 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
       const extraFree = build.includes("timeThief") && count >= 4 ? 1 : 0;
       nextDelay += count + extraFree;
       const granted = Math.max(0, count - 1 + extraFree);
+      setEnemyDelay(nextDelay);
+      setChapterTimeFx({ token: chapterTimeFxToken++, count: nextDelay, phase: "armed" });
       setMessage(`SKIP ×${count} → ${granted} FREE MOVE${granted === 1 ? "" : "S"}${extraFree > 0 ? " • TIME THIEF +1" : ""}`);
       showFeedback("free", `+${granted} FREE`, "special");
       playSfx(count >= 6 ? "skill" : "setup");
@@ -732,9 +744,17 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
     }
 
     if (nextDelay > 0) {
+      const beforeTick = nextDelay;
+      setChapterTimeFx({ token: chapterTimeFxToken++, count: beforeTick, phase: "tick" });
+      await delay(180);
       nextDelay -= 1;
       setEnemyDelay(nextDelay);
-      setMessage((text) => `${text} • ENEMY WAIT${nextDelay > 0 ? ` • FREE ${nextDelay}` : ""}`);
+      setChapterTimeFx({ token: chapterTimeFxToken++, count: nextDelay, phase: nextDelay === 0 ? "zero" : "tick" });
+      playSfx("setup");
+      await delay(nextDelay === 0 ? 300 : 220);
+      if (nextDelay === 0) setChapterTimeFx(null);
+      else setChapterTimeFx({ token: chapterTimeFxToken++, count: nextDelay, phase: "armed" });
+      setMessage((text) => `${text} • ENEMY WAIT${nextDelay > 0 ? ` • FREE ${nextDelay}` : " • TIME UP"}`);
       setTurn((value) => value + 1);
       setResolving(false);
       return;
@@ -750,6 +770,20 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
       nextBarrier -= blocked;
       hpDamage = Math.max(0, currentIntent.power - blocked);
     }
+    const enemyAttackSfx = currentIntent.kind === "heavy" ? "enemyHeavy" : currentIntent.kind === "drain" ? "enemyDrain" : currentIntent.kind === "pierce" ? "pierce" : currentIntent.kind === "disrupt" ? "enemyDisrupt" : "enemyAttack";
+    playSfx(enemyAttackSfx);
+    if (blocked > 0) {
+      setChapterGuardFx({ token: chapterGuardFxToken++, mode: "block", blocked, hpDamage });
+      playSfx("shield");
+      await delay(190);
+      if (hpDamage > 0) {
+        setChapterGuardFx({ token: chapterGuardFxToken++, mode: "break", blocked, hpDamage });
+        await delay(240);
+      } else {
+        await delay(210);
+      }
+      setChapterGuardFx(null);
+    }
     nextPlayerHp = Math.max(0, nextPlayerHp - hpDamage);
     setBarrier(nextBarrier);
     setPlayerHp(nextPlayerHp);
@@ -757,7 +791,6 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
     if (hpDamage > 0) showFeedback("hp", `-${hpDamage} HP`, "loss");
     if (currentIntent.kind !== "attack") showFeedback("enemy", currentIntent.label, "special", 900);
     setMessage((text) => `${text} • ${hpDamage > 0 ? `${currentIntent.label} -${hpDamage} HP` : `${currentIntent.label} BLOCK ${blocked}`}`);
-    playSfx(currentIntent.kind === "heavy" ? "enemyHeavy" : currentIntent.kind === "drain" ? "enemyDrain" : currentIntent.kind === "pierce" ? "pierce" : currentIntent.kind === "disrupt" ? "enemyDisrupt" : "enemyAttack");
 
     if (currentIntent.kind === "drain" && hpDamage > 0) {
       const drainBonus = stage === 8 ? 2 : 0;
@@ -869,6 +902,16 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
       <section className={`${styles.enemyStage} ${v2.feedbackHost} ${fx?.type === "attack" ? styles.targetHit : ""}`}>
         {feedbackNodes("enemy")}
         <img ref={enemySpriteRef} className={styles.enemySprite} src={PIXEL_ART_ASSETS.enemies[enemy.kind]} alt={enemy.name} />
+        {enemyDelay > 0 || chapterTimeFx ? (
+          <div
+            className={`${styles.chapterTimeStop} ${chapterTimeFx?.phase === "zero" ? styles.chapterTimeStopZero : ""}`}
+            aria-label={`Enemy time stop ${chapterTimeFx?.count ?? enemyDelay}`}
+          >
+            <i className={styles.pixelStopwatchLarge} aria-hidden="true" />
+            <strong>{chapterTimeFx?.count ?? enemyDelay}</strong>
+            <span>{(chapterTimeFx?.count ?? enemyDelay) === 0 ? "TIME UP" : "TIME STOP"}</span>
+          </div>
+        ) : null}
         <div className={styles.enemyInfo}>
           <strong>{enemy.name}</strong>
           <div className={styles.enemyHpTrack}><div style={{ width: `${Math.max(0, enemyHp / maxEnemyHp) * 100}%` }} /></div>
@@ -920,6 +963,16 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
       </section>
 
       <section className={`${styles.boardZone} ${v2.boardZoneStable}`}>
+        {chapterGuardFx ? (
+          <div
+            className={`${styles.chapterGuardFx} ${chapterGuardFx.mode === "break" ? styles.chapterGuardBreak : styles.chapterGuardBlock}`}
+            aria-label={chapterGuardFx.mode === "break" ? `Shield break ${chapterGuardFx.hpDamage} damage` : `Barrier blocks ${chapterGuardFx.blocked}`}
+          >
+            <i className={styles.pixelShieldLarge} aria-hidden="true"><b /></i>
+            <strong>{chapterGuardFx.mode === "break" ? "SHIELD BREAK" : "BLOCK"}</strong>
+            <span>{chapterGuardFx.mode === "break" ? `${chapterGuardFx.hpDamage} HP DAMAGE` : `${chapterGuardFx.blocked} DAMAGE ABSORBED`}</span>
+          </div>
+        ) : null}
         <div className={`${styles.fxBanner} ${v2.rankBanner} ${fx ? styles.fxBannerActive : ""}`}>
           {fx ? <><em>{fx.rank || PANEL_LABEL[fx.type]}</em>{PANEL_LABEL[fx.type]} ×{fx.count}</> : "PRESS A CLUSTER → RELEASE TO BREAK"}
         </div>
@@ -941,7 +994,9 @@ export default function PuzzleRPGClusterBreak({ embedded = false, onExit }: Chap
               <i className={`${styles.bridge} ${styles.bridgeRight}`} aria-hidden="true" />
               <i className={`${styles.bridge} ${styles.bridgeDown}`} aria-hidden="true" />
               <i className={`${styles.bridge} ${styles.bridgeLeft}`} aria-hidden="true" />
-              <b>{PANEL_GLYPH[tile.type]}</b>
+              <b>
+                {tile.type === "skip" ? <i className={styles.pixelStopwatchMini} aria-hidden="true" /> : tile.type === "barrier" ? <i className={styles.pixelShieldMini} aria-hidden="true" /> : PANEL_GLYPH[tile.type]}
+              </b>
               <span>{PANEL_LABEL[tile.type]}</span>
             </button>
           ))}
