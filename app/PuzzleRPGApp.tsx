@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { playSfx, primeAudio } from "./gameAudio";
+import PrismOverdrive from "./PrismOverdrive";
 import PuzzleRPGClusterBreak from "./PuzzleRPGClusterBreak";
 import RPGMode from "./rpg/RPGMode";
 import { createNewSave, loadSave, saveGame } from "./rpg/save";
@@ -10,7 +11,7 @@ import { RPG_ASSETS } from "./rpg/assets";
 import type { RPGSaveData } from "./rpg/types";
 import styles from "./PuzzleRPGApp.module.css";
 
-type Mode = "title" | "rpg-choice" | "rpg" | "chapter";
+type Mode = "title" | "rpg-choice" | "rpg" | "chapter" | "overdrive";
 
 export default function PuzzleRPGApp() {
   const [mode, setMode] = useState<Mode>("title");
@@ -26,7 +27,7 @@ export default function PuzzleRPGApp() {
 
   function select(next: Mode) {
     primeAudio(); playSfx("uiConfirm");
-    if (next === "chapter") stopRpgMusic();
+    if (next === "chapter" || next === "overdrive") stopRpgMusic();
     else if (next !== "rpg") setRpgMusic("title", storedSave?.settings.music ?? true);
     setMode(next);
   }
@@ -47,6 +48,7 @@ export default function PuzzleRPGApp() {
   }
 
   if (mode === "chapter") return <PuzzleRPGClusterBreak embedded onExit={backToTitle} />;
+  if (mode === "overdrive") return <PrismOverdrive onExit={backToTitle} />;
   if (mode === "rpg" && activeSave) return <RPGMode initialSave={activeSave} onExit={backToTitle} />;
 
   return (
@@ -61,6 +63,9 @@ export default function PuzzleRPGApp() {
         </button>
         <button type="button" className={styles.chapterMode} onClick={() => select("chapter")}>
           <span>ORIGINAL 10 BATTLES</span><strong>CHAPTER BATTLE</strong><small>BUILD • ELITE • PRISM SOVEREIGN</small>
+        </button>
+        <button type="button" className={styles.overdriveMode} onClick={() => select("overdrive")}>
+          <span>3 MINUTE HYPER CLUSTER</span><strong>PRISM OVERDRIVE</strong><small>COMBO • FEVER • CASCADE • JACKPOT</small>
         </button>
       </div> : <div className={styles.continuePanel}>
         <span>RPG MODE</span><strong>THE PRISM ROAD</strong>
