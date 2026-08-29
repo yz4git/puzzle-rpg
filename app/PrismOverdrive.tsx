@@ -43,10 +43,23 @@ type BoardFx = {
 };
 type ModeFx = {
   token: number;
-  kind: "fever" | "overFever" | "final";
+  kind: "fever" | "overFever" | "accel" | "overdrive" | "final";
   title: string;
   detail: string;
 };
+type RunPhase = "build" | "accel" | "overdrive" | "final";
+type TargetKind = "color" | "sequence" | "cascade";
+type PrismTarget = {
+  token: number;
+  kind: TargetKind;
+  label: string;
+  reward: number;
+  type?: PanelType;
+  need?: number;
+  sequence?: [PanelType, PanelType];
+  progress: number;
+};
+type ChargeMap = Record<PanelType, number>;
 
 const SIZE = 6;
 const RUN_MS = 180_000;
@@ -58,6 +71,64 @@ const TYPES: PanelType[] = ["attack", "heal", "barrier", "skip"];
 const LABEL: Record<PanelType, string> = { attack: "ATK", heal: "HEAL", barrier: "BAR", skip: "SKIP" };
 const GLYPH: Record<PanelType, string> = { attack: "▲", heal: "♥", barrier: "◆", skip: "⏱" };
 const HIGH_SCORE_KEY = "puzzle-rpg:prism-overdrive:high-score:v1";
+const PHASE_META: Record<RunPhase, { label: string; note: string; score: number; charge: number; cascadeCut: number; cascadeCap: number; cash: number }> = {
+  build: { label: "BUILD", note: "MAKE CHARGE", score: 1, charge: 1, cascadeCut: 0, cascadeCap: 4, cash: 1 },
+  accel: { label: "ACCEL", note: "FASTER LINKS", score: 1.15, charge: 1.25, cascadeCut: 1, cascadeCap: 4, cash: 1.08 },
+  overdrive: { label: "OVERDRIVE", note: "CHAIN FIELD", score: 1.35, charge: 1.55, cascadeCut: 2, cascadeCap: 5, cash: 1.18 },
+  final: { label: "FINAL", note: "NO LIMIT", score: 1.65, charge: 2, cascadeCut: 3, cascadeCap: 6, cash: 1.35 },
+};
+const emptyCharge = (): ChargeMap => ({ attack: 0, heal: 0, barrier: 0, skip: 0 });
+
+function phaseForTime(timeLeft: number): RunPhase {
+  if (timeLeft > 120_000) return "build";
+  if (timeLeft > 60_000) return "accel";
+  if (timeLeft > 30_000) return "overdrive";
+  return "final";
+}
+
+function phaseIndex(phase: RunPhase) {
+  return phase === "build" ? 0 : phase === "accel" ? 1 : phase === "overdrive" ? 2 : 3;
+}
+
+function targetProgressText(target: PrismTarget) {
+  if (target.kind === "sequence") return target.progress > 0 ? "1 / 2 • NEXT STEP" : "0 / 2 • START";
+  if (target.kind === "cascade") return `CHAIN ${target.need}+`;
+  return `${LABEL[target.type ?? "attack"]} ×${target.need}+`;
+}
+
+function desiredTargetType(target: PrismTarget): PanelType | null {
+  if (target.kind === "color") return target.type ?? null;
+  if (target.kind === "sequence" && target.sequence) return target.sequence[target.progress > 0 ? 1 : 0];
+  return null;
+}
+
+function makeTarget(phase: RunPhase, token: number): PrismTarget {
+  const idx = phaseIndex(phase);
+  const reward = [1800, 2800, 4200, 6200][idx]!;
+  const roll = Math.random();
+  if (roll < 0.46) {
+    const type = TYPES[Math.floor(Math.random() * TYPES.length)]!;
+    const need = 6 + Math.min(2, idx);
+    return { token, kind: "color", label: `${LABEL[type]} ×${need}+ BREAK`, reward, type, need, progress: 0 };
+  }
+  if (roll < 0.78) {
+    const first = TYPES[Math.floor(Math.random() * TYPES.length)]!;
+    let second = TYPES[Math.floor(Math.random() * TYPES.length)]!;
+    if (second === first) second = TYPES[(TYPES.indexOf(first) + 1) % TYPES.length]!;
+    return { token, kind: "sequence", label: `${LABEL[first]} → ${LABEL[second]}`, reward: Math.round(reward * 1.15), sequence: [first, second], progress: 0 };
+  }
+  const need = idx >= 2 ? 2 : 2;
+  return { token, kind: "cascade", label: `AUTO CHAIN ${need}+`, reward: Math.round(reward * 1.25), need, progress: 0 };
+}
+
+function pickScanColumn(queues: PanelType[][], target: PrismTarget) {
+  const wanted = desiredTargetType(target);
+  if (wanted) {
+    const matches = queues.map((queue, col) => queue[0] === wanted ? col : -1).filter((col) => col >= 0);
+    if (matches.length) return matches[Math.floor(Math.random() * matches.length)]!;
+  }
+  return Math.floor(Math.random() * SIZE);
+}
 
 const UPGRADES: UpgradeDef[] = [
   { id: "megaAttack", name: "MEGA ATK", icon: "▲+", tag: "ATK", description: "ATK ×5以上で周囲パネルも爆破" },
@@ -77,11 +148,29 @@ function nextId() { nextTileId += 1; return nextTileId; }
 function sleep(ms: number) { return new Promise<void>((resolve) => window.setTimeout(resolve, ms)); }
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 
-function randomType(fever = false): PanelType {
+function randomType(fever = false, phase: RunPhase = "build"): PanelType {
   const r = Math.random();
   if (fever) {
-    if (r < 0.38) return "attack";
+    if (r < 0.40) return "attack";
+    if (r < 0.72) return "heal";
+    return "skip";
+  }
+  if (phase === "final") {
+    if (r < 0.46) return "attack";
+    if (r < 0.76) return "heal";
+    if (r < 0.84) return "barrier";
+    return "skip";
+  }
+  if (phase === "overdrive") {
+    if (r < 0.42) return "attack";
     if (r < 0.70) return "heal";
+    if (r < 0.82) return "barrier";
+    return "skip";
+  }
+  if (phase === "accel") {
+    if (r < 0.38) return "attack";
+    if (r < 0.63) return "heal";
+    if (r < 0.83) return "barrier";
     return "skip";
   }
   if (r < 0.34) return "attack";
@@ -90,16 +179,16 @@ function randomType(fever = false): PanelType {
   return "skip";
 }
 
-function makeBoard(): Tile[] {
+function makeBoard(phase: RunPhase = "build"): Tile[] {
   const result: Tile[] = [];
   for (let row = 0; row < SIZE; row += 1) {
-    for (let col = 0; col < SIZE; col += 1) result.push({ id: nextId(), type: randomType(), row, col });
+    for (let col = 0; col < SIZE; col += 1) result.push({ id: nextId(), type: randomType(false, phase), row, col });
   }
   return result;
 }
 
-function makeQueues(): PanelType[][] {
-  return Array.from({ length: SIZE }, () => [randomType(), randomType(), randomType()]);
+function makeQueues(phase: RunPhase = "build"): PanelType[][] {
+  return Array.from({ length: SIZE }, () => [randomType(false, phase), randomType(false, phase), randomType(false, phase)]);
 }
 
 function mapTiles(tiles: Tile[]) {
@@ -137,7 +226,7 @@ function largestGroup(tiles: Tile[]): Tile[] {
   return best;
 }
 
-function settleBoard(tiles: Tile[], queues: PanelType[][], removed: Set<number>, fever: boolean) {
+function settleBoard(tiles: Tile[], queues: PanelType[][], removed: Set<number>, fever: boolean, phase: RunPhase = "build") {
   const nextTiles: Tile[] = [];
   const nextQueues = queues.map((queue) => [...queue]);
   for (let col = 0; col < SIZE; col += 1) {
@@ -147,7 +236,7 @@ function settleBoard(tiles: Tile[], queues: PanelType[][], removed: Set<number>,
     for (let index = 0; index < holes; index += 1) {
       const type = nextQueues[col]!.shift() ?? randomType(fever);
       nextTiles.push({ id: nextId(), type, row: holes - 1 - index, col });
-      nextQueues[col]!.push(randomType(fever));
+      nextQueues[col]!.push(randomType(fever, phase));
     }
   }
   return { tiles: nextTiles, queues: nextQueues };
@@ -241,6 +330,12 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [pressedId, setPressedId] = useState<number | null>(null);
   const [focusDelays, setFocusDelays] = useState<Record<number, number>>({});
   const [jackpotAfterglow, setJackpotAfterglow] = useState(false);
+  const [runPhase, setRunPhase] = useState<RunPhase>("build");
+  const [charge, setCharge] = useState<ChargeMap>(() => emptyCharge());
+  const [comboBank, setComboBank] = useState(0);
+  const [target, setTarget] = useState<PrismTarget>(() => makeTarget("build", 1));
+  const [scanColumn, setScanColumn] = useState(0);
+  const [targetPulse, setTargetPulse] = useState(false);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -256,6 +351,11 @@ export default function PrismOverdrive({ onExit }: Props) {
   const resolvingRef = useRef(false);
   const actionFxTokenRef = useRef(1);
   const finalTriggeredRef = useRef(false);
+  const phaseRef = useRef<RunPhase>("build");
+  const chargeRef = useRef<ChargeMap>(emptyCharge());
+  const bankRef = useRef(0);
+  const targetRef = useRef<PrismTarget>(target);
+  const targetTokenRef = useRef(2);
 
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
@@ -272,17 +372,19 @@ export default function PrismOverdrive({ onExit }: Props) {
       if (current < timeStopUntilRef.current || resolvingRef.current) return;
       timeRef.current = Math.max(0, timeRef.current - delta);
       setTimeLeft(timeRef.current);
-      if (!finalTriggeredRef.current && timeRef.current <= FINAL_MS) {
-        finalTriggeredRef.current = true;
-        const token = actionFxTokenRef.current++;
-        setModeFx({ token, kind: "final", title: "FINAL OVERDRIVE", detail: "30 SEC • LIMITER RELEASED" });
-        setLastRank("FINAL OVERDRIVE • ×BOOST");
-        playOverdriveSfx("final", 1.35);
-        window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), 1050);
-      }
+      const nextPhase = phaseForTime(timeRef.current);
+      if (nextPhase !== phaseRef.current) announcePhase(nextPhase);
       if (comboRef.current > 0 && current > comboExpireRef.current) {
         comboRef.current = 0;
         setCombo(0);
+        if (bankRef.current > 0) {
+          const lost = bankRef.current;
+          bankRef.current = 0;
+          setComboBank(0);
+          setLastRank(`BANK LOST • ${lost.toLocaleString()}`);
+          setMessage("COMBO BROKE • CASH OUT EARLIER OR KEEP THE CHAIN ALIVE");
+          playOverdriveSfx("cash", .62);
+        }
       }
       if (timeRef.current <= 0) finishRun();
     }, 100);
@@ -292,14 +394,139 @@ export default function PrismOverdrive({ onExit }: Props) {
   const feverActive = now < feverUntilRef.current;
   const overFeverActive = now < overFeverUntilRef.current;
   const timeStopped = now < timeStopUntilRef.current;
-  const finalOverdrive = screen === "running" && timeLeft <= FINAL_MS;
+  const finalOverdrive = screen === "running" && runPhase === "final";
   const multiplier = 1 + Math.floor(combo / 5) + (upgrades.includes("scoreRush") ? 0.5 : 0) + (feverActive ? 2 : 0) + (overFeverActive ? 2 : 0) + (finalOverdrive ? 1 : 0);
   const largest = useMemo(() => largestGroup(tiles).length, [tiles]);
 
+  function announcePhase(nextPhase: RunPhase) {
+    phaseRef.current = nextPhase;
+    setRunPhase(nextPhase);
+    const token = actionFxTokenRef.current++;
+    if (nextPhase === "accel") {
+      setModeFx({ token, kind: "accel", title: "ACCEL PHASE", detail: "DROP BIAS UP • CASCADE -1" });
+      setLastRank("ACCEL • LINKS OPEN");
+      setMessage("ACCEL • BUILD CHARGE FASTER • CASCADE THRESHOLD DOWN");
+      playOverdriveSfx("target", .92);
+    } else if (nextPhase === "overdrive") {
+      setModeFx({ token, kind: "overdrive", title: "OVERDRIVE PHASE", detail: "CHAIN FIELD • SCORE ×1.35" });
+      setLastRank("OVERDRIVE • CHAIN FIELD");
+      setMessage("OVERDRIVE • BIG CLUSTERS FORM FASTER");
+      playOverdriveSfx("fever", 1.12);
+    } else if (nextPhase === "final") {
+      finalTriggeredRef.current = true;
+      setModeFx({ token, kind: "final", title: "FINAL OVERDRIVE", detail: "30 SEC • LIMITER RELEASED" });
+      setLastRank("FINAL OVERDRIVE • ×BOOST");
+      setMessage("FINAL • CHARGE ×2 • CASCADE THRESHOLD MINIMUM");
+      playOverdriveSfx("final", 1.35);
+    }
+    window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), nextPhase === "final" ? 1050 : 880);
+  }
+
+  function setChargeValue(type: PanelType, value: number) {
+    const next = { ...chargeRef.current, [type]: clamp(Math.round(value), 0, 100) };
+    chargeRef.current = next;
+    setCharge(next);
+  }
+
+  function manualCharge(type: PanelType, count: number) {
+    const before = chargeRef.current[type];
+    if (count <= 4) {
+      const gain = Math.round((10 + count * 7) * PHASE_META[phaseRef.current].charge);
+      setChargeValue(type, before + gain);
+      return { multiplier: 1, gain, release: 0 };
+    }
+    if (before >= 8) {
+      const releaseMult = 1 + before / 100 * (1.05 + phaseIndex(phaseRef.current) * .12);
+      setChargeValue(type, 0);
+      return { multiplier: releaseMult, gain: 0, release: before };
+    }
+    return { multiplier: 1, gain: 0, release: 0 };
+  }
+
+  function addBank(points: number, comboValue: number, chainDepth = 0) {
+    const ratio = clamp(.18 + comboValue * .018 + chainDepth * .09, .18, .78);
+    const gain = Math.max(1, Math.round(points * ratio));
+    bankRef.current += gain;
+    setComboBank(bankRef.current);
+    return gain;
+  }
+
+  function cashOut() {
+    if (screen !== "running" || resolvingRef.current || bankRef.current <= 0) return;
+    primeAudio();
+    const payout = Math.round(bankRef.current * PHASE_META[phaseRef.current].cash);
+    bankRef.current = 0;
+    setComboBank(0);
+    comboRef.current = 0;
+    setCombo(0);
+    comboExpireRef.current = 0;
+    addScore(payout, `CASH OUT +${payout.toLocaleString()}`);
+    const token = actionFxTokenRef.current++;
+    setActionFx({ token, kind: "upgrade", title: "BANK SECURED!", detail: `+${payout.toLocaleString()} • COMBO RESET`, icon: "◆$" });
+    setMessage("SAFE SCORE LOCKED • START A NEW COMBO");
+    playOverdriveSfx("cash", 1.18);
+    window.setTimeout(() => setActionFx((value) => value?.token === token ? null : value), 650);
+  }
+
+  function rollTarget(nextQueues: PanelType[][] = queues) {
+    const next = makeTarget(phaseRef.current, targetTokenRef.current++);
+    targetRef.current = next;
+    setTarget(next);
+    setScanColumn(pickScanColumn(nextQueues, next));
+  }
+
+  function completeTarget(nextQueues: PanelType[][] = queues) {
+    const completed = targetRef.current;
+    const reward = completed.reward;
+    addScore(reward, `PRISM TARGET +${reward.toLocaleString()}`);
+    addFever(18 + phaseIndex(phaseRef.current) * 4);
+    const core = Math.min(3, jackpotRef.current + 1);
+    jackpotRef.current = core;
+    setJackpot(core);
+    setTargetPulse(true);
+    setMessage(`TARGET CLEAR • +${reward.toLocaleString()} • PRISM CORE +1`);
+    playOverdriveSfx("target", 1.08 + phaseIndex(phaseRef.current) * .08);
+    window.setTimeout(() => setTargetPulse(false), 620);
+    rollTarget(nextQueues);
+  }
+
+  function advanceManualTarget(type: PanelType, count: number, nextQueues: PanelType[][] = queues) {
+    const active = targetRef.current;
+    if (active.kind === "color") {
+      if (active.type === type && count >= (active.need ?? 6)) completeTarget(nextQueues);
+      return;
+    }
+    if (active.kind !== "sequence" || !active.sequence) return;
+    const [first, second] = active.sequence;
+    if (active.progress === 0) {
+      if (type === first) {
+        const next = { ...active, progress: 1 };
+        targetRef.current = next;
+        setTarget(next);
+        setMessage(`TARGET STEP 1 • ${LABEL[first]} → NOW ${LABEL[second]}`);
+      }
+      return;
+    }
+    if (type === second) {
+      completeTarget(nextQueues);
+    } else {
+      const nextProgress = type === first ? 1 : 0;
+      const next = { ...active, progress: nextProgress };
+      targetRef.current = next;
+      setTarget(next);
+    }
+  }
+
+  function advanceCascadeTarget(depth: number, nextQueues: PanelType[][]) {
+    const active = targetRef.current;
+    if (active.kind === "cascade" && depth >= (active.need ?? 2)) completeTarget(nextQueues);
+  }
+
   function resetRun() {
     nextTileId = 1;
-    const board = makeBoard();
-    const nextQueues = makeQueues();
+    const board = makeBoard("build");
+    const nextQueues = makeQueues("build");
+    const firstTarget = makeTarget("build", 1);
     setTiles(board); setQueues(nextQueues);
     setScore(0); scoreRef.current = 0;
     setCombo(0); comboRef.current = 0; setMaxCombo(0);
@@ -309,10 +536,15 @@ export default function PrismOverdrive({ onExit }: Props) {
     setUpgrades([]); setUpgradeChoices([]); setRunLevel(0); levelRef.current = 0;
     setClearingIds(new Set()); setFocusIds(new Set()); setFocusDelays({}); setActionFx(null); setBoardFx(null); setModeFx(null);
     setPressedId(null); setJackpotAfterglow(false);
+    setRunPhase("build"); phaseRef.current = "build";
+    const blankCharge = emptyCharge(); setCharge(blankCharge); chargeRef.current = blankCharge;
+    setComboBank(0); bankRef.current = 0;
+    setTarget(firstTarget); targetRef.current = firstTarget; targetTokenRef.current = 2;
+    setScanColumn(pickScanColumn(nextQueues, firstTarget)); setTargetPulse(false);
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
     lastTickRef.current = performance.now();
-    setMessage("BREAK CLUSTERS • KEEP THE COMBO ALIVE");
+    setMessage("SMALL BREAK = CHARGE • BIG BREAK = RELEASE • TARGET = CORE");
   }
 
   function startRun() {
@@ -383,14 +615,14 @@ export default function PrismOverdrive({ onExit }: Props) {
     return nextCombo;
   }
 
-  function scoreCluster(type: PanelType, count: number, chainDepth: number) {
+  function scoreCluster(type: PanelType, count: number, chainDepth: number, chargeMultiplier = 1) {
     const current = performance.now();
     const comboValue = comboRef.current;
     let mult = 1 + Math.floor(comboValue / 5) + (upgrades.includes("scoreRush") ? 0.5 : 0);
     if (current < feverUntilRef.current) mult += 2;
     if (current < overFeverUntilRef.current) mult += 2;
     if (timeRef.current <= FINAL_MS) mult += 1;
-    let base = count * count * 12 * (1 + chainDepth * 0.35);
+    let base = count * count * 12 * (1 + chainDepth * 0.35) * PHASE_META[phaseRef.current].score * chargeMultiplier;
     if (type === "attack") base *= 1.22;
     if (upgrades.includes("doubleBreak") && Math.random() < 0.25) base *= 2;
     const rank = count >= 12 ? "ULTRA BREAK" : count >= 9 ? "MEGA BREAK" : count >= 6 ? "BIG BREAK" : chainDepth > 0 ? `CASCADE ${chainDepth}` : "BREAK";
@@ -434,6 +666,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     const group = connectedGroup(tiles, liveSeed);
     const count = group.length;
     const comboValue = bumpCombo(liveSeed.type, count);
+    const chargeMove = manualCharge(liveSeed.type, count);
     let removed = new Set(group.map((tile) => tile.id));
     const attackBlast = liveSeed.type === "attack" && (count >= 6 || (upgrades.includes("megaAttack") && count >= 5));
     if (attackBlast) removed = expandAdjacent(tiles, group);
@@ -476,6 +709,15 @@ export default function PrismOverdrive({ onExit }: Props) {
       playSfx("playerAttack");
       playOverdriveSfx("attack", attackBlast ? 1.35 : Math.min(1.2, .72 + count * .06));
     }
+    if (chargeMove.gain > 0) {
+      fxDetail += ` • CHARGE +${chargeMove.gain}`;
+      setMessage(`${LABEL[liveSeed.type]} SMALL BREAK → CHARGE +${chargeMove.gain}`);
+    } else if (chargeMove.release > 0) {
+      fxTitle = `CHARGE RELEASE • ${fxTitle}`;
+      fxDetail += ` • BANKED ${chargeMove.release}% → ×${chargeMove.multiplier.toFixed(2)}`;
+      setLastRank(`CHARGE RELEASE ×${chargeMove.multiplier.toFixed(2)}`);
+      playOverdriveSfx("target", 1.12);
+    }
 
     setFocusDelays(fxWaveDelays(removedTiles, impactAnchor));
     setFocusIds(new Set(removed));
@@ -484,8 +726,12 @@ export default function PrismOverdrive({ onExit }: Props) {
     setBoardFx({ token: actionToken, kind: liveSeed.type, phase: "lock", x: impactAnchor.x, y: impactAnchor.y, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
     await sleep(380);
 
-    const scored = scoreCluster(liveSeed.type, removed.size, 0);
+    const scored = scoreCluster(liveSeed.type, removed.size, 0, chargeMove.multiplier);
     let nextScore = addScore(scored.points, scored.rank);
+    const bankGain = addBank(scored.points, comboValue, 0);
+    advanceManualTarget(liveSeed.type, count);
+    nextScore = scoreRef.current;
+    setMessage((current) => chargeMove.release > 0 ? `${current} • BANK +${bankGain.toLocaleString()}` : current);
     setBoardFx({ token: actionToken + 100000, kind: liveSeed.type, phase: "burst", x: impactAnchor.x, y: impactAnchor.y, points: Math.round(scored.points), chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
     if (attackBlast) playOverdriveSfx("mega", Math.min(1.45, 1.08 + removed.size * .025));
     await sleep(230);
@@ -500,18 +746,19 @@ export default function PrismOverdrive({ onExit }: Props) {
     playSfx(count >= 8 ? "cascade" : "drop");
     await sleep(190);
     let currentQueues = queues.map((queue) => [...queue]);
-    let settled = settleBoard(tiles, currentQueues, removed, performance.now() < feverUntilRef.current);
+    let settled = settleBoard(tiles, currentQueues, removed, performance.now() < feverUntilRef.current, phaseRef.current);
     let currentTiles = settled.tiles;
     currentQueues = settled.queues;
-    setTiles(currentTiles); setQueues(currentQueues); setClearingIds(new Set());
+    setTiles(currentTiles); setQueues(currentQueues); setScanColumn(pickScanColumn(currentQueues, targetRef.current)); setClearingIds(new Set());
     setBoardFx({ token: actionToken + 200000, kind: liveSeed.type, phase: "drop", x: impactAnchor.x, y: 91, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
     setActionFx(null);
     playOverdriveSfx("drop", Math.min(1.35, .72 + removed.size * .045));
     await sleep(330);
     setBoardFx(null);
 
-    const cascadeThreshold = (performance.now() < feverUntilRef.current ? 4 : 6) - (upgrades.includes("chainReactor") ? 1 : 0);
-    for (let depth = 1; depth <= 4; depth += 1) {
+    const cascadeThreshold = clamp((performance.now() < feverUntilRef.current ? 4 : 6) - (upgrades.includes("chainReactor") ? 1 : 0) - PHASE_META[phaseRef.current].cascadeCut, 3, 6);
+    const cascadeCap = PHASE_META[phaseRef.current].cascadeCap;
+    for (let depth = 1; depth <= cascadeCap; depth += 1) {
       const auto = largestGroup(currentTiles);
       if (auto.length < cascadeThreshold) break;
       const autoIds = new Set(auto.map((tile) => tile.id));
@@ -532,6 +779,9 @@ export default function PrismOverdrive({ onExit }: Props) {
       await sleep(520);
 
       nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);
+      addBank(autoScore.points, comboRef.current, depth);
+      advanceCascadeTarget(depth, currentQueues);
+      nextScore = scoreRef.current;
       setBoardFx({ token: cascadeToken + 100000, kind: "cascade", phase: "burst", x: cascadeAnchor.x, y: cascadeAnchor.y, points: Math.round(autoScore.points), chain: depth, count: auto.length, columns: cascadeAnchor.columns, links: fxLinks(auto) });
       setMessage(`CHAIN ${depth} SCORE +${Math.round(autoScore.points).toLocaleString()}`);
       addFever(auto.length * 2.4);
@@ -542,9 +792,9 @@ export default function PrismOverdrive({ onExit }: Props) {
       playSfx("cascade");
       playOverdriveSfx("cascade", 1 + depth * .18);
       await sleep(260);
-      settled = settleBoard(currentTiles, currentQueues, autoIds, performance.now() < feverUntilRef.current);
+      settled = settleBoard(currentTiles, currentQueues, autoIds, performance.now() < feverUntilRef.current, phaseRef.current);
       currentTiles = settled.tiles; currentQueues = settled.queues;
-      setTiles(currentTiles); setQueues(currentQueues); setClearingIds(new Set());
+      setTiles(currentTiles); setQueues(currentQueues); setScanColumn(pickScanColumn(currentQueues, targetRef.current)); setClearingIds(new Set());
       setBoardFx({ token: cascadeToken + 200000, kind: "cascade", phase: "drop", x: cascadeAnchor.x, y: 91, points: 0, chain: depth, count: auto.length, columns: cascadeAnchor.columns });
       playOverdriveSfx("drop", 0.9 + depth * .1);
       await sleep(350);
@@ -563,8 +813,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       const jackpotToken = actionFxTokenRef.current++;
       setBoardFx({ token: jackpotToken, kind: "jackpot", phase: "burst", x: 50, y: 50, points: Math.round(jackpotPoints), chain: 0, count: 36, columns: [0,1,2,3,4,5] });
       await sleep(680);
-      currentTiles = makeBoard(); currentQueues = makeQueues();
-      setTiles(currentTiles); setQueues(currentQueues);
+      currentTiles = makeBoard(phaseRef.current); currentQueues = makeQueues(phaseRef.current);
+      setTiles(currentTiles); setQueues(currentQueues); setScanColumn(pickScanColumn(currentQueues, targetRef.current));
       setBoardFx({ token: jackpotToken + 200000, kind: "jackpot", phase: "drop", x: 50, y: 91, points: 0, chain: 0, count: 36, columns: [0,1,2,3,4,5] });
       playOverdriveSfx("drop", 1.42);
       await sleep(390);
@@ -586,6 +836,8 @@ export default function PrismOverdrive({ onExit }: Props) {
   const timeSeconds = Math.ceil(timeLeft / 1000);
   const comboWindowMs = Math.max(0, comboExpireRef.current - now);
   const comboWindowMax = 2200 + (upgrades.includes("comboCore") ? 900 : 0) + (upgrades.includes("healLink") ? 900 : 0);
+  const scanType = queues[scanColumn]?.[0] ?? "attack";
+  const cashValue = Math.round(comboBank * PHASE_META[runPhase].cash);
 
   if (screen === "intro") {
     return <main className={styles.shell} data-screen="intro">
@@ -593,9 +845,9 @@ export default function PrismOverdrive({ onExit }: Props) {
       <div className={styles.introLogo}><span>PRISM</span><strong>OVERDRIVE</strong><em>3 MINUTE HYPER CLUSTER MODE</em></div>
       <div className={styles.introCore} aria-hidden="true">◆</div>
       <div className={styles.introRules}>
-        <b>BREAK → COMBO → FEVER → CASCADE</b>
-        <span>ATK = BLAST SCORE</span><span>HEAL = COMBO LINK</span>
-        <span>BAR = FEVER BANK</span><span>SKIP = TIME STOP</span>
+        <b>BUILD → AIM → RELEASE → CASH OUT</b>
+        <span>SMALL BREAK = CHARGE</span><span>BIG BREAK = RELEASE</span>
+        <span>TARGET CLEAR = PRISM CORE</span><span>SCAN = ONE NEXT COLUMN</span>
       </div>
       <button className={styles.start} type="button" onClick={startRun}>▶ START OVERDRIVE</button>
       <small className={styles.record}>HIGH SCORE {highScore.toLocaleString()}</small>
@@ -616,13 +868,18 @@ export default function PrismOverdrive({ onExit }: Props) {
       <div className={styles.jackpot}><span>JACKPOT</span><strong>{"◆".repeat(jackpot)}{"◇".repeat(3 - jackpot)}</strong></div>
     </section>
 
-    <section className={styles.next} aria-label="Overdrive next drop map">
-      <b>NEXT</b>{queues.map((queue, index) => <span key={index} className={styles[queue[0]!]}>{GLYPH[queue[0]!]}</span>)}
+    <section className={styles.strategyPanel} data-target-pulse={targetPulse ? "true" : "false"} aria-label="Overdrive strategy panel">
+      <div className={styles.phaseCard} data-phase={runPhase}><span>PHASE</span><strong>{PHASE_META[runPhase].label}</strong><em>{PHASE_META[runPhase].note}</em></div>
+      <div className={styles.targetCard}><span>PRISM TARGET</span><strong>{target.label}</strong><em>{targetProgressText(target)} • +{target.reward.toLocaleString()}</em></div>
+      <div className={styles.scanCard}><span>NEXT SCAN • COL {scanColumn + 1}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>ONLY THIS COLUMN IS REVEALED</em></div>
+      <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SECURE • RESET COMBO" : "BUILD BANK WITH COMBO"}</em></button>
+      <div className={styles.chargeRow} aria-label="Prism charge meters">{TYPES.map((type) => <span key={type} className={styles.chargeItem} data-type={type} data-value={charge[type]}><i>{GLYPH[type]}</i><b>{charge[type]}</b><u><em style={{ width: `${charge[type]}%` }} /></u></span>)}</div>
     </section>
 
     <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"}>
       <div className={styles.rank}>{lastRank || (resolving ? "BREAK!" : "KEEP MOVING")}</div>
       <div className={styles.board} aria-label="Prism Overdrive Cluster Break board">
+        <div className={styles.scanMarker} data-type={scanType} style={{ left: `${(scanColumn + .5) / SIZE * 100}%` }} aria-hidden="true"><b>▼</b><span>{GLYPH[scanType]}</span></div>
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
@@ -668,7 +925,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     <section className={styles.actionFeed} data-kind={actionFx?.kind ?? "idle"} aria-live="polite">
       {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
         <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
-      </div> : <div className={styles.actionIdle}><b>BREAK!</b><span>WATCH THE BOARD → CHAIN THE NEXT CLUSTER</span></div>}
+      </div> : <div className={styles.actionIdle}><b>PLAN THE BREAK</b><span>CHARGE SMALL → HIT TARGET → RELEASE BIG → CASH OUT OR PUSH</span></div>}
     </section>
 
     <section className={styles.runInfo}>
