@@ -1,0 +1,147 @@
+name: Apply Prism Overdrive Nonstop Pass
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-overdrive-nonstop.yml'
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply nonstop flow redesign
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/PrismOverdrive.tsx')
+          s=p.read_text()
+          def rep(old,new,label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'MISSING {label}')
+              s=s.replace(old,new,1)
+
+          rep('if (upgradeChoices.length > 0 || current < timeStopUntilRef.current) return;', 'if (current < timeStopUntilRef.current) return;', 'timer choice pause')
+          rep('}, [screen, upgradeChoices.length]);', '}, [screen]);', 'timer deps')
+          rep('''  function maybeOfferUpgrade(nextScore: number) {
+            const threshold = UPGRADE_THRESHOLDS[levelRef.current];
+            if (threshold == null || nextScore < threshold || upgradeChoices.length > 0) return;
+            const choices = chooseUpgrades(upgrades);
+            if (choices.length === 0) return;
+            setUpgradeChoices(choices);
+            setMessage("OVERDRIVE READY • CHOOSE 1");
+            playSfx("skill");
+          }''','''  function maybeOfferUpgrade(nextScore: number) {
+            const threshold = UPGRADE_THRESHOLDS[levelRef.current];
+            if (threshold == null || nextScore < threshold) return;
+            const picked = chooseUpgrades(upgrades)[0];
+            if (!picked) return;
+            setUpgrades((current) => current.includes(picked.id) ? current : [...current, picked.id]);
+            levelRef.current += 1;
+            setRunLevel(levelRef.current);
+            setLastRank(`LEVEL ${levelRef.current} • ${picked.name}!`);
+            setMessage(`${picked.name} AUTO INSTALLED • KEEP BREAKING`);
+            playSfx("skill");
+          }''','auto upgrade')
+          rep('if (screen !== "running" || resolving || upgradeChoices.length > 0 || timeRef.current <= 0) return;', 'if (screen !== "running" || resolving || timeRef.current <= 0) return;', 'clear guard')
+          rep('setMessage(`TIME STOP ${Math.round(stopMs / 100) / 10}s • +${(addedMs / 1000).toFixed(1)}s`);', 'setLastRank(`TIME STOP! • +${(addedMs / 1000).toFixed(1)} SEC`);\n      setMessage(`SKIP ×${count} • CLOCK FROZEN • KEEP AIMING`);', 'skip feedback')
+          rep('setMessage(`FEVER BANK +${count}`);', 'setLastRank(`FEVER +${count * (upgrades.includes("barOvercharge") ? 5 : 2)}`);\n      setMessage(`BAR ×${count} • FEVER CHARGE`);', 'bar feedback')
+          rep('setMessage(`COMBO LINK • WINDOW EXTENDED`);', 'setLastRank("COMBO SAVED!");\n      setMessage(`HEAL ×${count} • COMBO WINDOW EXTENDED`);', 'heal feedback')
+          rep('setMessage(attackBlast ? "MEGA ATK • PIXEL BLAST" : "ATK BREAK");', 'setLastRank(attackBlast ? "MEGA ATK!!" : count >= 6 ? "BIG BREAK!" : "ATK BREAK!");\n      setMessage(attackBlast ? `ATK ×${count} • AREA BLAST` : `ATK ×${count} • SCORE BREAK`);', 'attack feedback')
+          rep('nextScore = addScore(autoScore.points, `CASCADE ${depth}`);', 'nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);\n      setMessage(`AUTO CASCADE • +${Math.round(autoScore.points).toLocaleString()} • DON\'T STOP`);', 'cascade feedback')
+          rep('setMessage(`PRISM JACKPOT • +${Math.round(jackpotPoints).toLocaleString()}`);', 'setLastRank("PRISM JACKPOT!!!");\n      setMessage(`JACKPOT +${Math.round(jackpotPoints).toLocaleString()} • BOARD RESET`);', 'jackpot feedback')
+          rep('setMessage("OVER FEVER!! • SCORE ×5");', 'setLastRank("OVER FEVER!! • ×5");\n      setMessage("OVER FEVER • BREAK EVERYTHING");', 'over fever feedback')
+          rep('setMessage("PRISM FEVER!! • 3 COLOR DROP • SCORE ×3");', 'setLastRank("PRISM FEVER!! • ×3");\n      setMessage("3 COLOR DROP • CASCADE CHANCE UP");', 'fever feedback')
+          rep('disabled={resolving || upgradeChoices.length > 0 || screen !== "running"}', 'disabled={resolving || screen !== "running"}', 'board disabled')
+          rep('{finalOverdrive ? <div className={styles.finalBanner}>FINAL OVERDRIVE • SCORE BOOST</div> : null}', '{finalOverdrive ? <div className={styles.finalBanner}>FINAL OVERDRIVE • 30 SEC • NO STOP • SCORE BOOST</div> : null}', 'final banner')
+          rep('{upgradeChoices.length > 0 ? <div className={styles.overlay} role="dialog" aria-label="Choose Overdrive upgrade">', '{false && upgradeChoices.length > 0 ? <div className={styles.overlay} role="dialog" aria-label="Choose Overdrive upgrade">', 'disable choice overlay')
+          p.write_text(s)
+
+          css=Path('app/PrismOverdrive.module.css')
+          cs=css.read_text()
+          marker='/* PASS 39 — PRISM OVERDRIVE NON-STOP FLOW */'
+          if marker not in cs:
+              cs += '''\n\n/* PASS 39 — PRISM OVERDRIVE NON-STOP FLOW */
+          /* The board is the primary objective. Rewards never cover or pause play. */
+          .hypeRow{grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px}
+          .jackpot{display:none}
+          .next{display:none}
+          .boardWrap{padding-top:23px}
+          .board{width:min(96vw,53dvh,410px);border-color:#5b6c8c}
+          .rank{font-size:clamp(11px,3.2vw,15px);line-height:1.1;color:#fff578;text-shadow:2px 2px #000,-1px 0 #351060,1px 0 #351060;animation:rankPunch 180ms steps(2,end)}
+          @keyframes rankPunch{0%{transform:scale(.86)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+          .runInfo,.build{display:none}
+          .message{min-height:21px;margin-top:4px;padding:4px 5px;border-width:1px;font-size:7px;color:#c9d9ff;background:#030711}
+          .fever .rank{color:#7affff;font-size:clamp(13px,3.7vw,17px)}
+          .overFever .rank{color:#fff578;font-size:clamp(14px,4vw,19px)}
+          .final .rank{font-size:clamp(14px,4vw,19px);color:#fff578}
+          .finalBanner{top:48px;padding:5px 3px;font-size:8px;box-shadow:0 3px #000}
+          @media(max-height:700px){.boardWrap{padding-top:18px}.board{width:min(92vw,52dvh,370px)}.message{min-height:18px;padding:3px;font-size:6px}}
+          '''
+          css.write_text(cs)
+          PY
+      - run: npm ci
+      - name: TypeScript check
+        run: npx tsc --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/overdrive-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Nonstop gameplay QA
+        run: |
+          mkdir -p /tmp/overdrive-qa
+          cat > /tmp/overdrive-qa.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          await page.screenshot({path:'/tmp/overdrive-qa/01-start.jpg',type:'jpeg',quality:88});
+          let maxLevel=0;
+          for(let i=0;i<85;i++){
+            if(await page.getByRole('dialog',{name:/Choose Overdrive upgrade/}).isVisible().catch(()=>false)) throw new Error('upgrade choice interrupted gameplay');
+            const buttons=board.locator('button:not([disabled])');
+            const n=await buttons.count();
+            if(n){await buttons.nth((i*11)%n).click(); await page.waitForTimeout(145);} else await page.waitForTimeout(90);
+            const text=await page.locator('body').innerText();
+            const m=text.match(/LEVEL\s+(\d+)/); if(m) maxLevel=Math.max(maxLevel,Number(m[1]));
+            if(i===35) await page.screenshot({path:'/tmp/overdrive-qa/02-mid.jpg',type:'jpeg',quality:88});
+          }
+          await page.screenshot({path:'/tmp/overdrive-qa/03-late.jpg',type:'jpeg',quality:88});
+          const body=await page.locator('body').innerText();
+          const data={errors,maxLevel,hasChoose1:body.includes('CHOOSE 1'),bodyText:body,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('/tmp/overdrive-qa/review.json',JSON.stringify(data,null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(body.includes('CHOOSE 1')) throw new Error('CHOOSE 1 still rendered');
+          await browser.close();
+          NODE
+          node /tmp/overdrive-qa.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-nonstop-qa
+          path: /tmp/overdrive-qa
+          retention-days: 1
+      - name: Commit implementation and remove temporary QA workflows
+        run: |
+          rm -f .github/workflows/apply-overdrive-nonstop.yml .github/workflows/qa-overdrive-review.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css .github/workflows
+          git commit -m 'Redesign Prism Overdrive for nonstop flow'
+          git push origin HEAD:main
