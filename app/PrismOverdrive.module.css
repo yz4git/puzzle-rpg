@@ -396,3 +396,10 @@
 .helpOverlay{position:absolute;z-index:80;inset:0;display:grid;place-items:center;padding:16px;background:rgba(1,3,8,.88)}.helpOverlay>div{position:relative;width:min(94%,370px);padding:15px;border:3px solid #65f5ff;background:#07101a;box-shadow:0 0 0 3px #241044,7px 8px #000}.helpOverlay h2{margin:0 0 10px;color:#fff36d;font-size:18px}.helpOverlay p{margin:6px 0;padding:6px;border:1px solid #294057;background:#040911;color:#e7f5ff;font-size:9px;line-height:1.35}.helpOverlay p b{color:#65f5ff}.helpOverlay small{display:block;margin-top:9px;color:#91a9bf;font-size:7px;line-height:1.5}.helpOverlay button{position:absolute;right:7px;top:7px;width:32px;height:32px;border:2px solid #73849a;background:#080b12;color:#fff;font:1000 18px/1 monospace}
 @media(max-height:700px){.guideBar{min-height:35px}.guideBar strong{font-size:7px}.guideBar span{font-size:5px}.guideBar button{width:28px;height:28px}.strategyBeginner{min-height:34px!important}.strategyBeginner .targetCard{min-height:29px}.strategyBeginner .targetCard strong{font-size:8px}}
 @media(prefers-reduced-motion:reduce){.recommended{animation:none!important}}
+
+
+/* PASS 50 — BEGINNER FOCUS / FONT-SAFE ONBOARDING */
+.guideBar{min-height:48px!important}.guideBar strong{font-size:10px!important;letter-spacing:.04em}.guideBar span{font-size:7px!important}.guideBar button{font-size:18px!important}
+.strategyBeginner{min-height:44px!important}.strategyBeginner .targetCard{min-height:38px!important}.strategyBeginner .targetCard strong{font-size:11px!important}.strategyBeginner .targetCard em{font-size:6px!important}
+.recommended::after{content:"TAP"!important;font-size:6px!important;padding:2px 3px!important}.helpOverlay h2{font-size:17px!important;letter-spacing:.06em}.helpOverlay p{font-size:9px!important}.helpOverlay small{font-size:7px!important}
+@media(max-height:700px){.guideBar{min-height:39px!important}.guideBar strong{font-size:8px!important}.guideBar span{font-size:5px!important}.strategyBeginner{min-height:34px!important}}
