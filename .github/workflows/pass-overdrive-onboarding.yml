@@ -27,48 +27,49 @@ jobs:
           npx playwright install chromium
           bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/onboard.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
-          mkdir -p /tmp/onboarding-qa
-          cat > /tmp/qa.mjs <<'NODE'
+          mkdir -p onboarding-qa
+          cat > qa-onboarding.mjs <<'NODE'
           import {chromium} from 'playwright'; import fs from 'node:fs';
           const result={errors:[],stages:[],recommended:0,help:false,scrollWidth:0,innerWidth:0};
-          const save=()=>fs.writeFileSync('/tmp/onboarding-qa/review.json',JSON.stringify(result,null,2));
+          const save=()=>fs.writeFileSync('onboarding-qa/review.json',JSON.stringify(result,null,2));
           let b;
           try{
             b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); p.on('pageerror',e=>result.errors.push(String(e)));
             await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); result.stages.push('home');
             await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click(); result.stages.push('intro');
-            await p.screenshot({path:'/tmp/onboarding-qa/01-simple-intro.jpg',type:'jpeg',quality:92});
+            await p.screenshot({path:'onboarding-qa/01-simple-intro.jpg',type:'jpeg',quality:92});
             await p.getByRole('button',{name:/START OVERDRIVE/}).click(); result.stages.push('started');
             const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
-            await p.screenshot({path:'/tmp/onboarding-qa/02-first-move.jpg',type:'jpeg',quality:92});
+            await p.screenshot({path:'onboarding-qa/02-first-move.jpg',type:'jpeg',quality:92});
             const rec=p.locator('[class*="recommended"]:not([disabled])'); result.recommended=await rec.count();
             if(result.recommended>0){await rec.first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000}); result.stages.push('firstMove');}
             else result.errors.push('no recommended first move');
-            await p.screenshot({path:'/tmp/onboarding-qa/03-after-first.jpg',type:'jpeg',quality:92});
+            await p.screenshot({path:'onboarding-qa/03-after-first.jpg',type:'jpeg',quality:92});
             for(let n=0;n<6;n++){
               const enabled=board.locator('button:not([disabled])'); await enabled.first().waitFor({timeout:18000});
               const x=p.locator('[class*="recommended"]:not([disabled])'); if(await x.count()) await x.first().click(); else await enabled.first().click();
               await board.locator('button:not([disabled])').first().waitFor({timeout:18000});
             }
-            result.stages.push('advanced'); await p.screenshot({path:'/tmp/onboarding-qa/04-full-strategy.jpg',type:'jpeg',quality:92});
+            result.stages.push('advanced'); await p.screenshot({path:'onboarding-qa/04-full-strategy.jpg',type:'jpeg',quality:92});
             const helpButton=p.getByRole('button',{name:'？'}); result.stages.push(`helpButtons:${await helpButton.count()}`); await helpButton.first().click();
-            const dialog=p.locator('[role="dialog"][aria-label="Prism Overdrive help"]'); result.help=await dialog.isVisible().catch(()=>false); await p.screenshot({path:'/tmp/onboarding-qa/05-help.jpg',type:'jpeg',quality:92});
+            const dialog=p.locator('[role="dialog"][aria-label="Prism Overdrive help"]'); result.help=await dialog.isVisible().catch(()=>false); await p.screenshot({path:'onboarding-qa/05-help.jpg',type:'jpeg',quality:92});
             result.scrollWidth=await p.evaluate(()=>document.documentElement.scrollWidth); result.innerWidth=await p.evaluate(()=>innerWidth);
             if(result.scrollWidth>result.innerWidth)result.errors.push('horizontal overflow'); if(!result.help)result.errors.push('help not visible');
           }catch(e){result.errors.push(String(e));}
           finally{save(); if(b)await b.close();}
           if(result.errors.length)process.exitCode=1;
           NODE
-          node /tmp/qa.mjs
+          node qa-onboarding.mjs
       - uses: actions/upload-artifact@v4
         if: always()
-        with: {name: prism-overdrive-onboarding-qa, path: /tmp/onboarding-qa, retention-days: 1}
+        with: {name: prism-overdrive-onboarding-qa, path: onboarding-qa, retention-days: 1}
       - name: Fail if browser QA failed
         if: steps.browserqa.outcome != 'success'
         run: exit 1
       - name: Commit and cleanup
         run: |
-          rm -f scripts/pass-overdrive-onboarding.py .github/workflows/pass-overdrive-onboarding.yml
+          rm -f scripts/pass-overdrive-onboarding.py .github/workflows/pass-overdrive-onboarding.yml qa-onboarding.mjs
+          rm -rf onboarding-qa
           git config user.name yz4git
           git config user.email 65384484+yz4git@users.noreply.github.com
           git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
