@@ -1,0 +1,79 @@
+name: Prism Overdrive Review Capture
+on:
+  push:
+    paths:
+      - '.github/workflows/qa-overdrive-review.yml'
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - run: |
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && exit 0; sleep 1; done
+          cat /tmp/http.log; exit 1
+      - name: Capture play review
+        run: |
+          mkdir -p /tmp/qa
+          cat > qa.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          const log=[]; const errors=[];
+          page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.screenshot({path:'/tmp/qa/01-intro.jpg',type:'jpeg',quality:88});
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          await page.screenshot({path:'/tmp/qa/02-start.jpg',type:'jpeg',quality:88});
+          let firstChoiceAt=-1, secondChoiceAt=-1;
+          for(let i=0;i<55;i++){
+            const choice=page.getByRole('dialog',{name:/Choose Overdrive upgrade/});
+            if(await choice.isVisible().catch(()=>false)){
+              if(firstChoiceAt<0){firstChoiceAt=i; await page.screenshot({path:'/tmp/qa/03-first-choice.jpg',type:'jpeg',quality:88});}
+              else if(secondChoiceAt<0){secondChoiceAt=i; await page.screenshot({path:'/tmp/qa/05-second-choice.jpg',type:'jpeg',quality:88});}
+              await choice.locator('button').first().click();
+              await page.waitForTimeout(100);
+              if(firstChoiceAt>=0 && secondChoiceAt<0 && i===firstChoiceAt) await page.screenshot({path:'/tmp/qa/04-after-choice.jpg',type:'jpeg',quality:88});
+              continue;
+            }
+            const buttons=board.locator('button:not([disabled])');
+            const n=await buttons.count();
+            if(n){await buttons.nth((i*7)%n).click(); await page.waitForTimeout(170);} else await page.waitForTimeout(120);
+          }
+          const choice=page.getByRole('dialog',{name:/Choose Overdrive upgrade/});
+          if(await choice.isVisible().catch(()=>false)) await choice.locator('button').first().click();
+          await page.waitForTimeout(150);
+          await page.screenshot({path:'/tmp/qa/06-late.jpg',type:'jpeg',quality:88});
+          const data=await page.evaluate(()=>({
+            bodyText:document.body.innerText,
+            sw:document.documentElement.scrollWidth, sh:document.documentElement.scrollHeight,
+            iw:innerWidth, ih:innerHeight
+          }));
+          log.push({firstChoiceAt,secondChoiceAt,errors,...data});
+          require('fs');
+          NODE
+          # patch ESM fs write
+          python3 - <<'PY'
+          p='qa.mjs'; s=open(p).read(); s=s.replace("          require('fs');\n", "          const fs=await import('node:fs'); fs.writeFileSync('/tmp/qa/review.json',JSON.stringify(log,null,2)); await browser.close();\n")
+          open(p,'w').write(s)
+          PY
+          node qa.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-review
+          path: /tmp/qa
+          retention-days: 1
