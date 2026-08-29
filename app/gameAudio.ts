@@ -165,6 +165,45 @@ export function setSfxEnabled(enabled: boolean) {
   sfxEnabled = enabled;
 }
 
+export type OverdriveSfx = "attack" | "cascade" | "fever" | "jackpot" | "upgrade";
+
+/** Dense arcade-style reward sounds used only by PRISM OVERDRIVE. */
+export function playOverdriveSfx(name: OverdriveSfx, intensity = 1) {
+  if (!sfxEnabled) return;
+  const c = audioContext();
+  if (!c) return;
+  const t = c.currentTime;
+  const k = Math.max(0.55, Math.min(1.45, intensity));
+  if (name === "attack") {
+    sweep(140, 1180, t, .105, .09 * k, "sawtooth");
+    sweep(1760, 420, t + .045, .12, .065 * k, "square");
+    tone(82, t + .085, .12, .09 * k, "triangle");
+    noise(t + .07, .085, .075 * k);
+    return;
+  }
+  if (name === "cascade") {
+    arp([659, 784, 988, 1175, 1568, 1976], .026, .055 * k, "square");
+    sweep(220, 1320, t + .06, .13, .055 * k, "sawtooth");
+    noise(t + .11, .045, .03 * k);
+    return;
+  }
+  if (name === "fever") {
+    arp([392, 523, 659, 784, 1047, 1319, 1568], .038, .065 * k, "square");
+    sweep(110, 880, t, .22, .07 * k, "sawtooth");
+    noise(t + .15, .07, .05 * k);
+    return;
+  }
+  if (name === "jackpot") {
+    arp([523, 659, 784, 1047, 1319, 1568, 2093], .045, .075 * k, "square");
+    tone(98, t, .22, .11 * k, "triangle");
+    tone(196, t + .12, .2, .095 * k, "triangle");
+    noise(t + .18, .12, .075 * k);
+    return;
+  }
+  arp([330, 494, 659, 988, 1319, 1976], .04, .065 * k, "square");
+  sweep(180, 1280, t + .05, .18, .055 * k, "sawtooth");
+}
+
 export function playSfx(name: GameSfx) {
   if (!sfxEnabled) return;
   const replacement = SFX_ASSET_OVERRIDES[name];

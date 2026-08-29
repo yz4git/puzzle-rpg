@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { playSfx, primeAudio } from "./gameAudio";
+import { playOverdriveSfx, playSfx, primeAudio } from "./gameAudio";
 import styles from "./PrismOverdrive.module.css";
 
 type PanelType = "attack" | "heal" | "barrier" | "skip";
@@ -278,12 +278,14 @@ export default function PrismOverdrive({ onExit }: Props) {
       setLastRank("OVER FEVER!! • ×5");
       setMessage("OVER FEVER • BREAK EVERYTHING");
       playSfx("cascade");
+      playOverdriveSfx("fever", 1.25);
     } else if (current >= feverUntilRef.current && next >= 100) {
       next -= 100;
       feverUntilRef.current = current + FEVER_MS;
       setLastRank("PRISM FEVER!! • ×3");
       setMessage("3 COLOR DROP • CASCADE CHANCE UP");
       playSfx("cascade");
+      playOverdriveSfx("fever", 1);
     }
     feverRef.current = clamp(next, 0, 100);
     setFever(feverRef.current);
@@ -327,7 +329,8 @@ export default function PrismOverdrive({ onExit }: Props) {
     setMessage(`${picked.name} AUTO INSTALLED`);
     setActionFx({ token: actionFxTokenRef.current++, kind: "upgrade", title: `${picked.name} GET!`, detail: picked.description, icon: picked.icon });
     playSfx("skill");
-    await sleep(520);
+    playOverdriveSfx("upgrade", 1);
+    await sleep(620);
     setActionFx(null);
   }
 
@@ -389,6 +392,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       setLastRank(attackBlast ? "MEGA ATK!!" : count >= 6 ? "BIG BREAK!" : "ATK BREAK!");
       setMessage(attackBlast ? "RED ATK → NEARBY PANELS ALSO BREAK" : "RED ATK → SCORE");
       playSfx("playerAttack");
+      playOverdriveSfx("attack", attackBlast ? 1.35 : Math.min(1.2, .72 + count * .06));
     }
 
     setFocusIds(new Set(removed));
@@ -428,7 +432,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       setLastRank(`CHAIN ${depth}!`);
       setMessage(`AUTO MATCH FOUND • ${LABEL[autoType]} ×${auto.length} WILL BREAK`);
       playSfx("setup");
-      await sleep(420);
+      playOverdriveSfx("cascade", 0.72 + depth * .16);
+      await sleep(520);
 
       nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);
       setMessage(`CHAIN ${depth} SCORE +${Math.round(autoScore.points).toLocaleString()}`);
@@ -436,7 +441,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       setFocusIds(new Set());
       setClearingIds(autoIds);
       playSfx("cascade");
-      await sleep(220);
+      playOverdriveSfx("cascade", 1 + depth * .18);
+      await sleep(260);
       settled = settleBoard(currentTiles, currentQueues, autoIds, performance.now() < feverUntilRef.current);
       currentTiles = settled.tiles; currentQueues = settled.queues;
       setTiles(currentTiles); setQueues(currentQueues); setClearingIds(new Set());
@@ -451,7 +457,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       setLastRank("PRISM JACKPOT!!!");
       setMessage(`JACKPOT +${Math.round(jackpotPoints).toLocaleString()} • BOARD RESET`);
       playSfx("stageClear");
-      await sleep(260);
+      playOverdriveSfx("jackpot", 1.35);
+      await sleep(520);
       currentTiles = makeBoard(); currentQueues = makeQueues();
       setTiles(currentTiles); setQueues(currentQueues);
       setJackpotFlash(false);
@@ -500,7 +507,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       <b>NEXT</b>{queues.map((queue, index) => <span key={index} className={styles[queue[0]!]}>{GLYPH[queue[0]!]}</span>)}
     </section>
 
-    <section className={styles.boardWrap}>
+    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"}>
       <div className={styles.rank}>{lastRank || (resolving ? "BREAK!" : "KEEP MOVING")}</div>
       <div className={styles.board} aria-label="Prism Overdrive Cluster Break board">
         {tiles.map((tile) => <button
@@ -513,11 +520,15 @@ export default function PrismOverdrive({ onExit }: Props) {
           onClick={() => void clearCluster(tile)}
         ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
       </div>
-      {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
-        <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
-      </div> : null}
+      {actionFx ? <div key={`burst-${actionFx.token}`} className={styles.boardBurst} data-kind={actionFx.kind} aria-hidden="true"><i /><b /><u /></div> : null}
       {jackpotFlash ? <div className={styles.jackpotFlash}><span>PRISM</span><strong>JACKPOT!</strong></div> : null}
       {timeStopped ? <div className={styles.timeStopFx}><i>⏱</i><strong>TIME STOP</strong></div> : null}
+    </section>
+
+    <section className={styles.actionFeed} data-kind={actionFx?.kind ?? "idle"} aria-live="polite">
+      {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
+        <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
+      </div> : <div className={styles.actionIdle}><b>BREAK!</b><span>WATCH THE BOARD → CHAIN THE NEXT CLUSTER</span></div>}
     </section>
 
     <section className={styles.runInfo}>
