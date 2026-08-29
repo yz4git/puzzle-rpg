@@ -13,3 +13,20 @@
 @media(max-height:700px){.topbar{height:42px}.topbar>div{height:34px}.topbar>div>strong{font-size:14px}.hypeRow>div{min-height:42px}.combo strong{font-size:15px}.boardWrap{padding-top:14px}.board{width:min(91vw,45dvh,342px)}.rank{font-size:8px}.runInfo span{padding:3px 2px}.message{min-height:21px;padding:4px}.finalBanner{top:45px}.upgradeCard button{min-height:56px}.introCore{width:82px;height:82px;font-size:54px}.introLogo strong{font-size:42px}.introRules{padding:6px}.start{min-height:48px}}
 @media(max-height:590px){.hypeRow{grid-template-columns:1.3fr 1.1fr}.jackpot{display:none}.next{min-height:22px}.board{width:min(88vw,42dvh,292px)}.runInfo{margin-top:2px}.build{display:none}.message{font-size:6px}.topbar{height:38px}.finalBanner{top:41px}.introRules{font-size:6px}.introCore{width:64px;height:64px;font-size:42px}.introLogo strong{font-size:34px}}
 @media(prefers-reduced-motion:reduce){.clearing,.jackpotFlash,.finalBanner{animation-duration:1ms!important;animation-iteration-count:1!important}}
+
+/* PASS 39 — PRISM OVERDRIVE NON-STOP FLOW */
+/* The board is the primary objective. Rewards never cover or pause play. */
+.hypeRow{grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px}
+.jackpot{display:none}
+.next{display:none}
+.boardWrap{padding-top:23px}
+.board{width:min(96vw,53dvh,410px);border-color:#5b6c8c}
+.rank{font-size:clamp(11px,3.2vw,15px);line-height:1.1;color:#fff578;text-shadow:2px 2px #000,-1px 0 #351060,1px 0 #351060;animation:rankPunch 180ms steps(2,end)}
+@keyframes rankPunch{0%{transform:scale(.86)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+.runInfo,.build{display:none}
+.message{min-height:21px;margin-top:4px;padding:4px 5px;border-width:1px;font-size:7px;color:#c9d9ff;background:#030711}
+.fever .rank{color:#7affff;font-size:clamp(13px,3.7vw,17px)}
+.overFever .rank{color:#fff578;font-size:clamp(14px,4vw,19px)}
+.final .rank{font-size:clamp(14px,4vw,19px);color:#fff578}
+.finalBanner{top:48px;padding:5px 3px;font-size:8px;box-shadow:0 3px #000}
+@media(max-height:700px){.boardWrap{padding-top:18px}.board{width:min(92vw,52dvh,370px)}.message{min-height:18px;padding:3px;font-size:6px}}

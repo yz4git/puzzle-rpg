@@ -193,7 +193,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       setNow(current);
       const delta = Math.min(250, current - lastTickRef.current);
       lastTickRef.current = current;
-      if (upgradeChoices.length > 0 || current < timeStopUntilRef.current) return;
+      if (current < timeStopUntilRef.current) return;
       timeRef.current = Math.max(0, timeRef.current - delta);
       setTimeLeft(timeRef.current);
       if (comboRef.current > 0 && current > comboExpireRef.current) {
@@ -203,7 +203,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       if (timeRef.current <= 0) finishRun();
     }, 100);
     return () => window.clearInterval(timer);
-  }, [screen, upgradeChoices.length]);
+  }, [screen]);
 
   const feverActive = now < feverUntilRef.current;
   const overFeverActive = now < overFeverUntilRef.current;
@@ -263,12 +263,14 @@ export default function PrismOverdrive({ onExit }: Props) {
     if (current < feverUntilRef.current && next >= 100) {
       next -= 100;
       overFeverUntilRef.current = current + OVER_FEVER_MS;
-      setMessage("OVER FEVER!! • SCORE ×5");
+      setLastRank("OVER FEVER!! • ×5");
+      setMessage("OVER FEVER • BREAK EVERYTHING");
       playSfx("cascade");
     } else if (current >= feverUntilRef.current && next >= 100) {
       next -= 100;
       feverUntilRef.current = current + FEVER_MS;
-      setMessage("PRISM FEVER!! • 3 COLOR DROP • SCORE ×3");
+      setLastRank("PRISM FEVER!! • ×3");
+      setMessage("3 COLOR DROP • CASCADE CHANCE UP");
       playSfx("cascade");
     }
     feverRef.current = clamp(next, 0, 100);
@@ -303,11 +305,14 @@ export default function PrismOverdrive({ onExit }: Props) {
 
   function maybeOfferUpgrade(nextScore: number) {
     const threshold = UPGRADE_THRESHOLDS[levelRef.current];
-    if (threshold == null || nextScore < threshold || upgradeChoices.length > 0) return;
-    const choices = chooseUpgrades(upgrades);
-    if (choices.length === 0) return;
-    setUpgradeChoices(choices);
-    setMessage("OVERDRIVE READY • CHOOSE 1");
+    if (threshold == null || nextScore < threshold) return;
+    const picked = chooseUpgrades(upgrades)[0];
+    if (!picked) return;
+    setUpgrades((current) => current.includes(picked.id) ? current : [...current, picked.id]);
+    levelRef.current += 1;
+    setRunLevel(levelRef.current);
+    setLastRank(`LEVEL ${levelRef.current} • ${picked.name}!`);
+    setMessage(`${picked.name} AUTO INSTALLED • KEEP BREAKING`);
     playSfx("skill");
   }
 
@@ -322,7 +327,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   }
 
   async function clearCluster(seed: Tile) {
-    if (screen !== "running" || resolving || upgradeChoices.length > 0 || timeRef.current <= 0) return;
+    if (screen !== "running" || resolving || timeRef.current <= 0) return;
     const liveSeed = tiles.find((tile) => tile.id === seed.id);
     if (!liveSeed) return;
     primeAudio();
@@ -342,16 +347,20 @@ export default function PrismOverdrive({ onExit }: Props) {
       setTimeLeft(timeRef.current);
       const stopMs = count >= 6 ? 2000 : count >= 4 ? 1000 : 350;
       timeStopUntilRef.current = Math.max(timeStopUntilRef.current, performance.now() + stopMs);
-      setMessage(`TIME STOP ${Math.round(stopMs / 100) / 10}s • +${(addedMs / 1000).toFixed(1)}s`);
+      setLastRank(`TIME STOP! • +${(addedMs / 1000).toFixed(1)} SEC`);
+      setMessage(`SKIP ×${count} • CLOCK FROZEN • KEEP AIMING`);
       playSfx("skill");
     } else if (liveSeed.type === "barrier") {
-      setMessage(`FEVER BANK +${count}`);
+      setLastRank(`FEVER +${count * (upgrades.includes("barOvercharge") ? 5 : 2)}`);
+      setMessage(`BAR ×${count} • FEVER CHARGE`);
       playSfx("shield");
     } else if (liveSeed.type === "heal") {
-      setMessage(`COMBO LINK • WINDOW EXTENDED`);
+      setLastRank("COMBO SAVED!");
+      setMessage(`HEAL ×${count} • COMBO WINDOW EXTENDED`);
       playSfx("heal");
     } else {
-      setMessage(attackBlast ? "MEGA ATK • PIXEL BLAST" : "ATK BREAK");
+      setLastRank(attackBlast ? "MEGA ATK!!" : count >= 6 ? "BIG BREAK!" : "ATK BREAK!");
+      setMessage(attackBlast ? `ATK ×${count} • AREA BLAST` : `ATK ×${count} • SCORE BREAK`);
       playSfx("playerAttack");
     }
 
@@ -380,7 +389,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       comboRef.current += 1; setCombo(comboRef.current); setMaxCombo((value) => Math.max(value, comboRef.current));
       comboExpireRef.current = performance.now() + 2500 + (upgrades.includes("comboCore") ? 900 : 0);
       const autoScore = scoreCluster(auto[0]!.type, auto.length, depth);
-      nextScore = addScore(autoScore.points, `CASCADE ${depth}`);
+      nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);
+      setMessage(`AUTO CASCADE • +${Math.round(autoScore.points).toLocaleString()} • DON\'T STOP`);
       addFever(auto.length * 2.4);
       setClearingIds(autoIds);
       playSfx("cascade");
@@ -396,7 +406,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       const jackpotPoints = 5000 * (1 + Math.floor(comboValue / 5) + (finalOverdrive ? 1 : 0));
       nextScore = addScore(jackpotPoints, "PRISM JACKPOT");
       addFever(35);
-      setMessage(`PRISM JACKPOT • +${Math.round(jackpotPoints).toLocaleString()}`);
+      setLastRank("PRISM JACKPOT!!!");
+      setMessage(`JACKPOT +${Math.round(jackpotPoints).toLocaleString()} • BOARD RESET`);
       playSfx("stageClear");
       await sleep(260);
       currentTiles = makeBoard(); currentQueues = makeQueues();
@@ -452,7 +463,7 @@ export default function PrismOverdrive({ onExit }: Props) {
           type="button"
           className={`${styles.tile} ${styles[tile.type]} ${clearingIds.has(tile.id) ? styles.clearing : ""}`}
           style={{ left: `calc(${tile.col * (100 / SIZE)}% + 1px)`, top: `calc(${tile.row * (100 / SIZE)}% + 1px)` }}
-          disabled={resolving || upgradeChoices.length > 0 || screen !== "running"}
+          disabled={resolving || screen !== "running"}
           aria-label={`${LABEL[tile.type]} cluster panel row ${tile.row + 1} column ${tile.col + 1}`}
           onClick={() => void clearCluster(tile)}
         ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
@@ -467,9 +478,9 @@ export default function PrismOverdrive({ onExit }: Props) {
     <div className={styles.message} role="status">{message}</div>
     <div className={styles.build}>{upgrades.map((id) => <i key={id}>{UPGRADES.find((upgrade) => upgrade.id === id)?.name}</i>)}</div>
 
-    {finalOverdrive ? <div className={styles.finalBanner}>FINAL OVERDRIVE • SCORE BOOST</div> : null}
+    {finalOverdrive ? <div className={styles.finalBanner}>FINAL OVERDRIVE • 30 SEC • NO STOP • SCORE BOOST</div> : null}
 
-    {upgradeChoices.length > 0 ? <div className={styles.overlay} role="dialog" aria-label="Choose Overdrive upgrade">
+    {false && upgradeChoices.length > 0 ? <div className={styles.overlay} role="dialog" aria-label="Choose Overdrive upgrade">
       <div className={styles.upgradeCard}><span>OVERDRIVE LEVEL {runLevel + 1}</span><strong>CHOOSE 1</strong><p>ゲームを壊す能力を追加する</p>
         <div>{upgradeChoices.map((upgrade) => <button key={upgrade.id} type="button" data-tag={upgrade.tag} onClick={() => pickUpgrade(upgrade.id)}><b>{upgrade.icon}</b><span><strong>{upgrade.name}</strong><small>{upgrade.description}</small></span></button>)}</div>
       </div>
