@@ -1,0 +1,82 @@
+name: Prism Overdrive MEGA ATK QA
+on:
+  push:
+    paths:
+      - '.github/workflows/qa-overdrive-mega-vfx.yml'
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/mega-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Force-observe MEGA ATK
+        run: |
+          mkdir -p /tmp/mega-qa
+          cat > qa-mega.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:402,height:874}});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          async function enter(){
+            await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+            await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+            await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+            await page.locator('[aria-label="Prism Overdrive Cluster Break board"]').waitFor();
+          }
+          function bestAttack(cells){
+            const map=new Map(cells.map(x=>[`${x.r}:${x.c}`,x])); const seen=new Set(); let best=[];
+            for(const cell of cells){if(cell.type!=='ATK')continue;const key=`${cell.r}:${cell.c}`;if(seen.has(key))continue;const stack=[cell],g=[];seen.add(key);while(stack.length){const x=stack.pop();g.push(x);for(const [r,c] of [[x.r-1,x.c],[x.r+1,x.c],[x.r,x.c-1],[x.r,x.c+1]]){const k=`${r}:${c}`,y=map.get(k);if(y&&y.type==='ATK'&&!seen.has(k)){seen.add(k);stack.push(y)}}}if(g.length>best.length)best=g}return best;
+          }
+          await enter(); let found=false, size=0;
+          for(let attempt=0;attempt<80&&!found;attempt++){
+            const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+            const buttons=board.locator('button'); const n=await buttons.count(); const cells=[];
+            for(let i=0;i<n;i++){const label=await buttons.nth(i).getAttribute('aria-label');const m=label?.match(/^(ATK|HEAL|BAR|SKIP).*row (\d+) column (\d+)$/);if(m)cells.push({i,type:m[1],r:Number(m[2])-1,c:Number(m[3])-1});}
+            const best=bestAttack(cells); size=best.length;
+            if(size>=6){
+              await buttons.nth(best[0].i).click();
+              for(let p=0;p<10;p++){await page.waitForTimeout(70);const mega=page.locator('[class*="spatialFx"][data-mega="true"]');if(await mega.isVisible().catch(()=>false)){found=true;await page.screenshot({path:'/tmp/mega-qa/mega-atk.jpg',type:'jpeg',quality:92});break;}}
+              break;
+            }
+            await page.reload({waitUntil:'networkidle'});
+            await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+            await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+            await page.locator('[aria-label="Prism Overdrive Cluster Break board"]').waitFor();
+          }
+          fs.writeFileSync('/tmp/mega-qa/review.json',JSON.stringify({found,size,errors},null,2));
+          if(errors.length)throw new Error(errors.join('\n'));
+          if(!found)throw new Error('MEGA ATK VFX not observed');
+          await browser.close();
+          NODE
+          node qa-mega.mjs
+          rm qa-mega.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-mega-vfx-qa
+          path: /tmp/mega-qa
+          retention-days: 1
+      - name: Cleanup QA workflow
+        run: |
+          rm -f .github/workflows/qa-overdrive-mega-vfx.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add .github/workflows
+          git commit -m 'Remove temporary Prism Overdrive MEGA QA'
+          git push origin HEAD:main
