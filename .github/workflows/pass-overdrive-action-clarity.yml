@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/pass-overdrive-action-clarity.py'
+      - 'scripts/run-overdrive-action-clarity.py'
       - '.github/workflows/pass-overdrive-action-clarity.yml'
 jobs:
   pass:
@@ -18,7 +19,7 @@ jobs:
           node-version: 22.13.1
           cache: npm
       - name: Apply action clarity redesign
-        run: python3 scripts/pass-overdrive-action-clarity.py
+        run: python3 scripts/run-overdrive-action-clarity.py
       - run: npm ci
       - name: Production build
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
@@ -71,7 +72,7 @@ jobs:
           retention-days: 1
       - name: Commit and cleanup
         run: |
-          rm -f scripts/pass-overdrive-action-clarity.py .github/workflows/pass-overdrive-action-clarity.yml
+          rm -f scripts/pass-overdrive-action-clarity.py scripts/run-overdrive-action-clarity.py .github/workflows/pass-overdrive-action-clarity.yml
           git config user.name 'yz4git'
           git config user.email '65384484+yz4git@users.noreply.github.com'
           git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
