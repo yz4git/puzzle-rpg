@@ -1,0 +1,100 @@
+name: Prism Overdrive Implementation QA
+on:
+  push:
+    paths:
+      - '.github/workflows/pass-prism-overdrive.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply mode-select integration
+        run: python3 scripts/pass-prism-overdrive-integrate.py
+      - name: Source assertions
+        run: |
+          grep -q 'PRISM OVERDRIVE' app/PrismOverdrive.tsx
+          grep -q 'UPGRADE_THRESHOLDS' app/PrismOverdrive.tsx
+          grep -q 'PRISM JACKPOT' app/PrismOverdrive.tsx
+          grep -q 'FINAL_MS' app/PrismOverdrive.tsx
+          grep -q 'mode === "overdrive"' app/PuzzleRPGApp.tsx
+          grep -q 'overdriveMode' app/PuzzleRPGApp.module.css
+      - name: Install dependencies
+        run: npm ci
+      - name: Puzzle RPG TypeScript check
+        run: npx tsc -p tsconfig.puzzle.json --noEmit
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Install browser QA
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start production server
+        run: |
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/puzzle-rpg-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/puzzle-rpg-http.log
+          exit 1
+      - name: iPhone Prism Overdrive smoke
+        run: |
+          cat > .qa-overdrive.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 1 });
+          const errors = [];
+          page.on('pageerror', err => errors.push(String(err)));
+          await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle' });
+          const modeButton = page.getByRole('button', { name: /PRISM OVERDRIVE/ });
+          await modeButton.waitFor({ state: 'visible' });
+          const titleMetrics = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth, sh: document.documentElement.scrollHeight, ih: innerHeight }));
+          if (titleMetrics.sw > titleMetrics.iw + 1 || titleMetrics.sh > titleMetrics.ih + 1) throw new Error(`mode select overflow ${JSON.stringify(titleMetrics)}`);
+          await modeButton.click();
+          await page.getByRole('button', { name: /START OVERDRIVE/ }).click();
+          const board = page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor({ state: 'visible' });
+          for (let i = 0; i < 18; i += 1) {
+            const buttons = board.locator('button:not([disabled])');
+            if (await buttons.count() === 0) { await page.waitForTimeout(160); continue; }
+            await buttons.nth(i % Math.max(1, await buttons.count())).click();
+            await page.waitForTimeout(170);
+            const choose = page.getByRole('dialog', { name: /Choose Overdrive upgrade/ });
+            if (await choose.isVisible().catch(() => false)) {
+              await choose.locator('button').first().click();
+              await page.waitForTimeout(80);
+            }
+          }
+          const scoreText = await page.locator('header').locator('div').nth(0).locator('strong').textContent();
+          const score = Number(String(scoreText ?? '').replace(/,/g,''));
+          if (!Number.isFinite(score) || score <= 0) throw new Error(`score did not increase: ${scoreText}`);
+          const gameMetrics = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth, sh: document.documentElement.scrollHeight, ih: innerHeight }));
+          if (gameMetrics.sw > gameMetrics.iw + 1 || gameMetrics.sh > gameMetrics.ih + 1) throw new Error(`overdrive overflow ${JSON.stringify(gameMetrics)}`);
+          if (errors.length) throw new Error(`runtime errors: ${errors.join(' | ')}`);
+          await page.screenshot({ path: '/tmp/prism-overdrive-iphone.jpg', type: 'jpeg', quality: 90 });
+          console.log('PRISM OVERDRIVE SMOKE PASS', { score, titleMetrics, gameMetrics });
+          await browser.close();
+          NODE
+          node .qa-overdrive.mjs
+      - name: Upload QA screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-iphone-qa
+          path: /tmp/prism-overdrive-iphone.jpg
+          retention-days: 1
+      - name: Commit final integration
+        run: |
+          rm -f .qa-overdrive.mjs
+          rm scripts/pass-prism-overdrive-integrate.py .github/workflows/pass-prism-overdrive.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Complete Prism Overdrive mode implementation'
+          git push origin main
