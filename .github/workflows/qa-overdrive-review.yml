@@ -28,6 +28,7 @@ jobs:
           mkdir -p /tmp/qa
           cat > qa.mjs <<'NODE'
           import { chromium } from 'playwright';
+          import fs from 'node:fs';
           const browser = await chromium.launch({headless:true});
           const page = await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
           const log=[]; const errors=[];
@@ -64,13 +65,9 @@ jobs:
             iw:innerWidth, ih:innerHeight
           }));
           log.push({firstChoiceAt,secondChoiceAt,errors,...data});
-          require('fs');
+          fs.writeFileSync('/tmp/qa/review.json',JSON.stringify(log,null,2));
+          await browser.close();
           NODE
-          # patch ESM fs write
-          python3 - <<'PY'
-          p='qa.mjs'; s=open(p).read(); s=s.replace("          require('fs');\n", "          const fs=await import('node:fs'); fs.writeFileSync('/tmp/qa/review.json',JSON.stringify(log,null,2)); await browser.close();\n")
-          open(p,'w').write(s)
-          PY
           node qa.mjs
       - uses: actions/upload-artifact@v4
         with:
