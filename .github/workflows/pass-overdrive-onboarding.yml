@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/pass-overdrive-onboarding.py'
+      - '.github/workflows/pass-overdrive-onboarding.yml'
 jobs:
   pass:
     runs-on: ubuntu-latest
@@ -19,6 +20,8 @@ jobs:
       - name: Production build
         run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
       - name: Browser QA
+        id: browserqa
+        continue-on-error: true
         run: |
           npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
           npx playwright install chromium
@@ -27,19 +30,42 @@ jobs:
           mkdir -p /tmp/onboarding-qa
           cat > /tmp/qa.mjs <<'NODE'
           import {chromium} from 'playwright'; import fs from 'node:fs';
-          const b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); const errors=[]; p.on('pageerror',e=>errors.push(String(e)));
-          await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
-          await p.screenshot({path:'/tmp/onboarding-qa/01-simple-intro.jpg',type:'jpeg',quality:92}); await p.getByRole('button',{name:/START OVERDRIVE/}).click();
-          const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor(); await p.screenshot({path:'/tmp/onboarding-qa/02-first-move.jpg',type:'jpeg',quality:92});
-          const rec=p.locator('[class*="recommended"]:not([disabled])'); if(await rec.count()<1) throw new Error('no recommended first move'); await rec.first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});
-          await p.screenshot({path:'/tmp/onboarding-qa/03-after-first.jpg',type:'jpeg',quality:92});
-          for(let n=0;n<6;n++){const x=p.locator('[class*="recommended"]:not([disabled])'); if(await x.count()) await x.first().click(); else await board.locator('button:not([disabled])').first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});}
-          await p.screenshot({path:'/tmp/onboarding-qa/04-full-strategy.jpg',type:'jpeg',quality:92}); await p.getByRole('button',{name:'？'}).click(); await p.screenshot({path:'/tmp/onboarding-qa/05-help.jpg',type:'jpeg',quality:92});
-          const r={errors,scrollWidth:await p.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await p.evaluate(()=>innerWidth),help:await p.getByRole('dialog',{name:/help/i}).isVisible()}; fs.writeFileSync('/tmp/onboarding-qa/review.json',JSON.stringify(r,null,2)); if(errors.length||r.scrollWidth>r.innerWidth||!r.help) throw new Error(JSON.stringify(r)); await b.close();
+          const result={errors:[],stages:[],recommended:0,help:false,scrollWidth:0,innerWidth:0};
+          const save=()=>fs.writeFileSync('/tmp/onboarding-qa/review.json',JSON.stringify(result,null,2));
+          let b;
+          try{
+            b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); p.on('pageerror',e=>result.errors.push(String(e)));
+            await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); result.stages.push('home');
+            await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click(); result.stages.push('intro');
+            await p.screenshot({path:'/tmp/onboarding-qa/01-simple-intro.jpg',type:'jpeg',quality:92});
+            await p.getByRole('button',{name:/START OVERDRIVE/}).click(); result.stages.push('started');
+            const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+            await p.screenshot({path:'/tmp/onboarding-qa/02-first-move.jpg',type:'jpeg',quality:92});
+            const rec=p.locator('[class*="recommended"]:not([disabled])'); result.recommended=await rec.count();
+            if(result.recommended>0){await rec.first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000}); result.stages.push('firstMove');}
+            else result.errors.push('no recommended first move');
+            await p.screenshot({path:'/tmp/onboarding-qa/03-after-first.jpg',type:'jpeg',quality:92});
+            for(let n=0;n<6;n++){
+              const enabled=board.locator('button:not([disabled])'); await enabled.first().waitFor({timeout:18000});
+              const x=p.locator('[class*="recommended"]:not([disabled])'); if(await x.count()) await x.first().click(); else await enabled.first().click();
+              await board.locator('button:not([disabled])').first().waitFor({timeout:18000});
+            }
+            result.stages.push('advanced'); await p.screenshot({path:'/tmp/onboarding-qa/04-full-strategy.jpg',type:'jpeg',quality:92});
+            const helpButton=p.getByRole('button',{name:'？'}); result.stages.push(`helpButtons:${await helpButton.count()}`); await helpButton.first().click();
+            const dialog=p.locator('[role="dialog"][aria-label="Prism Overdrive help"]'); result.help=await dialog.isVisible().catch(()=>false); await p.screenshot({path:'/tmp/onboarding-qa/05-help.jpg',type:'jpeg',quality:92});
+            result.scrollWidth=await p.evaluate(()=>document.documentElement.scrollWidth); result.innerWidth=await p.evaluate(()=>innerWidth);
+            if(result.scrollWidth>result.innerWidth)result.errors.push('horizontal overflow'); if(!result.help)result.errors.push('help not visible');
+          }catch(e){result.errors.push(String(e));}
+          finally{save(); if(b)await b.close();}
+          if(result.errors.length)process.exitCode=1;
           NODE
           node /tmp/qa.mjs
       - uses: actions/upload-artifact@v4
+        if: always()
         with: {name: prism-overdrive-onboarding-qa, path: /tmp/onboarding-qa, retention-days: 1}
+      - name: Fail if browser QA failed
+        if: steps.browserqa.outcome != 'success'
+        run: exit 1
       - name: Commit and cleanup
         run: |
           rm -f scripts/pass-overdrive-onboarding.py .github/workflows/pass-overdrive-onboarding.yml
