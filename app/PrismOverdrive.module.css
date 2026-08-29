@@ -413,3 +413,10 @@
 @keyframes recommendedOutline{50%{box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px #fff36d,0 0 16px #fff36d!important}}
 @media(max-height:700px){.strategyRouteLesson{min-height:39px!important}.strategyRouteLesson .targetCard,.strategyRouteLesson .scanCard{min-height:33px}}
 @media(prefers-reduced-motion:reduce){.recommended{animation:none!important}}
+
+
+/* PASS 52 — TAP ARROW / PRESERVE TILE COLOR */
+.recommended{background:var(--fill)!important;color:#fff!important;filter:none!important;transform:none!important;box-shadow:inset 0 0 0 2px #fff36d,inset 0 0 0 4px var(--edge),0 0 8px rgba(255,243,109,.72)!important}
+.recommended::after{content:""!important;position:absolute!important;inset:auto!important;width:0!important;height:0!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
+.recommendedLead::after{content:"▼"!important;position:absolute!important;inset:auto 2px auto auto!important;width:10px!important;height:10px!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;color:#fff36d!important;text-shadow:1px 1px #000,-1px -1px #000!important;font:1000 9px/10px monospace!important;opacity:1!important;z-index:8!important;pointer-events:none!important}
+@keyframes recommendedOutline{0%,100%{box-shadow:inset 0 0 0 2px #fff36d,inset 0 0 0 4px var(--edge),0 0 6px rgba(255,243,109,.55)}50%{box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px var(--edge),0 0 10px rgba(255,243,109,.85)}}
