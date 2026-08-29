@@ -1,0 +1,40 @@
+name: Overdrive Gameplay Review
+on:
+  push:
+    paths: ['.github/workflows/review-overdrive-gameplay.yml']
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - run: npm ci
+      - run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/review-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - run: |
+          mkdir -p /tmp/review
+          cat > /tmp/review.mjs <<'NODE'
+          import {chromium} from 'playwright'; import fs from 'node:fs';
+          const b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); const errors=[]; p.on('pageerror',e=>errors.push(String(e)));
+          await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click(); await p.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+          const samples=[]; let clears=0; const start=Date.now();
+          for(let turn=0;turn<34;turn++){
+            await board.locator('button:not([disabled])').first().waitFor({timeout:15000});
+            const buttons=board.locator('button:not([disabled])'); const n=await buttons.count(); let best=null;
+            for(let i=0;i<n;i++){ const el=buttons.nth(i); const label=await el.getAttribute('aria-label'); if(!label) continue; const m=label.match(/(ATK|HEAL|BAR|SKIP).*row (\d+) column (\d+)/); if(!m) continue; const type=m[1],r=+m[2]-1,c=+m[3]-1; const all=[]; for(let j=0;j<n;j++){const l=await buttons.nth(j).getAttribute('aria-label'); const mm=l?.match(/(ATK|HEAL|BAR|SKIP).*row (\d+) column (\d+)/); if(mm) all.push({i:j,t:mm[1],r:+mm[2]-1,c:+mm[3]-1});} const map=new Map(all.map(x=>[`${x.r}:${x.c}`,x])); const seen=new Set(), stack=[{t:type,r,c}]; let size=0; while(stack.length){const x=stack.pop(),k=`${x.r}:${x.c}`; if(seen.has(k))continue; const q=map.get(k); if(!q||q.t!==type)continue; seen.add(k);size++; for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]])stack.push({t:type,r:x.r+dr,c:x.c+dc});} if(!best||size>best.size)best={i,size,type}; }
+            if(!best) break; await buttons.nth(best.i).click(); clears++;
+            await p.waitForTimeout(150); const rank=(await p.locator('[class*=rank]').first().textContent())?.trim(); const feed=(await p.locator('[class*=actionFeed]').textContent())?.trim(); samples.push({turn,choice:best,rank,feed});
+            if(turn===0||turn===7||turn===17||turn===33) await p.screenshot({path:`/tmp/review/${String(turn).padStart(2,'0')}.jpg`,type:'jpeg',quality:90});
+          }
+          await board.locator('button:not([disabled])').first().waitFor({timeout:15000}).catch(()=>{}); await p.screenshot({path:'/tmp/review/final.jpg',type:'jpeg',quality:92});
+          const text=await p.locator('body').innerText(); fs.writeFileSync('/tmp/review/review.json',JSON.stringify({errors,clears,elapsedRealSec:(Date.now()-start)/1000,text,samples},null,2)); await b.close(); if(errors.length) throw new Error(errors.join('\n'));
+          NODE
+          node /tmp/review.mjs
+      - uses: actions/upload-artifact@v4
+        with: {name: overdrive-gameplay-review, path: /tmp/review, retention-days: 1}
