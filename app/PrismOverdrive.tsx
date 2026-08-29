@@ -370,6 +370,9 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [bossCoreMax, setBossCoreMax] = useState(0);
   const [bossBreaks, setBossBreaks] = useState(0);
   const [routePulse, setRoutePulse] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
+  const [showHelp, setShowHelp] = useState(false);
+  const [moves, setMoves] = useState(0);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -649,6 +652,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     setMissionStreak(0); missionStreakRef.current = 0;
     setBossCoreHp(0); bossCoreHpRef.current = 0; setBossCoreMax(0); bossCoreMaxRef.current = 0;
     setBossBreaks(0); bossBreaksRef.current = 0;
+    setGuideStep(0); setShowHelp(false); setMoves(0);
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
     lastTickRef.current = performance.now();
@@ -773,6 +777,8 @@ export default function PrismOverdrive({ onExit }: Props) {
     resolvingRef.current = true;
     const group = connectedGroup(tiles, liveSeed);
     const count = group.length;
+    setMoves((value) => value + 1);
+    if (guideStep < 2) setGuideStep((value) => value + 1);
     const selectedRoute = routePlan && routePlan.ids.includes(liveSeed.id) ? routePlan : null;
     const comboValue = bumpCombo(liveSeed.type, count);
     const chargeMove = manualCharge(liveSeed.type, count);
@@ -970,6 +976,14 @@ export default function PrismOverdrive({ onExit }: Props) {
   const routePlan = useMemo(() => forecastRoute(tiles, queues, scanColumn), [tiles, queues, scanColumn]);
   const routeIds = useMemo(() => new Set(routePlan?.ids ?? []), [routePlan]);
   const cashValue = Math.round(comboBank * PHASE_META[runPhase].cash);
+  const beginner = moves < 6;
+  const recommended = useMemo(() => {
+    if (routePlan?.ids?.length) return new Set(routePlan.ids);
+    const best = largestGroup(tiles);
+    return new Set(best.map((tile) => tile.id));
+  }, [tiles, routePlan]);
+  const guideTitle = moves === 0 ? "① SAME COLOR → TAP" : moves < 3 ? "② BIG GROUP = BIG SCORE" : routePlan ? "③ GLOWING ROUTE = GOOD MOVE" : "③ TARGET IS YOUR NEXT GOAL";
+  const guideText = moves === 0 ? "同じ色がつながった場所をタップ。まずはそれだけでOK。" : moves < 3 ? "つながりが大きいほど高得点。光っている候補を狙おう。" : routePlan ? "ROUTE表示を消すと、予告パネルがつながって連鎖しやすい。" : "上のTARGETを狙う。細かいゲージは慣れてからでOK。";
 
   if (screen === "intro") {
     return <main className={styles.shell} data-screen="intro">
@@ -977,9 +991,10 @@ export default function PrismOverdrive({ onExit }: Props) {
       <div className={styles.introLogo}><span>PRISM</span><strong>OVERDRIVE</strong><em>3 MINUTE HYPER CLUSTER MODE</em></div>
       <div className={styles.introCore} aria-hidden="true">◆</div>
       <div className={styles.introRules}>
-        <b>BUILD → AIM → RELEASE → CASH OUT</b>
-        <span>SMALL BREAK = CHARGE</span><span>BIG BREAK = RELEASE</span>
-        <span>TARGET ×3 = BOSS CORE</span><span>SCAN ROUTE = PLANNED CHAIN</span>
+        <b>遊び方は1つだけ</b>
+        <strong>同じ色がつながった場所をタップ</strong>
+        <span>大きくつなげて消すほど高得点！</span>
+        <span>最初のプレイ中に順番に教えます</span>
       </div>
       <button className={styles.start} type="button" onClick={startRun}>▶ START OVERDRIVE</button>
       <small className={styles.record}>HIGH SCORE {highScore.toLocaleString()}</small>
@@ -1000,13 +1015,18 @@ export default function PrismOverdrive({ onExit }: Props) {
       <div className={styles.jackpot}><span>JACKPOT</span><strong>{"◆".repeat(jackpot)}{"◇".repeat(3 - jackpot)}</strong></div>
     </section>
 
-    <section className={styles.strategyPanel} data-target-pulse={targetPulse ? "true" : "false"} aria-label="Overdrive strategy panel">
-      <div className={styles.phaseCard} data-phase={runPhase}><span>PHASE</span><strong>{PHASE_META[runPhase].label}</strong><em>{PHASE_META[runPhase].note}</em></div>
+    <section className={styles.guideBar} data-done={beginner ? "false" : "true"}>
+      <div><strong>{guideTitle}</strong><span>{guideText}</span></div>
+      <button type="button" onClick={() => setShowHelp(true)}>？</button>
+    </section>
+
+    <section className={`${styles.strategyPanel} ${beginner ? styles.strategyBeginner : ""}`} data-target-pulse={targetPulse ? "true" : "false"} aria-label="Overdrive strategy panel">
+      {!beginner ? <div className={styles.phaseCard} data-phase={runPhase}><span>PHASE</span><strong>{PHASE_META[runPhase].label}</strong><em>{PHASE_META[runPhase].note}</em></div> : null}
       <div className={styles.targetCard}><span>PRISM TARGET</span><strong>{target.label}</strong><em>{targetProgressText(target)} • +{target.reward.toLocaleString()}</em></div>
-      <div className={styles.scanCard} data-route={routePlan ? "ready" : "none"}><span>NEXT SCAN • COL {scanColumn + 1}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>{routePlan ? `ROUTE READY → ${LABEL[routePlan.type]} ×${routePlan.projected}` : "NO ROUTE • SHAPE THE COLUMN"}</em></div>
-      <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SECURE • RESET COMBO + STREAK" : "BUILD BANK WITH COMBO"}</em></button>
-      <div className={styles.missionCard} data-boss={bossCoreHp > 0 ? "active" : "idle"} data-breaks={bossBreaks}><span>{bossCoreHp > 0 ? "BOSS CORE" : "MISSION STREAK"}</span><strong>{bossCoreHp > 0 ? `HP ${bossCoreHp}/${bossCoreMax}` : `${"◆".repeat(missionStreak)}${"◇".repeat(3-missionStreak)}  ${missionStreak}/3`}</strong><em>{bossCoreHp > 0 ? "RELEASE • ROUTE • CHAIN 2+" : "3 TARGETS WITHOUT COMBO BREAK"}</em><u><i style={{ width: `${bossCoreHp > 0 ? bossCoreHp / Math.max(1, bossCoreMax) * 100 : missionStreak / 3 * 100}%` }} /></u></div>
-      <div className={styles.chargeRow} aria-label="Prism charge meters">{TYPES.map((type) => <span key={type} className={styles.chargeItem} data-type={type} data-value={charge[type]}><i>{GLYPH[type]}</i><b>{charge[type]}</b><u><em style={{ width: `${charge[type]}%` }} /></u></span>)}</div>
+      {!beginner ? <div className={styles.scanCard} data-route={routePlan ? "ready" : "none"}><span>NEXT SCAN • COL {scanColumn + 1}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>{routePlan ? `ROUTE READY → ${LABEL[routePlan.type]} ×${routePlan.projected}` : "NO ROUTE • SHAPE THE COLUMN"}</em></div> : null}
+      {!beginner ? <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "得点を確定 / COMBO終了" : "COMBOでBANKがたまる"}</em></button> : null}
+      {!beginner ? <div className={styles.missionCard} data-boss={bossCoreHp > 0 ? "active" : "idle"} data-breaks={bossBreaks}><span>{bossCoreHp > 0 ? "BOSS CORE" : "MISSION STREAK"}</span><strong>{bossCoreHp > 0 ? `HP ${bossCoreHp}/${bossCoreMax}` : `${"◆".repeat(missionStreak)}${"◇".repeat(3-missionStreak)}  ${missionStreak}/3`}</strong><em>{bossCoreHp > 0 ? "CHARGE / ROUTE / CHAINで攻撃" : "TARGETを3回連続達成"}</em><u><i style={{ width: `${bossCoreHp > 0 ? bossCoreHp / Math.max(1, bossCoreMax) * 100 : missionStreak / 3 * 100}%` }} /></u></div> : null}
+      {!beginner ? <div className={styles.chargeRow} aria-label="Prism charge meters">{TYPES.map((type) => <span key={type} className={styles.chargeItem} data-type={type} data-value={charge[type]}><i>{GLYPH[type]}</i><b>{charge[type]}</b><u><em style={{ width: `${charge[type]}%` }} /></u></span>)}</div> : null}
     </section>
 
     <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"} data-route-pulse={routePulse ? "true" : "false"}>
@@ -1016,7 +1036,7 @@ export default function PrismOverdrive({ onExit }: Props) {
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
-          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""} ${pressedId === tile.id ? styles.pressed : ""} ${routeIds.has(tile.id) ? styles.routeReady : ""}`}
+          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""} ${pressedId === tile.id ? styles.pressed : ""} ${routeIds.has(tile.id) ? styles.routeReady : ""} ${beginner && recommended.has(tile.id) ? styles.recommended : ""}`}
           style={{
             left: `calc(${tile.col * (100 / SIZE)}% + 1px)`,
             top: `calc(${tile.row * (100 / SIZE)}% + 1px)`,
@@ -1050,6 +1070,8 @@ export default function PrismOverdrive({ onExit }: Props) {
       {jackpotFlash ? <div className={styles.jackpotFlash}><span>PRISM</span><strong>JACKPOT!</strong></div> : null}
       {timeStopped ? <div className={styles.timeStopFx}><i>⏱</i><strong>TIME STOP</strong></div> : null}
     </section>
+
+    {showHelp ? <div className={styles.helpOverlay} role="dialog" aria-label="Prism Overdrive help"><div><button type="button" onClick={() => setShowHelp(false)}>×</button><h2>遊び方</h2><p><b>1.</b> 同じ色がつながった場所をタップ</p><p><b>2.</b> 大きな塊ほど高得点</p><p><b>3.</b> TARGETを狙うとボーナス</p><p><b>4.</b> ROUTEが光ったら狙い目</p><p><b>5.</b> CASH OUTでBANK得点を安全に確定</p><small>CHARGEやBOSS COREはプレイしているうちに自然に使えます。最初から覚える必要はありません。</small></div></div> : null}
 
     {modeFx ? <div key={modeFx.token} className={styles.modeTransform} data-kind={modeFx.kind} aria-hidden="true">
       <i /><b /><u /><strong>{modeFx.title}</strong><span>{modeFx.detail}</span>
