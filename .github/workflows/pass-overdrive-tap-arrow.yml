@@ -1,0 +1,62 @@
+name: Prism Overdrive Tap Arrow Polish
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-tap-arrow.py'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - name: Apply tap arrow polish
+        run: python3 scripts/pass-overdrive-tap-arrow.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+      - name: Tap arrow visual QA
+        run: |
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/tap-arrow.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+          mkdir -p /tmp/tap-arrow-qa
+          cat > qa-tap-arrow.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const result={errors:[],recommended:0,pseudo:null,tileBg:null,scrollWidth:0,innerWidth:0};
+          const b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); p.on('pageerror',e=>result.errors.push(String(e)));
+          try{
+            await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click(); await p.getByRole('button',{name:/START OVERDRIVE/}).click();
+            const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+            for(let n=0;n<2;n++){const r=p.locator('[class*="recommended"]:not([disabled])'); if(await r.count()) await r.first().click(); else await board.locator('button:not([disabled])').first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});}
+            const lead=p.locator('[class*="recommendedLead"]:not([disabled])').first(); result.recommended=await lead.count();
+            if(result.recommended){result.pseudo=await lead.evaluate(el=>{const s=getComputedStyle(el,'::after');return {content:s.content,width:s.width,height:s.height,background:s.backgroundColor,top:s.top,right:s.right};}); result.tileBg=await lead.evaluate(el=>getComputedStyle(el).backgroundColor);}
+            await p.screenshot({path:'/tmp/tap-arrow-qa/01-target-arrow.jpg',type:'jpeg',quality:94});
+            result.scrollWidth=await p.evaluate(()=>document.documentElement.scrollWidth); result.innerWidth=await p.evaluate(()=>innerWidth);
+            if(!result.recommended) result.errors.push('no recommended lead');
+            if(result.pseudo && (parseFloat(result.pseudo.width)>14 || parseFloat(result.pseudo.height)>14)) result.errors.push('tap pseudo too large');
+            if(result.pseudo && !/rgba\(0, 0, 0, 0\)|transparent/.test(result.pseudo.background)) result.errors.push('tap pseudo has fill');
+            if(result.scrollWidth>result.innerWidth) result.errors.push('horizontal overflow');
+          }catch(e){result.errors.push(String(e));}
+          fs.writeFileSync('/tmp/tap-arrow-qa/review.json',JSON.stringify(result,null,2)); await b.close(); if(result.errors.length) process.exitCode=1;
+          NODE
+          node qa-tap-arrow.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: prism-overdrive-tap-arrow-qa, path: /tmp/tap-arrow-qa, retention-days: 1}
+      - name: Commit and cleanup
+        if: success()
+        run: |
+          rm -f scripts/pass-overdrive-tap-arrow.py .github/workflows/pass-overdrive-tap-arrow.yml qa-tap-arrow.mjs
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Preserve Prism Overdrive tile colors in tutorial'
+          git push origin HEAD:main
