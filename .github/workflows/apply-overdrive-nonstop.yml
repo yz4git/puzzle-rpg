@@ -16,75 +16,10 @@ jobs:
         with:
           node-version: 22.13.1
           cache: npm
-      - name: Apply nonstop flow redesign
+      - name: Apply redesign
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p=Path('app/PrismOverdrive.tsx')
-          s=p.read_text()
-          def rep(old,new,label):
-              global s
-              if old not in s: raise SystemExit(f'MISSING {label}')
-              s=s.replace(old,new,1)
-          def sub(pattern,new,label):
-              global s
-              s,n=re.subn(pattern,new,s,count=1,flags=re.S)
-              if n != 1: raise SystemExit(f'MISSING {label}: {n}')
-
-          rep('if (upgradeChoices.length > 0 || current < timeStopUntilRef.current) return;', 'if (current < timeStopUntilRef.current) return;', 'timer choice pause')
-          rep('}, [screen, upgradeChoices.length]);', '}, [screen]);', 'timer deps')
-          sub(r'  function maybeOfferUpgrade\(nextScore: number\) \{.*?\n  \}\n\n(?=  function pickUpgrade)', '''  function maybeOfferUpgrade(nextScore: number) {
-            const threshold = UPGRADE_THRESHOLDS[levelRef.current];
-            if (threshold == null || nextScore < threshold) return;
-            const picked = chooseUpgrades(upgrades)[0];
-            if (!picked) return;
-            setUpgrades((current) => current.includes(picked.id) ? current : [...current, picked.id]);
-            levelRef.current += 1;
-            setRunLevel(levelRef.current);
-            setLastRank(`LEVEL ${levelRef.current} • ${picked.name}!`);
-            setMessage(`${picked.name} AUTO INSTALLED • KEEP BREAKING`);
-            playSfx("skill");
-          }
-
-''', 'auto upgrade')
-          rep('if (screen !== "running" || resolving || upgradeChoices.length > 0 || timeRef.current <= 0) return;', 'if (screen !== "running" || resolving || timeRef.current <= 0) return;', 'clear guard')
-          rep('setMessage(`TIME STOP ${Math.round(stopMs / 100) / 10}s • +${(addedMs / 1000).toFixed(1)}s`);', 'setLastRank(`TIME STOP! • +${(addedMs / 1000).toFixed(1)} SEC`);\n      setMessage(`SKIP ×${count} • CLOCK FROZEN • KEEP AIMING`);', 'skip feedback')
-          rep('setMessage(`FEVER BANK +${count}`);', 'setLastRank(`FEVER +${count * (upgrades.includes("barOvercharge") ? 5 : 2)}`);\n      setMessage(`BAR ×${count} • FEVER CHARGE`);', 'bar feedback')
-          rep('setMessage(`COMBO LINK • WINDOW EXTENDED`);', 'setLastRank("COMBO SAVED!");\n      setMessage(`HEAL ×${count} • COMBO WINDOW EXTENDED`);', 'heal feedback')
-          rep('setMessage(attackBlast ? "MEGA ATK • PIXEL BLAST" : "ATK BREAK");', 'setLastRank(attackBlast ? "MEGA ATK!!" : count >= 6 ? "BIG BREAK!" : "ATK BREAK!");\n      setMessage(attackBlast ? `ATK ×${count} • AREA BLAST` : `ATK ×${count} • SCORE BREAK`);', 'attack feedback')
-          rep('nextScore = addScore(autoScore.points, `CASCADE ${depth}`);', 'nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);\n      setMessage(`AUTO CASCADE • +${Math.round(autoScore.points).toLocaleString()} • DON\'T STOP`);', 'cascade feedback')
-          rep('setMessage(`PRISM JACKPOT • +${Math.round(jackpotPoints).toLocaleString()}`);', 'setLastRank("PRISM JACKPOT!!!");\n      setMessage(`JACKPOT +${Math.round(jackpotPoints).toLocaleString()} • BOARD RESET`);', 'jackpot feedback')
-          rep('setMessage("OVER FEVER!! • SCORE ×5");', 'setLastRank("OVER FEVER!! • ×5");\n      setMessage("OVER FEVER • BREAK EVERYTHING");', 'over fever feedback')
-          rep('setMessage("PRISM FEVER!! • 3 COLOR DROP • SCORE ×3");', 'setLastRank("PRISM FEVER!! • ×3");\n      setMessage("3 COLOR DROP • CASCADE CHANCE UP");', 'fever feedback')
-          rep('disabled={resolving || upgradeChoices.length > 0 || screen !== "running"}', 'disabled={resolving || screen !== "running"}', 'board disabled')
-          rep('{finalOverdrive ? <div className={styles.finalBanner}>FINAL OVERDRIVE • SCORE BOOST</div> : null}', '{finalOverdrive ? <div className={styles.finalBanner}>FINAL OVERDRIVE • 30 SEC • NO STOP • SCORE BOOST</div> : null}', 'final banner')
-          rep('{upgradeChoices.length > 0 ? <div className={styles.overlay} role="dialog" aria-label="Choose Overdrive upgrade">', '{false && upgradeChoices.length > 0 ? <div className={styles.overlay} role="dialog" aria-label="Choose Overdrive upgrade">', 'disable choice overlay')
-          p.write_text(s)
-
-          css=Path('app/PrismOverdrive.module.css')
-          cs=css.read_text()
-          marker='/* PASS 39 — PRISM OVERDRIVE NON-STOP FLOW */'
-          if marker not in cs:
-              cs += '''\n\n/* PASS 39 — PRISM OVERDRIVE NON-STOP FLOW */
-          /* The board is the primary objective. Rewards never cover or pause play. */
-          .hypeRow{grid-template-columns:1fr 1fr;gap:5px;margin-bottom:5px}
-          .jackpot{display:none}
-          .next{display:none}
-          .boardWrap{padding-top:23px}
-          .board{width:min(96vw,53dvh,410px);border-color:#5b6c8c}
-          .rank{font-size:clamp(11px,3.2vw,15px);line-height:1.1;color:#fff578;text-shadow:2px 2px #000,-1px 0 #351060,1px 0 #351060;animation:rankPunch 180ms steps(2,end)}
-          @keyframes rankPunch{0%{transform:scale(.86)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
-          .runInfo,.build{display:none}
-          .message{min-height:21px;margin-top:4px;padding:4px 5px;border-width:1px;font-size:7px;color:#c9d9ff;background:#030711}
-          .fever .rank{color:#7affff;font-size:clamp(13px,3.7vw,17px)}
-          .overFever .rank{color:#fff578;font-size:clamp(14px,4vw,19px)}
-          .final .rank{font-size:clamp(14px,4vw,19px);color:#fff578}
-          .finalBanner{top:48px;padding:5px 3px;font-size:8px;box-shadow:0 3px #000}
-          @media(max-height:700px){.boardWrap{padding-top:18px}.board{width:min(92vw,52dvh,370px)}.message{min-height:18px;padding:3px;font-size:6px}}
-          '''
-          css.write_text(cs)
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmltcG9ydCByZQpwPVBhdGgoImFwcC9QcmlzbU92ZXJkcml2ZS50c3giKQpzPXAucmVhZF90ZXh0KCkKZGVmIHJlcChvbGQsbmV3LGxhYmVsKToKICAgIGdsb2JhbCBzCiAgICBpZiBvbGQgbm90IGluIHM6CiAgICAgICAgcmFpc2UgU3lzdGVtRXhpdChmIk1JU1NJTkcgIHtsYWJlbH0iKQogICAgcz1zLnJlcGxhY2Uob2xkLG5ldywxKQpkZWYgc3ViKHBhdHRlcm4sbmV3LGxhYmVsKToKICAgIGdsb2JhbCBzCiAgICBzLG49cmUuc3VibihwYXR0ZXJuLG5ldyxzLGNvdW50PTEsZmxhZ3M9cmUuUykKICAgIGlmIG4gIT0gMToKICAgICAgICByYWlzZSBTeXN0ZW1FeGl0KGYiTUlTU0lORyB7bGFiZWx9OiB7bn0iKQoKcmVwKCdpZiAodXBncmFkZUNob2ljZXMubGVuZ3RoID4gMCB8fCBjdXJyZW50IDwgdGltZVN0b3BVbnRpbFJlZi5jdXJyZW50KSByZXR1cm47JywgJ2lmIChjdXJyZW50IDwgdGltZVN0b3BVbnRpbFJlZi5jdXJyZW50KSByZXR1cm47JywgJ3RpbWVyIGNob2ljZSBwYXVzZScpCnJlcCgnfSwgW3NjcmVlbiwgdXBncmFkZUNob2ljZXMubGVuZ3RoXSk7JywgJ30sIFtzY3JlZW5dKTsnLCAndGltZXIgZGVwcycpCnN1YihyJyAgZnVuY3Rpb24gbWF5YmVPZmZlclVwZ3JhZGVcKG5leHRTY29yZTogbnVtYmVyXCkgXHsuKj9cbiAgXH1cblxuKD89ICBmdW5jdGlvbiBwaWNrVXBncmFkZSknLCAnJycgIGZ1bmN0aW9uIG1heWJlT2ZmZXJVcGdyYWRlKG5leHRTY29yZTogbnVtYmVyKSB7CiAgICBjb25zdCB0aHJlc2hvbGQgPSBVUEdSQURFX1RIUkVTSE9MRFNb bGV2ZWxSZWYuY3VycmVudF07CiAgICBpZiAodGhyZXNob2xkID09IG51bGwgfHwgbmV4dFNjb3JlIDwgdGhyZXNob2xkKSByZXR1cm47CiAgICBjb25zdCBwaWNrZWQgPSBjaG9vc2VVcGdyYWRlcyh1cGdyYWRlcylbMF07CiAgICBpZiAoIXBpY2tlZCkgcmV0dXJuOwogICAgc2V0VXBncmFkZXMoKGN1cnJlbnQpID0+IGN1cnJlbnQuaW5jbHVkZXMocGlja2VkLmlkKSA/IGN1cnJlbnQgOiBbLi4uY3VycmVudCwgcGlja2VkLmlkXSk7CiAgICBsZXZlbFJlZi5jdXJyZW50ICs9IDE7CiAgICBzZXRSdW5MZXZlbChsZXZlbFJlZi5jdXJyZW50KTsKICAgIHNldExhc3RSYW5rKGBMRVZFTCAke2xldmVsUmVmLmN1cnJlbnR9IOKAoiAke3BpY2tlZC5uYW1lfSFgKTsKICAgIHNldE1lc3NhZ2UoYCR7cGlja2VkLm5hbWV9IEFVVE8gSU5TVEFMTEVEIOKAoiBLRUVQIEJSRUFLSU5HYCk7CiAgICBwbGF5U2Z4KCJza2lsbCIpOwogIH0KCicnJywgJ2F1dG8gdXBncmFkZScpCnJlcCgnaWYgKHNjcmVlbiAhPT0gInJ1bm5pbmciIHx8IHJlc29sdmluZyB8fCB1cGdyYWRlQ2hvaWNlcy5sZW5ndGggPiAwIHx8IHRpbWVSZWYuY3VycmVudCA8PSAwKSByZXR1cm47JywgJ2lmIChzY3JlZW4gIT09ICJydW5uaW5nIiB8fCByZXNvbHZpbmcgfHwgdGltZVJlZi5jdXJyZW50IDw9IDApIHJldHVybjsnLCAnY2xlYXIgZ3VhcmQnKQpyZXAoJ3NldE1lc3NhZ2UoYFRJTUUgU1RPUCAke01hdGgucm91bmQoc3RvcE1zIC8gMTAwKSAvIDEwfXMg4oCiICske2FkZGVkTXMgLyAxMDAwfS50b0ZpeGVkKDEpfXNgKTsnLCAnc2V0TGFzdFJhbmooYFRJTUUgU1RPUCEg4oCiICske2FkZGVkTXMgLyAxMDAwfS50b0ZpeGVkKDEpfSBTRUNgKTtcbiAgICAgIHNldE1lc3NhZ2UoYFNLSVAgw5cke2NvdW50fSDigKIgQ0xPQ0sgRlJPWkVOIOKAoiBLRUVQIEFJTUlOR2ApOycsICdza2lwIGZlZWRiYWNrJykKcmVwKCdzZXRNZXNzYWdlKGBGRVZFUiBCQU5LICske2NvdW50fWApOycsICdzZXRMYXN0UmFuayhgRkVWRVIgKyR7Y291bnQgKiAodXBncmFkZXMuaW5jbHVkZXMoImJhck92ZXJjaGFyZ2UiKSA/IDUgOiAyKX1gKTtcbiAgICAgIHNldE1lc3NhZ2UoYEJBUiDDlCR7Y291bnR9IOKAoiBGRVZFUiBDSEFSR0VgKTsnLCAnYmFyIGZlZWRiYWNrJykKcmVwKCdzZXRNZXNzYWdlKGBDT01CTyBMSU5LIOKAoiBXSU5ET1cgRVhURU5ERURgKTsnLCAnc2V0TGFzdFJhbmsoIkNPTUJPIFNBVkVEISIpO1xuICAgICAgc2V0TWVzc2FnZShgSEVBTCDDlCR7Y291bnR9IOKAoiBDT01CTyBXSU5ET1cgRVhURU5ERURgKTsnLCAnaGVhbCBmZWVkYmFjaycpCnJlcCgnc2V0TWVzc2FnZShhdHRhY2tCbGFzdCA/ICJNRUdBIEFUSyDigKIgUElYRUwgQkxBU1QiIDogIkFUSyBCUkVBSyIpOycsICdzZXRMYXN0UmFuayhhdHRhY2tCbGFzdCA/ICJNRUdBIEFUSyEhIiA6IGNvdW50ID49IDYgPyAiQklHIEJSRUFLISIgOiAiQVRLIEJSRUFLISIpO1xuICAgICAgc2V0TWVzc2FnZShhdHRhY2tCbGFzdCA/IGBBVEsgw5cke2NvdW50fSDigKIgQVJFQS BCTEFTVGA gOiBgQVRLIMOXJHtjb3VudH0g4oCiIFNDT1JFIEJSRUFLYCk7JywgJ2F0dGFjayBmZWVkYmFjaycpCnJlcCgnbmV4dFNjb3JlID0gYWRkU2NvcmUoYXV0b1Njb3JlLnBvaW50cywgYENBU0NBREUgJHtkZXB0aH1gKTsnLCAnbmV4dFNjb3JlID0gYWRkU2NvcmUoYXV0b1Njb3JlLnBvaW50cywgYENIQUlOICR7ZGVwdGh9IWBpO1xuICAgICAgc2V0TWVzc2FnZShgQVVUTyBDQVNDQURFIOKAoiArJHtNYXRoLnJvdW5kKGF1dG9TY29yZS5wb2ludHMpLnRvTG9jYWxlU3RyaW5nKCl9IOKAoiBET05cJ1QgU1RPU GApOycsICdjYXNjYWRlIGZlZWRiYWNrJykKcmVwKCdzZXRNZXNzYWdlKGBQUklTTSBKQUNLUE9UIOKAoiArJHtNYXRoLnJvdW5kKGphY2twb3RQb2ludHMpLnRvTG9jYWxlU3RyaW5nKCl9YCk7JywgJ3NldExhc3RSYW5rKCJQUklTTSBKQUNLUE9UISEhIik7XG4gICAgICBzZXRNZXNzYWdlKGBKQUNLUE9UICske01hdGgucm91bmQoamFja3BvdFBvaW50cykudG9Mb2NhbGVTdHJpbmcoKX0g4oCiIEJPQVJEIFJFU0VUYCk7JywgJ2phY2twb3QgZmVlZGJhY2snKQpyZXAoJ3NldE1lc3NhZ2UoIk9WRVIgRkVWRVIhISDigKIgU0NPUkUgw5c1Iik7JywgJ3NldExhc3RSYW5rKCJPVkVSIEZFVkVSISEgwrc1Iik7XG4gICAgICBzZXRNZXNzYWdlKCJPVkVSIEZFVkVSIOKAoiBCUkVBSyBFVkVSWVRISU5HIik7JywgJ292ZXIgZmV2ZXIgZmVlZGJhY2snKQpyZXAoJ3NldE1lc3NhZ2UoIlBSSVNNIEZFVkVSISEg4oCiIDMgQ09MT1IgRFJPUCDigKIgU0NPUkUgwrczIik7JywgJ3NldExhc3RSYW5rKCJQUklTTSBGRVZFUiEhIMK3MyIpO1xuICAgICAgc2V0TWVzc2FnZSgiMyBDT0xPUiBEUk9QIOKAoiBDQVNDQURFIENIQU5DRSBVUCIpOycsICdmZXZlciBmZWVkYmFjaycpCnJlcCgnZGlzYWJsZWQ9e3Jlc29sdmluZyB8fCB1cGdyYWRlQ2hvaWNlcy5sZW5ndGggPiAwIHx8IHNjcmVlbiAhPT0gInJ1bm5pbmcifScsICdkaXNhYmxlZD17cmVzb2x2aW5nIHx8IHNjcmVlbiAhPT0gInJ1bm5pbmcifScsICdib2FyZCBkaXNhYmxlZCcpCnJlcCgne2ZpbmFsT3ZlcmRyaXZlID8gPGRpdiBjbGFzc05hbWU9e3N0eWxlcy5maW5hbEJhbm5lcn0+RklOQUwgT1ZFUkRSSVZFIOKAoiBTQ09SRSBCT09TVDwvZGl2PiA6IG51bGx9JywgJ3tmaW5hbE92ZXJkcml2ZSA/IDxkaXYgY2xhc3NOYW1lPXtzdHlsZXMuZmluYWxCYW5uZXJ9PkZJTkFMIE9WRVJEUklWRSDigKIgMzAgU0VDIOKAoiBOTyBTVE9QIOKAoiBTQ09SRSBCT09TVDwvZGl2PiA6IG51bGx9JywgJ2ZpbmFsIGJhbm5lcicpCnJlcCgne3VwZ3JhZGVDaG9pY2VzLmxlbmd0aCA+IDAgPyA8ZGl2IGNsYXNzTmFtZT17c3R5bGVzLm92ZXJsYXl9IHJvbGU9ImRpYWxvZyIgYXJpYS1sYWJlbD0iQ2hvb3NlIE92ZXJkcml2ZSB1cGdyYWRlIj4nLCAne2ZhbHNlICYmIHVwZ3JhZGVDaG9pY2VzLmxlbmd0aCA+IDAgPyA8ZGl2IGNsYXNzTmFtZT17c3R5bGVzLm92ZXJsYXl9IHJvbGU9ImRpYWxvZyIgYXJpYS1sYWJlbD0iQ2hvb3NlIE92ZXJkcml2ZSB1cGdyYWRlIj4nLCAnZGlzYWJsZSBjaG9pY2Ugb3ZlcmxheScpCnAud3JpdGVfdGV4dChzKQoKY3NzPVBhdGgoImFwcC9QcmlzbU92ZXJkcml2ZS5tb2R1bGUuY3NzIikKY3M9Y3NzLnJlYWRfdGV4dCgpCm1hcmtlcj0iLyogUEFTUyAzOSDigJQgUFJJU00gT1ZFUkRSSVZFIE5PTi1TVE9QIEZMT1cgKi8iCmlmIG1hcmtlciBub3QgaW4gY3M6CiAgICBjcyArPSAnJwonCi8qIFBBU1MgMzk g4oCUIFBSSVNNIE9WRVJEUklWRSBOT04tU1RPUCBGTE9XICovCi8qIFRoZSBib2FyZCBpcyB0aGUgcHJpbWFyeSBvYmplY3RpdmUuIFJld2FyZHMgbmV2ZXIgY292ZXIgb3IgcGF1c2UgcGxheS4gKi8KLmh5cGVSb3d7Z3JpZC10ZW1wbGF0ZS1jb2x1bW5zOjFmciAxZnI7Z2FwOjVweDttYXJnaW4tYm90dG9tOjVweH0KLmphY2twb3R7ZGlzcGxheTpub25lfQoubmV4dHtkaXNwbGF5Om5vbmV9Ci5ib2FyZFdyYXB7cGFkZGluZy10b3A6MjNweH0KLmJvYXJke3dpZHRoOm1pbig5NnZ3LDUzZHZoLDQxMHB4KTtib3JkZXItY29sb3I6IzViNmM4Y30KLnJhbmt7Zm9udC1zaXplOmNsYW1wKDExcHgsMy4ydncsMTVweCk7bGluZS1oZWlnaHQ6MS4xO2NvbG9yOiNmZmY1Nzg7dGV4dC1zaGFkb3c6MnB4IDJweCAjMDAwLC0xcHggMCAjMzUxMDYwLDFweCAwICMzNTEwNjA7YW5pbWF0aW9uOnJhbmtQdW5jaCAxODB tcyBzdGVwcygyLGVuZCl9CkBrZXlmcmFtZXMgcmFua1B1bmNoezAle3RyYW5zZm9ybTpzY2FsZSguODYpfTU1JXt0cmFuc2Zvcm06c2NhbGUoMS4wOCl9MTAwJXt0cmFuc2Zvcm06c2NhbGUoMSl9fQoucnVuSW5mbywuYnVpbGR7ZGlzcGxheTpub25lfQoubWVzc2FnZXttaW4taGVpZ2h0OjIxcHg7bWFyZ2luLXRvcDo0cHg7cGFkZGluZzo0cHggNXB4O2JvcmRlci13aWR0aDoxcHg7Zm9udC1zaXplOjdweDtjb2xvcjojYzlkOWZmO2JhY2tncm91bmQ6IzAzMDcxMX0KLmZldmVyIC5yYW5re2NvbG9yOiM3YWZmZmY7Zm9udC1zaXplOmNsYW1wKDEzcHgsMy43dncsMTdweCl9Ci5vdmVyRmV2ZXIgLnJhbmt7Y29sb3I6I2ZmZjU3ODtmb250LXNpemU6Y2xhbXAoMTRweCw0dncsMTlweCl9Ci5maW5hbCAucmFua3tmb250LXNpemU6Y2xhbXAoMTRweCw0dncsMTlweCk7Y29sb3I6I2ZmZjU3OH0KLmZpbmFsQmFubmVye3RvcDo0OHB4O3BhZGRpbmc6NXB4IDNweDtmb250LXNpemU6OHB4O2JveC1zaGFkb3c6MCAzcHggIzAwMH0KQG1lZGlhKG1heC1oZWlnaHQ6NzAwcHgpey5ib2FyZFdyYXB7cGFkZGluZy10b3A6MThweH0uYm9hcmR7d2lkdGg6bWluKDkydncsNTJkdmgsMzcwcHgpfS5tZXNzYWdle21pbi1oZWlnaHQ6MThweDtwYWRkaW5nOjNweDtmb250LXNpemU6NnB4fX0KJycnCmNzcy53cml0ZV90ZXh0KGNzKQo=' | base64 -d > /tmp/patch.py
+          python3 /tmp/patch.py
       - run: npm ci
       - name: TypeScript check
         run: npx tsc --noEmit
@@ -99,40 +34,14 @@ jobs:
       - name: Nonstop gameplay QA
         run: |
           mkdir -p /tmp/overdrive-qa
-          cat > /tmp/overdrive-qa.mjs <<'NODE'
-          import { chromium } from 'playwright';
-          import fs from 'node:fs';
-          const browser = await chromium.launch({headless:true});
-          const page = await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
-          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
-          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
-          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
-          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
-          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
-          await board.waitFor();
-          await page.screenshot({path:'/tmp/overdrive-qa/01-start.jpg',type:'jpeg',quality:88});
-          for(let i=0;i<85;i++){
-            if(await page.getByRole('dialog',{name:/Choose Overdrive upgrade/}).isVisible().catch(()=>false)) throw new Error('upgrade choice interrupted gameplay');
-            const buttons=board.locator('button:not([disabled])');
-            const n=await buttons.count();
-            if(n){await buttons.nth((i*11)%n).click(); await page.waitForTimeout(145);} else await page.waitForTimeout(90);
-            if(i===35) await page.screenshot({path:'/tmp/overdrive-qa/02-mid.jpg',type:'jpeg',quality:88});
-          }
-          await page.screenshot({path:'/tmp/overdrive-qa/03-late.jpg',type:'jpeg',quality:88});
-          const body=await page.locator('body').innerText();
-          const data={errors,hasChoose1:body.includes('CHOOSE 1'),bodyText:body,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
-          fs.writeFileSync('/tmp/overdrive-qa/review.json',JSON.stringify(data,null,2));
-          if(errors.length) throw new Error(errors.join('\n'));
-          if(body.includes('CHOOSE 1')) throw new Error('CHOOSE 1 still rendered');
-          await browser.close();
-          NODE
+          echo 'aW1wb3J0IHsgY2hyb21pdW0gfSBmcm9tICJwbGF5d3JpZ2h0IjsKaW1wb3J0IGZzIGZyb20gIm5vZGU6ZnMiOwpjb25zdCBicm93c2VyID0gYXdhaXQgY2hyb21pdW0ubGF1bmNoKHtoZWFkbGVzczp0cnVlfSk7CmNvbnN0IHBhZ2UgPSBhd2FpdCBicm93c2VyLm5ld1BhZ2Uoe3ZpZXdwb3J0Ont3aWR0aDo0MDIsaGVpZ2h0Ojg3NH0sZGV2aWNlU2NhbGVGYWN0b3I6MX0pOwpjb25zdCBlcnJvcnM9W107IHBhZ2Uub24oInBhZ2VlcnJvciIsZT0+ZXJyb3JzLnB1c2goU3RyaW5nKGUpKSk7CmF3YWl0IHBhZ2UuZ290bygiaHR0cDovLzEyNy4wLjAuMTo0MTczIix7d2FpdFVudGlsOiJuZXR3b3JraWRsZSJ9KTsKYXdhaXQgcGFnZS5nZXRCeVJvbGUoImJ1dHRvbiIse25hbWU6L1BSSVNNIE9WRVJEUklWRS99KS5jbGljaygpOwphd2FpdCBwYWdlLmdldEJ5Um9sZSgiYnV0dG9uIix7bmFtZTovU1RBUlQgT1ZFUkRSSVZFL30pLmNsaWNrKCk7CmNvbnN0IGJvYXJkPXBhZ2UubG9jYXRvcignW2FyaWEtbGFiZWw9IlByaXNtIE92ZXJkcml2ZSBDbHVzdGVyIEJyZWFrIGJvYXJkIl0nKTsKYXdhaXQgYm9hcmQud2FpdEZvcigpOwphd2FpdCBwYWdlLnNjcmVlbnNob3Qoe3BhdGg6Ii90bXAvb3ZlcmRyaXZlLXFhLzAxLXN0YXJ0LmpwZyIsdHlwZToianBlZyIscXVhbGl0eTo4OH0pOwpmb3IobGV0IGk9MDtpPDg1O2krKyl7CiAgaWYoYXdhaXQgcGFnZS5nZXRCeVJvbGUoImRpYWxvZyIse25hbWU6L0Nob29zZSBPdmVyZHJpdmUgdXBncmFkZS99KS5pc1Zpc2libGUoKS5jYXRjaCgoKT0+ZmFsc2UpKSB0aHJvdyBuZXcgRXJyb3IoInVwZ3JhZGUgY2hvaWNlIGludGVycnVwdGVkIGdhbWVwbGF5Iik7CiAgY29uc3QgYnV0dG9ucz1ib2FyZC5sb2NhdG9yKCJidXR0b246bm90KFtkaXNhYmxlZF0pIik7CiAgY29uc3Qgbj1hd2FpdCBidXR0b25zLmNvdW50KCk7CiAgaWYobil7YXdhaXQgYnV0dG9ucy5udGgoKGkqMTEpJW4pLmNsaWNrKCk7IGF3YWl0IHBhZ2Uud2FpdEZvclRpbWVvdXQoMTQ1KTt9IGVsc2UgYXdhaXQgcGFnZS53YWl0Rm9yVGltZW91dCg5MCk7CiAgaWYoaT09PTM1KSBhd2FpdCBwYWdlLnNjcmVlbnNob3Qoe3BhdGg6Ii90bXAvb3ZlcmRyaXZlLXFhLzAyLW1pZC5qcGciLHR5cGU6ImpwZWciLHF1YWxpdHk6ODh9KTsKfQphd2FpdCBwYWdlLnNjcmVlbnNob3Qoe3BhdGg6Ii90bXAvb3ZlcmRyaXZlLXFhLzAzLWxhdGUuanBnIix0eXBlOiJqcGVnIixxdWFsaXR5Ojg4fSk7CmNvbnN0IGJvZHk9YXdhaXQgcGFnZS5sb2NhdG9yKCJib2R5IikuaW5uZXJUZXh0KCk7CmNvbnN0IGRhdGE9e2Vycm9ycyxoYXNDaG9vc2UxOmJvZHkuaW5jbHVkZXMoIkNIT09TRSAxIiksYm9keVRleHQ6Ym9keSxzY3JvbGxXaWR0aDphd2FpdCBwYWdlLmV2YWx1YXRlKCgpPT5kb2N1bWVudC5kb2N1bWVudEVsZW1lbnQuc2Nyb2xsV2lkdGgpLGlubmVyV2lkdGg6YXdhaXQgcGFnZS5ldmFsdWF0ZSgoKT0+aW5uZXJXaWR0aCl9Owpmcy53cml0ZUZpbGVTeW5jKCIvdG1wL292ZXJkcml2ZS1xYS9yZXZpZXcuanNvbiIsSlNPTi5zdHJpbmdpZnkoZGF0YSxudWxsLDIpKTsKaWYoZXJyb3JzLmxlbmd0aCkgdGhyb3cgbmV3IEVycm9yKGVycm9ycy5qb2luKCJcbiIpKTsKaWYoYm9keS5pbmNsdWRlcygiQ0hPT1NFIDEiKSkgdGhyb3cgbmV3IEVycm9yKCJDSE9PU0UgMSBzdGlsbCByZW5kZXJlZCIpOwphd2FpdCBicm93c2VyLmNsb3NlKCk7Cg==' | base64 -d > /tmp/overdrive-qa.mjs
           node /tmp/overdrive-qa.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: prism-overdrive-nonstop-qa
           path: /tmp/overdrive-qa
           retention-days: 1
-      - name: Commit implementation and remove temporary QA workflows
+      - name: Commit implementation and cleanup
         run: |
           rm -f .github/workflows/apply-overdrive-nonstop.yml .github/workflows/qa-overdrive-review.yml
           git config user.name 'yz4git'
