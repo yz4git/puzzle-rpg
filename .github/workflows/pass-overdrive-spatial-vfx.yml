@@ -1,0 +1,91 @@
+name: Prism Overdrive Spatial VFX
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-spatial-vfx.py'
+      - '.github/workflows/pass-overdrive-spatial-vfx.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply spatial VFX redesign
+        run: python3 scripts/pass-overdrive-spatial-vfx.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/overdrive-spatial-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Spatial visual gameplay QA
+        run: |
+          mkdir -p /tmp/overdrive-spatial-qa
+          cat > qa-overdrive-spatial.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          await page.screenshot({path:'/tmp/overdrive-spatial-qa/start.jpg',type:'jpeg',quality:92});
+          let lockSeen=false, burstSeen=false, dropSeen=false, cascadeSeen=false;
+          for(let i=0;i<100;i++){
+            const buttons=board.locator('button:not([disabled])'); const n=await buttons.count();
+            if(n){
+              await buttons.nth((i*7)%n).click();
+              for(let probe=0;probe<10;probe++){
+                await page.waitForTimeout(90);
+                const fx=page.locator('[class*="spatialFx"]');
+                if(await fx.isVisible().catch(()=>false)){
+                  const phase=await fx.getAttribute('data-phase');
+                  const kind=await fx.getAttribute('data-kind');
+                  if(phase==='lock' && !lockSeen){lockSeen=true; await page.screenshot({path:'/tmp/overdrive-spatial-qa/lock.jpg',type:'jpeg',quality:92});}
+                  if(phase==='burst' && !burstSeen){burstSeen=true; await page.screenshot({path:'/tmp/overdrive-spatial-qa/burst.jpg',type:'jpeg',quality:92});}
+                  if(phase==='drop' && !dropSeen){dropSeen=true; await page.screenshot({path:'/tmp/overdrive-spatial-qa/drop.jpg',type:'jpeg',quality:92});}
+                  if(kind==='cascade' && !cascadeSeen){cascadeSeen=true; await page.screenshot({path:'/tmp/overdrive-spatial-qa/cascade.jpg',type:'jpeg',quality:92});}
+                }
+              }
+            } else await page.waitForTimeout(150);
+            if(lockSeen && burstSeen && dropSeen && cascadeSeen) break;
+          }
+          await page.screenshot({path:'/tmp/overdrive-spatial-qa/final.jpg',type:'jpeg',quality:92});
+          const feed=page.locator('[class*="actionFeed"]');
+          const b=await board.boundingBox(); const f=await feed.boundingBox();
+          const result={errors,lockSeen,burstSeen,dropSeen,cascadeSeen,board:b,feed:f,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('/tmp/overdrive-spatial-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(!lockSeen || !burstSeen || !dropSeen) throw new Error(`missing spatial phase ${JSON.stringify(result)}`);
+          if(b && f && f.y < b.y+b.height) throw new Error('action feed overlaps board');
+          if(result.scrollWidth>result.innerWidth) throw new Error('horizontal overflow');
+          await browser.close();
+          NODE
+          node qa-overdrive-spatial.mjs
+          rm qa-overdrive-spatial.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-spatial-vfx-qa
+          path: /tmp/overdrive-spatial-qa
+          retention-days: 1
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-spatial-vfx.py .github/workflows/pass-overdrive-spatial-vfx.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css app/gameAudio.ts scripts .github/workflows
+          git commit -m 'Add spatial dopamine VFX to Prism Overdrive'
+          git push origin HEAD:main
