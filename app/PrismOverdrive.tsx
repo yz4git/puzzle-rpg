@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { playOverdriveSfx, playSfx, primeAudio } from "./gameAudio";
 import styles from "./PrismOverdrive.module.css";
 
@@ -181,6 +182,20 @@ function fxAnchor(items: Tile[]) {
   return { x, y, columns };
 }
 
+function fxWaveDelays(items: Tile[], anchor: { x: number; y: number }) {
+  const ax = anchor.x / 100 * SIZE - 0.5;
+  const ay = anchor.y / 100 * SIZE - 0.5;
+  const delays: Record<number, number> = {};
+  for (const tile of items) delays[tile.id] = Math.round((Math.abs(tile.col - ax) + Math.abs(tile.row - ay)) * 38);
+  return delays;
+}
+
+function fxRouteDelays(items: Tile[]) {
+  const delays: Record<number, number> = {};
+  items.forEach((tile, index) => { delays[tile.id] = Math.min(245, index * 34); });
+  return delays;
+}
+
 function fxLinks(items: Tile[]) {
   const map = mapTiles(items);
   const links: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
@@ -223,6 +238,9 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [actionFx, setActionFx] = useState<ActionFx | null>(null);
   const [boardFx, setBoardFx] = useState<BoardFx | null>(null);
   const [modeFx, setModeFx] = useState<ModeFx | null>(null);
+  const [pressedId, setPressedId] = useState<number | null>(null);
+  const [focusDelays, setFocusDelays] = useState<Record<number, number>>({});
+  const [jackpotAfterglow, setJackpotAfterglow] = useState(false);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -289,7 +307,8 @@ export default function PrismOverdrive({ onExit }: Props) {
     setFever(0); feverRef.current = 0;
     setJackpot(0); jackpotRef.current = 0; setJackpotFlash(false);
     setUpgrades([]); setUpgradeChoices([]); setRunLevel(0); levelRef.current = 0;
-    setClearingIds(new Set()); setFocusIds(new Set()); setActionFx(null); setBoardFx(null); setModeFx(null);
+    setClearingIds(new Set()); setFocusIds(new Set()); setFocusDelays({}); setActionFx(null); setBoardFx(null); setModeFx(null);
+    setPressedId(null); setJackpotAfterglow(false);
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
     lastTickRef.current = performance.now();
@@ -458,6 +477,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       playOverdriveSfx("attack", attackBlast ? 1.35 : Math.min(1.2, .72 + count * .06));
     }
 
+    setFocusDelays(fxWaveDelays(removedTiles, impactAnchor));
     setFocusIds(new Set(removed));
     const actionToken = actionFxTokenRef.current++;
     setActionFx({ token: actionToken, kind: liveSeed.type, title: fxTitle, detail: fxDetail, icon: GLYPH[liveSeed.type] });
@@ -475,6 +495,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     setJackpot(Math.min(3, charge));
 
     setFocusIds(new Set());
+    setFocusDelays({});
     setClearingIds(removed);
     playSfx(count >= 8 ? "cascade" : "drop");
     await sleep(190);
@@ -500,6 +521,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       const autoScore = scoreCluster(autoType, auto.length, depth);
       const cascadeAnchor = fxAnchor(auto);
       const cascadeToken = actionFxTokenRef.current++;
+      setFocusDelays(fxRouteDelays(auto));
       setFocusIds(autoIds);
       setActionFx({ token: cascadeToken, kind: "cascade", title: `AUTO CASCADE → CHAIN ${depth}!`, detail: `${LABEL[autoType]} ×${auto.length} CONNECTED BY THE DROP`, icon: "↯" });
       setBoardFx({ token: cascadeToken, kind: "cascade", phase: "lock", x: cascadeAnchor.x, y: cascadeAnchor.y, points: 0, chain: depth, count: auto.length, columns: cascadeAnchor.columns, links: fxLinks(auto) });
@@ -515,6 +537,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       addFever(auto.length * 2.4);
       await sleep(240);
       setFocusIds(new Set());
+      setFocusDelays({});
       setClearingIds(autoIds);
       playSfx("cascade");
       playOverdriveSfx("cascade", 1 + depth * .18);
@@ -546,11 +569,15 @@ export default function PrismOverdrive({ onExit }: Props) {
       playOverdriveSfx("drop", 1.42);
       await sleep(390);
       setJackpotFlash(false);
+      setJackpotAfterglow(true);
+      playOverdriveSfx("rebuild", 1.28);
+      window.setTimeout(() => setJackpotAfterglow(false), 1180);
     }
 
     setActionFx(null);
     setBoardFx(null);
     setFocusIds(new Set());
+    setFocusDelays({});
     await maybeOfferUpgrade(nextScore);
     setResolving(false);
     resolvingRef.current = false;
@@ -576,7 +603,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   }
 
   return <main data-hype={combo >= 30 ? "max" : combo >= 15 ? "high" : combo >= 5 ? "mid" : "low"} className={`${styles.shell} ${feverActive ? styles.fever : ""} ${overFeverActive ? styles.overFever : ""} ${finalOverdrive ? styles.final : ""}`}>
-    <div className={styles.backFx} aria-hidden="true"><i /><i /><b /><u /></div>
+    <div className={styles.backFx} aria-hidden="true"><i /><i /><i /><b /><u /><span /></div>
     <header className={styles.topbar}>
       <button className={styles.exit} type="button" onClick={onExit}>◀ MODE</button>
       <div><span>SCORE</span><strong>{score.toLocaleString()}</strong><i>{lastGain > 0 ? `+${lastGain.toLocaleString()}` : ""}</i></div>
@@ -593,21 +620,27 @@ export default function PrismOverdrive({ onExit }: Props) {
       <b>NEXT</b>{queues.map((queue, index) => <span key={index} className={styles[queue[0]!]}>{GLYPH[queue[0]!]}</span>)}
     </section>
 
-    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-jackpot={jackpotFlash ? "true" : "false"}>
+    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"}>
       <div className={styles.rank}>{lastRank || (resolving ? "BREAK!" : "KEEP MOVING")}</div>
       <div className={styles.board} aria-label="Prism Overdrive Cluster Break board">
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
-          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""}`}
+          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""} ${pressedId === tile.id ? styles.pressed : ""}`}
           style={{
             left: `calc(${tile.col * (100 / SIZE)}% + 1px)`,
             top: `calc(${tile.row * (100 / SIZE)}% + 1px)`,
             animationDelay: boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? `${tile.row * 22}ms` : undefined,
-          }}
+            "--focus-delay": `${focusDelays[tile.id] ?? 0}ms`,
+            "--tile-delay": `${tile.row * 14 + tile.col * 9}ms`,
+          } as CSSProperties}
           disabled={resolving || screen !== "running"}
           aria-label={`${LABEL[tile.type]} cluster panel row ${tile.row + 1} column ${tile.col + 1}`}
-          onClick={() => void clearCluster(tile)}
+          onPointerDown={() => { setPressedId(tile.id); playOverdriveSfx("tap", 0.72); }}
+          onPointerUp={() => setPressedId(null)}
+          onPointerCancel={() => setPressedId(null)}
+          onPointerLeave={() => setPressedId((value) => value === tile.id ? null : value)}
+          onClick={() => { setPressedId(null); void clearCluster(tile); }}
         ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
         {boardFx ? <div key={boardFx.token} className={styles.spatialFx} data-kind={boardFx.kind} data-phase={boardFx.phase} data-mega={boardFx.mega ? "true" : "false"} data-chain={boardFx.chain} aria-hidden="true">
           {boardFx.kind === "cascade" && boardFx.phase !== "drop" && boardFx.links?.length ? <svg className={styles.chainPath} viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -617,7 +650,7 @@ export default function PrismOverdrive({ onExit }: Props) {
             <i className={styles.impactRing} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }} />
             <i className={styles.impactCore} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }} />
             <span className={styles.shardField} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }}>{Array.from({ length: 10 }, (_, index) => <i key={index} />)}</span>
-            {boardFx.phase === "burst" && boardFx.points > 0 ? <strong className={styles.scorePop} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }}>+{boardFx.points.toLocaleString()}</strong> : null}
+            {boardFx.phase === "burst" && boardFx.points > 0 ? <strong className={styles.scorePop} data-score={`+${boardFx.points.toLocaleString()}`} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }}>+{boardFx.points.toLocaleString()}</strong> : null}
             {boardFx.chain > 0 ? <em className={styles.chainStamp} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }}>CHAIN {boardFx.chain}</em> : null}
           </> : null}
           {boardFx.phase === "drop" ? <span className={styles.dropField}>{boardFx.columns.map((column) => <i key={column} style={{ left: `${(column + 0.5) / SIZE * 100}%` }} />)}</span> : null}
