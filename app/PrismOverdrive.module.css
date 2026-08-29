@@ -30,3 +30,22 @@
 .final .rank{font-size:clamp(14px,4vw,19px);color:#fff578}
 .finalBanner{top:48px;padding:5px 3px;font-size:8px;box-shadow:0 3px #000}
 @media(max-height:700px){.boardWrap{padding-top:18px}.board{width:min(92vw,52dvh,370px)}.message{min-height:18px;padding:3px;font-size:6px}}
+
+
+/* PASS 40 — ACTION CLARITY / READABLE CASCADE */
+.focused{z-index:8!important;filter:brightness(1.8)!important;transform:scale(.92)!important;outline:4px solid #fff!important;outline-offset:-5px;animation:focusBeat 280ms steps(2,end) infinite!important}
+@keyframes focusBeat{50%{filter:brightness(2.7)!important;transform:scale(.86)!important}}
+.clearing{animation-duration:180ms!important}
+.actionFx{position:absolute;z-index:24;left:50%;top:50%;width:min(88%,330px);min-height:96px;box-sizing:border-box;transform:translate(-50%,-50%);display:grid;grid-template-columns:58px 1fr;grid-template-rows:auto auto;align-items:center;gap:2px 8px;padding:10px 12px;border:4px solid #fff;background:#050914;box-shadow:0 0 0 3px #000,7px 8px #000;pointer-events:none;animation:actionFxIn 180ms steps(3,end)}
+.actionFx i{grid-row:1/3;width:52px;height:52px;display:grid;place-items:center;border:3px solid currentColor;background:#090d18;font:1000 31px/1 monospace;font-style:normal;text-shadow:2px 2px #000}
+.actionFx strong{align-self:end;font-size:clamp(13px,4vw,18px);line-height:1.05;letter-spacing:.04em;text-shadow:2px 2px #000}
+.actionFx span{align-self:start;font-size:clamp(7px,2.2vw,10px);line-height:1.35;color:#fff}
+.actionFx[data-kind="attack"]{color:#ff765e;border-color:#ff654c;background:#2d0910}
+.actionFx[data-kind="heal"]{color:#ff86d5;border-color:#ff6bc8;background:#2a0820}
+.actionFx[data-kind="barrier"]{color:#73e7ff;border-color:#54d9ff;background:#062431}
+.actionFx[data-kind="skip"]{color:#fff578;border-color:#fff26d;background:#282306}
+.actionFx[data-kind="cascade"]{color:#fff578;border-color:#75f6ff;background:#120a31;min-height:108px}
+.actionFx[data-kind="cascade"] strong{font-size:clamp(15px,4.6vw,21px);color:#fff578}
+.actionFx[data-kind="upgrade"]{color:#d9a0ff;border-color:#b86cff;background:#180b2c}
+@keyframes actionFxIn{0%{transform:translate(-50%,-50%) scale(.72);opacity:0}65%{transform:translate(-50%,-50%) scale(1.06);opacity:1}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@media(max-height:700px){.actionFx{min-height:82px;padding:7px 9px;grid-template-columns:48px 1fr}.actionFx i{width:42px;height:42px;font-size:25px}.actionFx[data-kind="cascade"]{min-height:88px}}

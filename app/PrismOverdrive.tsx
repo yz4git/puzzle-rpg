@@ -20,6 +20,13 @@ type UpgradeId =
   | "healLink";
 type UpgradeDef = { id: UpgradeId; name: string; icon: string; tag: string; description: string };
 type Props = { onExit?: () => void };
+type ActionFx = {
+  token: number;
+  kind: PanelType | "cascade" | "upgrade";
+  title: string;
+  detail: string;
+  icon: string;
+};
 
 const SIZE = 6;
 const RUN_MS = 180_000;
@@ -168,6 +175,8 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [runLevel, setRunLevel] = useState(0);
   const [lastGain, setLastGain] = useState(0);
   const [lastRank, setLastRank] = useState("");
+  const [focusIds, setFocusIds] = useState<Set<number>>(new Set());
+  const [actionFx, setActionFx] = useState<ActionFx | null>(null);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -180,6 +189,8 @@ export default function PrismOverdrive({ onExit }: Props) {
   const overFeverUntilRef = useRef(0);
   const timeStopUntilRef = useRef(0);
   const lastTickRef = useRef(performance.now());
+  const resolvingRef = useRef(false);
+  const actionFxTokenRef = useRef(1);
 
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
@@ -193,7 +204,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       setNow(current);
       const delta = Math.min(250, current - lastTickRef.current);
       lastTickRef.current = current;
-      if (current < timeStopUntilRef.current) return;
+      if (current < timeStopUntilRef.current || resolvingRef.current) return;
       timeRef.current = Math.max(0, timeRef.current - delta);
       setTimeLeft(timeRef.current);
       if (comboRef.current > 0 && current > comboExpireRef.current) {
@@ -223,7 +234,8 @@ export default function PrismOverdrive({ onExit }: Props) {
     setFever(0); feverRef.current = 0;
     setJackpot(0); jackpotRef.current = 0; setJackpotFlash(false);
     setUpgrades([]); setUpgradeChoices([]); setRunLevel(0); levelRef.current = 0;
-    setClearingIds(new Set()); setResolving(false); setLastGain(0); setLastRank("");
+    setClearingIds(new Set()); setFocusIds(new Set()); setActionFx(null);
+    setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0;
     lastTickRef.current = performance.now();
     setMessage("BREAK CLUSTERS • KEEP THE COMBO ALIVE");
@@ -303,7 +315,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     return { points: base * mult, rank };
   }
 
-  function maybeOfferUpgrade(nextScore: number) {
+  async function maybeOfferUpgrade(nextScore: number) {
     const threshold = UPGRADE_THRESHOLDS[levelRef.current];
     if (threshold == null || nextScore < threshold) return;
     const picked = chooseUpgrades(upgrades)[0];
@@ -312,8 +324,11 @@ export default function PrismOverdrive({ onExit }: Props) {
     levelRef.current += 1;
     setRunLevel(levelRef.current);
     setLastRank(`LEVEL ${levelRef.current} • ${picked.name}!`);
-    setMessage(`${picked.name} AUTO INSTALLED • KEEP BREAKING`);
+    setMessage(`${picked.name} AUTO INSTALLED`);
+    setActionFx({ token: actionFxTokenRef.current++, kind: "upgrade", title: `${picked.name} GET!`, detail: picked.description, icon: picked.icon });
     playSfx("skill");
+    await sleep(520);
+    setActionFx(null);
   }
 
   function pickUpgrade(id: UpgradeId) {
@@ -332,6 +347,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     if (!liveSeed) return;
     primeAudio();
     setResolving(true);
+    resolvingRef.current = true;
     const group = connectedGroup(tiles, liveSeed);
     const count = group.length;
     const comboValue = bumpCombo(liveSeed.type, count);
@@ -341,28 +357,43 @@ export default function PrismOverdrive({ onExit }: Props) {
     if (liveSeed.type === "skip" && count >= 4 && upgrades.includes("timeBomb")) addRandomIds(tiles, removed, 3);
     if (count >= 10 && upgrades.includes("prismNuke")) addRandomIds(tiles, removed, 8);
 
+    let fxTitle = "";
+    let fxDetail = "";
     if (liveSeed.type === "skip") {
       const addedMs = Math.min(3000, count * 250);
       timeRef.current = Math.min(RUN_MS + 20_000, timeRef.current + addedMs);
       setTimeLeft(timeRef.current);
       const stopMs = count >= 6 ? 2000 : count >= 4 ? 1000 : 350;
       timeStopUntilRef.current = Math.max(timeStopUntilRef.current, performance.now() + stopMs);
+      fxTitle = `TIME STOP ×${count}`;
+      fxDetail = `YELLOW SKIP → CLOCK STOP +${(addedMs / 1000).toFixed(1)} SEC`;
       setLastRank(`TIME STOP! • +${(addedMs / 1000).toFixed(1)} SEC`);
-      setMessage(`SKIP ×${count} • CLOCK FROZEN • KEEP AIMING`);
+      setMessage("YELLOW SKIP → CLOCK STOPS");
       playSfx("skill");
     } else if (liveSeed.type === "barrier") {
-      setLastRank(`FEVER +${count * (upgrades.includes("barOvercharge") ? 5 : 2)}`);
-      setMessage(`BAR ×${count} • FEVER CHARGE`);
+      const feverGain = count * (upgrades.includes("barOvercharge") ? 5 : 2);
+      fxTitle = `FEVER CHARGE ×${count}`;
+      fxDetail = `BLUE BAR → FEVER +${feverGain}`;
+      setLastRank(`FEVER +${feverGain}`);
+      setMessage("BLUE BAR → FEVER GAUGE");
       playSfx("shield");
     } else if (liveSeed.type === "heal") {
+      fxTitle = `COMBO LINK ×${count}`;
+      fxDetail = "PINK HEAL → COMBO WINDOW EXTENDED";
       setLastRank("COMBO SAVED!");
-      setMessage(`HEAL ×${count} • COMBO WINDOW EXTENDED`);
+      setMessage("PINK HEAL → MORE TIME FOR NEXT COMBO");
       playSfx("heal");
     } else {
+      fxTitle = attackBlast ? `MEGA ATTACK ×${count}!` : `ATTACK ×${count}!`;
+      fxDetail = attackBlast ? `RED ATK → AREA BLAST • ${removed.size} PANELS` : `RED ATK → SCORE BREAK • ${removed.size} PANELS`;
       setLastRank(attackBlast ? "MEGA ATK!!" : count >= 6 ? "BIG BREAK!" : "ATK BREAK!");
-      setMessage(attackBlast ? `ATK ×${count} • AREA BLAST` : `ATK ×${count} • SCORE BREAK`);
+      setMessage(attackBlast ? "RED ATK → NEARBY PANELS ALSO BREAK" : "RED ATK → SCORE");
       playSfx("playerAttack");
     }
+
+    setFocusIds(new Set(removed));
+    setActionFx({ token: actionFxTokenRef.current++, kind: liveSeed.type, title: fxTitle, detail: fxDetail, icon: GLYPH[liveSeed.type] });
+    await sleep(360);
 
     const scored = scoreCluster(liveSeed.type, removed.size, 0);
     let nextScore = addScore(scored.points, scored.rank);
@@ -371,34 +402,45 @@ export default function PrismOverdrive({ onExit }: Props) {
     jackpotRef.current = charge;
     setJackpot(Math.min(3, charge));
 
+    setFocusIds(new Set());
     setClearingIds(removed);
     playSfx(count >= 8 ? "cascade" : "drop");
-    await sleep(95);
+    await sleep(190);
     let currentQueues = queues.map((queue) => [...queue]);
     let settled = settleBoard(tiles, currentQueues, removed, performance.now() < feverUntilRef.current);
     let currentTiles = settled.tiles;
     currentQueues = settled.queues;
     setTiles(currentTiles); setQueues(currentQueues); setClearingIds(new Set());
-    await sleep(110);
+    setActionFx(null);
+    await sleep(240);
 
     const cascadeThreshold = (performance.now() < feverUntilRef.current ? 4 : 6) - (upgrades.includes("chainReactor") ? 1 : 0);
     for (let depth = 1; depth <= 4; depth += 1) {
       const auto = largestGroup(currentTiles);
       if (auto.length < cascadeThreshold) break;
       const autoIds = new Set(auto.map((tile) => tile.id));
+      const autoType = auto[0]!.type;
       comboRef.current += 1; setCombo(comboRef.current); setMaxCombo((value) => Math.max(value, comboRef.current));
       comboExpireRef.current = performance.now() + 2500 + (upgrades.includes("comboCore") ? 900 : 0);
-      const autoScore = scoreCluster(auto[0]!.type, auto.length, depth);
+      const autoScore = scoreCluster(autoType, auto.length, depth);
+      setFocusIds(autoIds);
+      setActionFx({ token: actionFxTokenRef.current++, kind: "cascade", title: `AUTO CASCADE → CHAIN ${depth}!`, detail: `${LABEL[autoType]} ×${auto.length} CONNECTED BY THE DROP`, icon: "↯" });
+      setLastRank(`CHAIN ${depth}!`);
+      setMessage(`AUTO MATCH FOUND • ${LABEL[autoType]} ×${auto.length} WILL BREAK`);
+      playSfx("setup");
+      await sleep(420);
+
       nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);
-      setMessage(`AUTO CASCADE • +${Math.round(autoScore.points).toLocaleString()} • DON\'T STOP`);
+      setMessage(`CHAIN ${depth} SCORE +${Math.round(autoScore.points).toLocaleString()}`);
       addFever(auto.length * 2.4);
+      setFocusIds(new Set());
       setClearingIds(autoIds);
       playSfx("cascade");
-      await sleep(90);
+      await sleep(220);
       settled = settleBoard(currentTiles, currentQueues, autoIds, performance.now() < feverUntilRef.current);
       currentTiles = settled.tiles; currentQueues = settled.queues;
       setTiles(currentTiles); setQueues(currentQueues); setClearingIds(new Set());
-      await sleep(90);
+      await sleep(280);
     }
 
     if (jackpotRef.current >= 3) {
@@ -415,8 +457,11 @@ export default function PrismOverdrive({ onExit }: Props) {
       setJackpotFlash(false);
     }
 
-    maybeOfferUpgrade(nextScore);
+    setActionFx(null);
+    setFocusIds(new Set());
+    await maybeOfferUpgrade(nextScore);
     setResolving(false);
+    resolvingRef.current = false;
   }
 
   const timeSeconds = Math.ceil(timeLeft / 1000);
@@ -461,13 +506,16 @@ export default function PrismOverdrive({ onExit }: Props) {
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
-          className={`${styles.tile} ${styles[tile.type]} ${clearingIds.has(tile.id) ? styles.clearing : ""}`}
+          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""}`}
           style={{ left: `calc(${tile.col * (100 / SIZE)}% + 1px)`, top: `calc(${tile.row * (100 / SIZE)}% + 1px)` }}
           disabled={resolving || screen !== "running"}
           aria-label={`${LABEL[tile.type]} cluster panel row ${tile.row + 1} column ${tile.col + 1}`}
           onClick={() => void clearCluster(tile)}
         ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
       </div>
+      {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
+        <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
+      </div> : null}
       {jackpotFlash ? <div className={styles.jackpotFlash}><span>PRISM</span><strong>JACKPOT!</strong></div> : null}
       {timeStopped ? <div className={styles.timeStopFx}><i>⏱</i><strong>TIME STOP</strong></div> : null}
     </section>
