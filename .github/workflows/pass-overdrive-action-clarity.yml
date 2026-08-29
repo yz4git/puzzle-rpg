@@ -1,0 +1,79 @@
+name: Prism Overdrive Action Clarity Pass
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-action-clarity.py'
+      - '.github/workflows/pass-overdrive-action-clarity.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply action clarity redesign
+        run: python3 scripts/pass-overdrive-action-clarity.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install --with-deps chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/overdrive-clarity-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Visual gameplay QA
+        run: |
+          mkdir -p /tmp/overdrive-clarity-qa
+          cat > /tmp/qa.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          let actionSeen=false, cascadeSeen=false;
+          for(let i=0;i<80;i++){
+            const buttons=board.locator('button:not([disabled])'); const n=await buttons.count();
+            if(n){await buttons.nth((i*7)%n).click(); await page.waitForTimeout(120);}
+            const fx=page.locator('[class*="actionFx"]');
+            if(await fx.isVisible().catch(()=>false)){
+              actionSeen=true;
+              const txt=await fx.innerText();
+              if(txt.includes('AUTO CASCADE')) cascadeSeen=true;
+              if(!fs.existsSync('/tmp/overdrive-clarity-qa/action.jpg')) await page.screenshot({path:'/tmp/overdrive-clarity-qa/action.jpg',type:'jpeg',quality:90});
+              if(cascadeSeen && !fs.existsSync('/tmp/overdrive-clarity-qa/cascade.jpg')) await page.screenshot({path:'/tmp/overdrive-clarity-qa/cascade.jpg',type:'jpeg',quality:90});
+            }
+            await page.waitForTimeout(680);
+            if(cascadeSeen) break;
+          }
+          await page.screenshot({path:'/tmp/overdrive-clarity-qa/final.jpg',type:'jpeg',quality:90});
+          fs.writeFileSync('/tmp/overdrive-clarity-qa/review.json',JSON.stringify({errors,actionSeen,cascadeSeen,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)},null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(!actionSeen) throw new Error('action feedback was never visible');
+          await browser.close();
+          NODE
+          node /tmp/qa.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-action-clarity-qa
+          path: /tmp/overdrive-clarity-qa
+          retention-days: 1
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-action-clarity.py .github/workflows/pass-overdrive-action-clarity.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Make Prism Overdrive actions visually readable'
+          git push origin HEAD:main
