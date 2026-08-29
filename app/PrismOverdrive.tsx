@@ -38,6 +38,7 @@ type BoardFx = {
   count: number;
   columns: number[];
   mega?: boolean;
+  links?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
 };
 type ModeFx = {
   token: number;
@@ -178,6 +179,23 @@ function fxAnchor(items: Tile[]) {
   const y = items.reduce((sum, tile) => sum + tile.row + 0.5, 0) / items.length / SIZE * 100;
   const columns = [...new Set(items.map((tile) => tile.col))].sort((a, b) => a - b);
   return { x, y, columns };
+}
+
+function fxLinks(items: Tile[]) {
+  const map = mapTiles(items);
+  const links: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+  for (const tile of items) {
+    for (const [row, col] of [[tile.row + 1, tile.col], [tile.row, tile.col + 1]]) {
+      if (!map.has(`${row}:${col}`)) continue;
+      links.push({
+        x1: (tile.col + 0.5) / SIZE * 100,
+        y1: (tile.row + 0.5) / SIZE * 100,
+        x2: (col + 0.5) / SIZE * 100,
+        y2: (row + 0.5) / SIZE * 100,
+      });
+    }
+  }
+  return links;
 }
 
 export default function PrismOverdrive({ onExit }: Props) {
@@ -484,7 +502,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       const cascadeToken = actionFxTokenRef.current++;
       setFocusIds(autoIds);
       setActionFx({ token: cascadeToken, kind: "cascade", title: `AUTO CASCADE → CHAIN ${depth}!`, detail: `${LABEL[autoType]} ×${auto.length} CONNECTED BY THE DROP`, icon: "↯" });
-      setBoardFx({ token: cascadeToken, kind: "cascade", phase: "lock", x: cascadeAnchor.x, y: cascadeAnchor.y, points: 0, chain: depth, count: auto.length, columns: cascadeAnchor.columns });
+      setBoardFx({ token: cascadeToken, kind: "cascade", phase: "lock", x: cascadeAnchor.x, y: cascadeAnchor.y, points: 0, chain: depth, count: auto.length, columns: cascadeAnchor.columns, links: fxLinks(auto) });
       setLastRank(`CHAIN ${depth}!`);
       setMessage(`AUTO MATCH FOUND • ${LABEL[autoType]} ×${auto.length} WILL BREAK`);
       playSfx("setup");
@@ -492,7 +510,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       await sleep(520);
 
       nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);
-      setBoardFx({ token: cascadeToken + 100000, kind: "cascade", phase: "burst", x: cascadeAnchor.x, y: cascadeAnchor.y, points: Math.round(autoScore.points), chain: depth, count: auto.length, columns: cascadeAnchor.columns });
+      setBoardFx({ token: cascadeToken + 100000, kind: "cascade", phase: "burst", x: cascadeAnchor.x, y: cascadeAnchor.y, points: Math.round(autoScore.points), chain: depth, count: auto.length, columns: cascadeAnchor.columns, links: fxLinks(auto) });
       setMessage(`CHAIN ${depth} SCORE +${Math.round(autoScore.points).toLocaleString()}`);
       addFever(auto.length * 2.4);
       await sleep(240);
@@ -518,11 +536,15 @@ export default function PrismOverdrive({ onExit }: Props) {
       setLastRank("PRISM JACKPOT!!!");
       setMessage(`JACKPOT +${Math.round(jackpotPoints).toLocaleString()} • BOARD RESET`);
       playSfx("stageClear");
-      playOverdriveSfx("jackpot", 1.35);
-      setBoardFx({ token: actionFxTokenRef.current++, kind: "jackpot", phase: "burst", x: 50, y: 50, points: Math.round(jackpotPoints), chain: 0, count: 36, columns: [0,1,2,3,4,5] });
-      await sleep(620);
+      playOverdriveSfx("jackpot", 1.42);
+      const jackpotToken = actionFxTokenRef.current++;
+      setBoardFx({ token: jackpotToken, kind: "jackpot", phase: "burst", x: 50, y: 50, points: Math.round(jackpotPoints), chain: 0, count: 36, columns: [0,1,2,3,4,5] });
+      await sleep(680);
       currentTiles = makeBoard(); currentQueues = makeQueues();
       setTiles(currentTiles); setQueues(currentQueues);
+      setBoardFx({ token: jackpotToken + 200000, kind: "jackpot", phase: "drop", x: 50, y: 91, points: 0, chain: 0, count: 36, columns: [0,1,2,3,4,5] });
+      playOverdriveSfx("drop", 1.42);
+      await sleep(390);
       setJackpotFlash(false);
     }
 
@@ -554,6 +576,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   }
 
   return <main data-hype={combo >= 30 ? "max" : combo >= 15 ? "high" : combo >= 5 ? "mid" : "low"} className={`${styles.shell} ${feverActive ? styles.fever : ""} ${overFeverActive ? styles.overFever : ""} ${finalOverdrive ? styles.final : ""}`}>
+    <div className={styles.backFx} aria-hidden="true"><i /><i /><b /><u /></div>
     <header className={styles.topbar}>
       <button className={styles.exit} type="button" onClick={onExit}>◀ MODE</button>
       <div><span>SCORE</span><strong>{score.toLocaleString()}</strong><i>{lastGain > 0 ? `+${lastGain.toLocaleString()}` : ""}</i></div>
@@ -570,19 +593,26 @@ export default function PrismOverdrive({ onExit }: Props) {
       <b>NEXT</b>{queues.map((queue, index) => <span key={index} className={styles[queue[0]!]}>{GLYPH[queue[0]!]}</span>)}
     </section>
 
-    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"}>
+    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-jackpot={jackpotFlash ? "true" : "false"}>
       <div className={styles.rank}>{lastRank || (resolving ? "BREAK!" : "KEEP MOVING")}</div>
       <div className={styles.board} aria-label="Prism Overdrive Cluster Break board">
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
           className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""}`}
-          style={{ left: `calc(${tile.col * (100 / SIZE)}% + 1px)`, top: `calc(${tile.row * (100 / SIZE)}% + 1px)` }}
+          style={{
+            left: `calc(${tile.col * (100 / SIZE)}% + 1px)`,
+            top: `calc(${tile.row * (100 / SIZE)}% + 1px)`,
+            animationDelay: boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? `${tile.row * 22}ms` : undefined,
+          }}
           disabled={resolving || screen !== "running"}
           aria-label={`${LABEL[tile.type]} cluster panel row ${tile.row + 1} column ${tile.col + 1}`}
           onClick={() => void clearCluster(tile)}
         ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
-        {boardFx ? <div key={boardFx.token} className={styles.spatialFx} data-kind={boardFx.kind} data-phase={boardFx.phase} data-mega={boardFx.mega ? "true" : "false"} aria-hidden="true">
+        {boardFx ? <div key={boardFx.token} className={styles.spatialFx} data-kind={boardFx.kind} data-phase={boardFx.phase} data-mega={boardFx.mega ? "true" : "false"} data-chain={boardFx.chain} aria-hidden="true">
+          {boardFx.kind === "cascade" && boardFx.phase !== "drop" && boardFx.links?.length ? <svg className={styles.chainPath} viewBox="0 0 100 100" preserveAspectRatio="none">
+            {boardFx.links.map((link, index) => <line key={index} x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} />)}
+          </svg> : null}
           {boardFx.phase !== "drop" ? <>
             <i className={styles.impactRing} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }} />
             <i className={styles.impactCore} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }} />

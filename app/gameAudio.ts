@@ -218,10 +218,12 @@ export function playOverdriveSfx(name: OverdriveSfx, intensity = 1) {
     return;
   }
   if (name === "jackpot") {
-    arp([523, 659, 784, 1047, 1319, 1568, 2093], .045, .075 * k, "square");
-    tone(98, t, .22, .11 * k, "triangle");
-    tone(196, t + .12, .2, .095 * k, "triangle");
-    noise(t + .18, .12, .075 * k);
+    arp([523, 659, 784, 1047, 1319, 1568, 2093], .042, .078 * k, "square");
+    tone(98, t, .25, .12 * k, "triangle");
+    tone(196, t + .11, .22, .1 * k, "triangle");
+    sweep(240, 2480, t + .08, .28, .075 * k, "sawtooth");
+    arp([1047, 1319, 1568, 2093, 2637], .028, .045 * k, "triangle");
+    noise(t + .16, .15, .082 * k);
     return;
   }
   arp([330, 494, 659, 988, 1319, 1976], .04, .065 * k, "square");
