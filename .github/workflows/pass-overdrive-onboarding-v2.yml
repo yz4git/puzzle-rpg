@@ -1,0 +1,83 @@
+name: Prism Overdrive Onboarding Clarity v2
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-onboarding-v2.py'
+      - '.github/workflows/pass-overdrive-onboarding-v2.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - name: Apply clarity pass
+        run: python3 scripts/pass-overdrive-onboarding-v2.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/onboarding-v2.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Beginner progression QA
+        run: |
+          mkdir -p onboarding-v2-qa
+          cat > qa-onboarding-v2.mjs <<'NODE'
+          import {chromium} from 'playwright'; import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          const intro=await page.locator('[class*="introRules"]').innerText();
+          await page.screenshot({path:'onboarding-v2-qa/01-intro.jpg',type:'jpeg',quality:92});
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+          const guide=page.locator('[class*="guideBar"]');
+          const strategy=page.locator('[aria-label="Overdrive strategy panel"]');
+          const hype=page.locator('[class*="hypeRow"]');
+          const recommended=page.locator('[class*="recommended"]:not([disabled])');
+          const first={guide:await guide.innerText(),strategy:await strategy.count(),hype:await hype.count(),recommended:await recommended.count()};
+          await page.screenshot({path:'onboarding-v2-qa/02-step1.jpg',type:'jpeg',quality:92});
+          if(first.recommended<1) throw new Error('step1 recommendation missing');
+          await recommended.first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});
+          await page.screenshot({path:'onboarding-v2-qa/03-step2.jpg',type:'jpeg',quality:92});
+          const step2=await guide.innerText();
+          const r2=page.locator('[class*="recommended"]:not([disabled])'); await r2.first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});
+          const step3={guide:await guide.innerText(),strategy:await strategy.count(),strategyText:await strategy.innerText()};
+          await page.screenshot({path:'onboarding-v2-qa/04-step3-target.jpg',type:'jpeg',quality:92});
+          for(let i=0;i<4;i++){const e=board.locator('button:not([disabled])');await e.first().waitFor({timeout:18000});const r=page.locator('[class*="recommended"]:not([disabled])');if(await r.count())await r.first().click();else await e.first().click();await board.locator('button:not([disabled])').first().waitFor({timeout:18000});}
+          const advanced={guide:await guide.innerText(),strategyText:await strategy.innerText(),hype:await hype.count(),scan:await page.locator('[class*="scanCard"]').count(),cash:await page.locator('[class*="cashOut"]').count()};
+          await page.screenshot({path:'onboarding-v2-qa/05-advanced.jpg',type:'jpeg',quality:92});
+          await page.getByRole('button',{name:'Help'}).click();
+          const help=page.locator('[role="dialog"][aria-label="Prism Overdrive help"]'); const helpText=await help.innerText();
+          await page.screenshot({path:'onboarding-v2-qa/06-help.jpg',type:'jpeg',quality:92});
+          const result={errors,intro,first,step2,step3,advanced,helpText,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('onboarding-v2-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length)throw new Error(errors.join('\n'));
+          if(first.strategy!==0||first.hype!==0)throw new Error('advanced UI visible on step1');
+          if(!step2.includes('STEP 2'))throw new Error('step2 guide missing');
+          if(step3.strategy!==1||!step3.strategyText.includes('YOUR TARGET'))throw new Error('target not introduced on step3');
+          if(advanced.hype!==1||advanced.scan!==1||advanced.cash!==1)throw new Error('advanced systems did not unlock');
+          if(!helpText.includes('HOW TO PLAY')||/[\u3040-\u30ff\u3400-\u9fff]/.test(helpText+intro+first.guide+step2))throw new Error('font-unsafe onboarding copy');
+          if(result.scrollWidth>result.innerWidth)throw new Error('horizontal overflow');
+          await browser.close();
+          NODE
+          node qa-onboarding-v2.mjs
+      - uses: actions/upload-artifact@v4
+        with: {name: prism-overdrive-onboarding-v2-qa, path: onboarding-v2-qa, retention-days: 1}
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-onboarding-v2.py .github/workflows/pass-overdrive-onboarding-v2.yml qa-onboarding-v2.mjs
+          rm -rf onboarding-v2-qa
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Simplify Prism Overdrive first-time play'
+          git push origin HEAD:main
