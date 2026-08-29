@@ -1,0 +1,50 @@
+name: Prism Overdrive Onboarding Pass
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-onboarding.py'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - name: Apply onboarding
+        run: python3 scripts/pass-overdrive-onboarding.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/onboard.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+          mkdir -p /tmp/onboarding-qa
+          cat > /tmp/qa.mjs <<'NODE'
+          import {chromium} from 'playwright'; import fs from 'node:fs';
+          const b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); const errors=[]; p.on('pageerror',e=>errors.push(String(e)));
+          await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await p.screenshot({path:'/tmp/onboarding-qa/01-simple-intro.jpg',type:'jpeg',quality:92}); await p.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor(); await p.screenshot({path:'/tmp/onboarding-qa/02-first-move.jpg',type:'jpeg',quality:92});
+          const rec=p.locator('[class*="recommended"]:not([disabled])'); if(await rec.count()<1) throw new Error('no recommended first move'); await rec.first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});
+          await p.screenshot({path:'/tmp/onboarding-qa/03-after-first.jpg',type:'jpeg',quality:92});
+          for(let n=0;n<6;n++){const x=p.locator('[class*="recommended"]:not([disabled])'); if(await x.count()) await x.first().click(); else await board.locator('button:not([disabled])').first().click(); await board.locator('button:not([disabled])').first().waitFor({timeout:18000});}
+          await p.screenshot({path:'/tmp/onboarding-qa/04-full-strategy.jpg',type:'jpeg',quality:92}); await p.getByRole('button',{name:'？'}).click(); await p.screenshot({path:'/tmp/onboarding-qa/05-help.jpg',type:'jpeg',quality:92});
+          const r={errors,scrollWidth:await p.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await p.evaluate(()=>innerWidth),help:await p.getByRole('dialog',{name:/help/i}).isVisible()}; fs.writeFileSync('/tmp/onboarding-qa/review.json',JSON.stringify(r,null,2)); if(errors.length||r.scrollWidth>r.innerWidth||!r.help) throw new Error(JSON.stringify(r)); await b.close();
+          NODE
+          node /tmp/qa.mjs
+      - uses: actions/upload-artifact@v4
+        with: {name: prism-overdrive-onboarding-qa, path: /tmp/onboarding-qa, retention-days: 1}
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-onboarding.py .github/workflows/pass-overdrive-onboarding.yml
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Make Prism Overdrive easier to learn'
+          git push origin HEAD:main
