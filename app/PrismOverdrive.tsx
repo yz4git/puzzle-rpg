@@ -37,6 +37,13 @@ type BoardFx = {
   chain: number;
   count: number;
   columns: number[];
+  mega?: boolean;
+};
+type ModeFx = {
+  token: number;
+  kind: "fever" | "overFever" | "final";
+  title: string;
+  detail: string;
 };
 
 const SIZE = 6;
@@ -197,6 +204,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [focusIds, setFocusIds] = useState<Set<number>>(new Set());
   const [actionFx, setActionFx] = useState<ActionFx | null>(null);
   const [boardFx, setBoardFx] = useState<BoardFx | null>(null);
+  const [modeFx, setModeFx] = useState<ModeFx | null>(null);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -211,6 +219,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   const lastTickRef = useRef(performance.now());
   const resolvingRef = useRef(false);
   const actionFxTokenRef = useRef(1);
+  const finalTriggeredRef = useRef(false);
 
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
@@ -227,6 +236,14 @@ export default function PrismOverdrive({ onExit }: Props) {
       if (current < timeStopUntilRef.current || resolvingRef.current) return;
       timeRef.current = Math.max(0, timeRef.current - delta);
       setTimeLeft(timeRef.current);
+      if (!finalTriggeredRef.current && timeRef.current <= FINAL_MS) {
+        finalTriggeredRef.current = true;
+        const token = actionFxTokenRef.current++;
+        setModeFx({ token, kind: "final", title: "FINAL OVERDRIVE", detail: "30 SEC • LIMITER RELEASED" });
+        setLastRank("FINAL OVERDRIVE • ×BOOST");
+        playOverdriveSfx("final", 1.35);
+        window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), 1050);
+      }
       if (comboRef.current > 0 && current > comboExpireRef.current) {
         comboRef.current = 0;
         setCombo(0);
@@ -254,9 +271,9 @@ export default function PrismOverdrive({ onExit }: Props) {
     setFever(0); feverRef.current = 0;
     setJackpot(0); jackpotRef.current = 0; setJackpotFlash(false);
     setUpgrades([]); setUpgradeChoices([]); setRunLevel(0); levelRef.current = 0;
-    setClearingIds(new Set()); setFocusIds(new Set()); setActionFx(null); setBoardFx(null);
+    setClearingIds(new Set()); setFocusIds(new Set()); setActionFx(null); setBoardFx(null); setModeFx(null);
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
-    feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0;
+    feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
     lastTickRef.current = performance.now();
     setMessage("BREAK CLUSTERS • KEEP THE COMBO ALIVE");
   }
@@ -297,15 +314,21 @@ export default function PrismOverdrive({ onExit }: Props) {
       overFeverUntilRef.current = current + OVER_FEVER_MS;
       setLastRank("OVER FEVER!! • ×5");
       setMessage("OVER FEVER • BREAK EVERYTHING");
+      const token = actionFxTokenRef.current++;
+      setModeFx({ token, kind: "overFever", title: "OVER FEVER", detail: "PRISM LIMIT BROKEN • ×5" });
+      window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), 900);
       playSfx("cascade");
-      playOverdriveSfx("fever", 1.25);
+      playOverdriveSfx("fever", 1.35);
     } else if (current >= feverUntilRef.current && next >= 100) {
       next -= 100;
       feverUntilRef.current = current + FEVER_MS;
       setLastRank("PRISM FEVER!! • ×3");
       setMessage("3 COLOR DROP • CASCADE CHANCE UP");
+      const token = actionFxTokenRef.current++;
+      setModeFx({ token, kind: "fever", title: "PRISM FEVER", detail: "3 COLOR DROP • ×3" });
+      window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), 820);
       playSfx("cascade");
-      playOverdriveSfx("fever", 1);
+      playOverdriveSfx("fever", 1.12);
     }
     feverRef.current = clamp(next, 0, 100);
     setFever(feverRef.current);
@@ -420,12 +443,13 @@ export default function PrismOverdrive({ onExit }: Props) {
     setFocusIds(new Set(removed));
     const actionToken = actionFxTokenRef.current++;
     setActionFx({ token: actionToken, kind: liveSeed.type, title: fxTitle, detail: fxDetail, icon: GLYPH[liveSeed.type] });
-    setBoardFx({ token: actionToken, kind: liveSeed.type, phase: "lock", x: impactAnchor.x, y: impactAnchor.y, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns });
+    setBoardFx({ token: actionToken, kind: liveSeed.type, phase: "lock", x: impactAnchor.x, y: impactAnchor.y, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
     await sleep(380);
 
     const scored = scoreCluster(liveSeed.type, removed.size, 0);
     let nextScore = addScore(scored.points, scored.rank);
-    setBoardFx({ token: actionToken + 100000, kind: liveSeed.type, phase: "burst", x: impactAnchor.x, y: impactAnchor.y, points: Math.round(scored.points), chain: 0, count: removed.size, columns: impactAnchor.columns });
+    setBoardFx({ token: actionToken + 100000, kind: liveSeed.type, phase: "burst", x: impactAnchor.x, y: impactAnchor.y, points: Math.round(scored.points), chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
+    if (attackBlast) playOverdriveSfx("mega", Math.min(1.45, 1.08 + removed.size * .025));
     await sleep(230);
     addFever(count * 3 + Math.max(0, count - 4) * 5 + (liveSeed.type === "barrier" ? count * (upgrades.includes("barOvercharge") ? 5 : 2) : 0));
     let charge = jackpotRef.current + (count >= 10 ? 2 : count >= 7 ? 1 : 0);
@@ -441,7 +465,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     let currentTiles = settled.tiles;
     currentQueues = settled.queues;
     setTiles(currentTiles); setQueues(currentQueues); setClearingIds(new Set());
-    setBoardFx({ token: actionToken + 200000, kind: liveSeed.type, phase: "drop", x: impactAnchor.x, y: 91, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns });
+    setBoardFx({ token: actionToken + 200000, kind: liveSeed.type, phase: "drop", x: impactAnchor.x, y: 91, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
     setActionFx(null);
     playOverdriveSfx("drop", Math.min(1.35, .72 + removed.size * .045));
     await sleep(330);
@@ -552,13 +576,13 @@ export default function PrismOverdrive({ onExit }: Props) {
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
-          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""}`}
+          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""}`}
           style={{ left: `calc(${tile.col * (100 / SIZE)}% + 1px)`, top: `calc(${tile.row * (100 / SIZE)}% + 1px)` }}
           disabled={resolving || screen !== "running"}
           aria-label={`${LABEL[tile.type]} cluster panel row ${tile.row + 1} column ${tile.col + 1}`}
           onClick={() => void clearCluster(tile)}
         ><b>{GLYPH[tile.type]}</b><span>{LABEL[tile.type]}</span></button>)}
-        {boardFx ? <div key={boardFx.token} className={styles.spatialFx} data-kind={boardFx.kind} data-phase={boardFx.phase} aria-hidden="true">
+        {boardFx ? <div key={boardFx.token} className={styles.spatialFx} data-kind={boardFx.kind} data-phase={boardFx.phase} data-mega={boardFx.mega ? "true" : "false"} aria-hidden="true">
           {boardFx.phase !== "drop" ? <>
             <i className={styles.impactRing} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }} />
             <i className={styles.impactCore} style={{ left: `${boardFx.x}%`, top: `${boardFx.y}%` }} />
@@ -573,6 +597,10 @@ export default function PrismOverdrive({ onExit }: Props) {
       {jackpotFlash ? <div className={styles.jackpotFlash}><span>PRISM</span><strong>JACKPOT!</strong></div> : null}
       {timeStopped ? <div className={styles.timeStopFx}><i>⏱</i><strong>TIME STOP</strong></div> : null}
     </section>
+
+    {modeFx ? <div key={modeFx.token} className={styles.modeTransform} data-kind={modeFx.kind} aria-hidden="true">
+      <i /><b /><u /><strong>{modeFx.title}</strong><span>{modeFx.detail}</span>
+    </div> : null}
 
     <section className={styles.actionFeed} data-kind={actionFx?.kind ?? "idle"} aria-live="polite">
       {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">

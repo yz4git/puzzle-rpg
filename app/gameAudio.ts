@@ -165,7 +165,7 @@ export function setSfxEnabled(enabled: boolean) {
   sfxEnabled = enabled;
 }
 
-export type OverdriveSfx = "attack" | "cascade" | "fever" | "jackpot" | "upgrade" | "drop";
+export type OverdriveSfx = "attack" | "cascade" | "fever" | "jackpot" | "upgrade" | "drop" | "mega" | "final";
 
 /** Dense arcade-style reward sounds used only by PRISM OVERDRIVE. */
 export function playOverdriveSfx(name: OverdriveSfx, intensity = 1) {
@@ -194,6 +194,21 @@ export function playOverdriveSfx(name: OverdriveSfx, intensity = 1) {
     sweep(980 * pitch, 180 * pitch, t, .085, .035 * k, "triangle");
     tone(120 * pitch, t + .07, .055, .055 * k, "triangle");
     noise(t + .065, .035, .022 * k);
+    return;
+  }
+  if (name === "mega") {
+    tone(62, t, .22, .13 * k, "triangle");
+    sweep(120, 1680, t, .14, .11 * k, "sawtooth");
+    sweep(2400, 260, t + .055, .18, .085 * k, "square");
+    noise(t + .035, .16, .12 * k);
+    arp([659, 988, 1319, 1976], .035, .06 * k, "square");
+    return;
+  }
+  if (name === "final") {
+    tone(55, t, .35, .13 * k, "triangle");
+    sweep(90, 1760, t, .38, .1 * k, "sawtooth");
+    arp([262,392,523,659,784,1047,1319,1568,2093], .042, .07 * k, "square");
+    noise(t + .18, .2, .08 * k);
     return;
   }
   if (name === "fever") {
