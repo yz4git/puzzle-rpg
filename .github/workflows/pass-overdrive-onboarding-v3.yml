@@ -1,0 +1,65 @@
+name: Prism Overdrive Progressive Onboarding v3
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-onboarding-v3.py'
+      - '.github/workflows/pass-overdrive-onboarding-v3.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - run: python3 scripts/pass-overdrive-onboarding-v3.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/onboarding-v3.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Progressive tutorial QA
+        run: |
+          mkdir -p onboarding-v3-qa
+          cat > qa-onboarding-v3.mjs <<'NODE'
+          import {chromium} from 'playwright'; import fs from 'node:fs';
+          const b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); const errors=[]; p.on('pageerror',e=>errors.push(String(e)));
+          await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click(); await p.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor(); const guide=p.locator('[class*="guideBar"]');
+          await p.screenshot({path:'onboarding-v3-qa/01-basic.jpg',type:'jpeg',quality:92});
+          const clickMove=async()=>{const e=board.locator('button:not([disabled])');await e.first().waitFor({timeout:18000});const r=p.locator('[class*="recommended"]:not([disabled])');if(await r.count())await r.first().click();else await e.first().click();await board.locator('button:not([disabled])').first().waitFor({timeout:18000});};
+          await clickMove(); await clickMove();
+          const simpleTarget=await p.locator('[class*="targetCard"] strong').innerText(); await p.screenshot({path:'onboarding-v3-qa/02-target.jpg',type:'jpeg',quality:92});
+          for(let i=0;i<4;i++)await clickMove();
+          const routeStage={guide:await guide.innerText(),hype:await p.locator('[class*="hypeRow"]').count(),scan:await p.locator('[class*="scanCard"]').count(),cash:await p.locator('[class*="cashOut"]').count(),mission:await p.locator('[class*="missionCard"]').count()};
+          await p.screenshot({path:'onboarding-v3-qa/03-route-lesson.jpg',type:'jpeg',quality:92});
+          for(let i=0;i<4;i++){const e=board.locator('button:not([disabled])');await e.first().waitFor({timeout:18000});const route=p.locator('[class*="routeReady"]:not([disabled])');if(await route.count())await route.first().click();else await e.first().click();await board.locator('button:not([disabled])').first().waitFor({timeout:18000});}
+          const full={guide:await guide.innerText(),hype:await p.locator('[class*="hypeRow"]').count(),cash:await p.locator('[class*="cashOut"]').count(),mission:await p.locator('[class*="missionCard"]').count(),charge:await p.locator('[aria-label="Prism charge meters"]').count()};
+          await p.screenshot({path:'onboarding-v3-qa/04-full.jpg',type:'jpeg',quality:92});
+          const firstRec=p.locator('[class*="recommendedLead"]');
+          const result={errors,simpleTarget,routeStage,full,scrollWidth:await p.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await p.evaluate(()=>innerWidth),recommendedLeadCount:await firstRec.count()};
+          fs.writeFileSync('onboarding-v3-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length)throw new Error(errors.join('\n'));
+          if(!/^(ATK|HEAL|BAR|SKIP) ×4\+ BREAK$/.test(simpleTarget))throw new Error(`first target not simple: ${simpleTarget}`);
+          if(!routeStage.guide.includes('STEP 4')||routeStage.hype!==0||routeStage.scan!==1||routeStage.cash!==0||routeStage.mission!==0)throw new Error(`route stage wrong ${JSON.stringify(routeStage)}`);
+          if(!full.guide.includes('FULL SYSTEMS')||full.hype!==1||full.cash!==1||full.mission!==1||full.charge!==1)throw new Error(`full stage wrong ${JSON.stringify(full)}`);
+          if(result.scrollWidth>result.innerWidth)throw new Error('horizontal overflow'); await b.close();
+          NODE
+          node qa-onboarding-v3.mjs
+      - uses: actions/upload-artifact@v4
+        with: {name: prism-overdrive-onboarding-v3-qa, path: onboarding-v3-qa, retention-days: 1}
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-onboarding-v3.py .github/workflows/pass-overdrive-onboarding-v3.yml qa-onboarding-v3.mjs
+          rm -rf onboarding-v3-qa
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Stage Prism Overdrive tutorial systems gradually'
+          git push origin HEAD:main
