@@ -1,0 +1,116 @@
+name: Prism Overdrive Premium VFX
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-premium-vfx.py'
+      - '.github/workflows/pass-overdrive-premium-vfx.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply premium VFX redesign
+        run: python3 scripts/pass-overdrive-premium-vfx.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/overdrive-premium-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Premium visual gameplay QA
+        run: |
+          mkdir -p /tmp/overdrive-premium-qa
+          cat > qa-overdrive-premium.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const errors=[];
+
+          // Normal visual pass first.
+          const normal=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          normal.on('pageerror',e=>errors.push(String(e)));
+          await normal.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await normal.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await normal.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const normalBoard=normal.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await normalBoard.waitFor();
+          await normal.screenshot({path:'/tmp/overdrive-premium-qa/01-normal.jpg',type:'jpeg',quality:92});
+          const backLayers=await normal.locator('[class*="backFx"] > *').count();
+
+          // Deterministic all-ATK board forces cascades and then a jackpot on the second user clear.
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          page.on('pageerror',e=>errors.push(String(e)));
+          await page.addInitScript(()=>{Math.random=()=>0.1});
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          let chainPathSeen=false, jackpotSeen=false, jackpotDropSeen=false;
+
+          async function runClear(){
+            await board.locator('button:not([disabled])').first().click();
+            for(let p=0;p<130;p++){
+              await page.waitForTimeout(70);
+              const path=page.locator('[class*="chainPath"]');
+              if(!chainPathSeen && await path.isVisible().catch(()=>false)){
+                chainPathSeen=true;
+                const lineCount=await path.locator('line').count();
+                if(lineCount<1) throw new Error('cascade path has no links');
+                await page.screenshot({path:'/tmp/overdrive-premium-qa/02-cascade-path.jpg',type:'jpeg',quality:92});
+              }
+              const jackpot=page.locator('[class*="boardWrap"][data-jackpot="true"]');
+              if(!jackpotSeen && await jackpot.isVisible().catch(()=>false)){
+                jackpotSeen=true;
+                await page.screenshot({path:'/tmp/overdrive-premium-qa/03-jackpot-warp.jpg',type:'jpeg',quality:92});
+              }
+              const jackpotDrop=page.locator('[class*="spatialFx"][data-kind="jackpot"][data-phase="drop"]');
+              if(!jackpotDropSeen && await jackpotDrop.isVisible().catch(()=>false)){
+                jackpotDropSeen=true;
+                await page.screenshot({path:'/tmp/overdrive-premium-qa/04-jackpot-rebuild.jpg',type:'jpeg',quality:92});
+              }
+              const enabled=await board.locator('button:not([disabled])').count();
+              if(enabled>0 && p>30) break;
+            }
+          }
+          await runClear();
+          await runClear();
+          await page.screenshot({path:'/tmp/overdrive-premium-qa/05-after.jpg',type:'jpeg',quality:92});
+
+          const b=await board.boundingBox(); const feed=await page.locator('[class*="actionFeed"]').boundingBox();
+          const result={errors,backLayers,chainPathSeen,jackpotSeen,jackpotDropSeen,board:b,feed,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('/tmp/overdrive-premium-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(backLayers<4) throw new Error('background layer incomplete');
+          if(!chainPathSeen) throw new Error('cascade route not observed');
+          if(!jackpotSeen || !jackpotDropSeen) throw new Error(`jackpot transformation incomplete ${JSON.stringify(result)}`);
+          if(b && feed && feed.y < b.y+b.height) throw new Error('action feed overlaps board');
+          if(result.scrollWidth>result.innerWidth) throw new Error('horizontal overflow');
+          await browser.close();
+          NODE
+          node qa-overdrive-premium.mjs
+          rm qa-overdrive-premium.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-premium-vfx-qa
+          path: /tmp/overdrive-premium-qa
+          retention-days: 1
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-premium-vfx.py .github/workflows/pass-overdrive-premium-vfx.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css app/gameAudio.ts scripts .github/workflows
+          git commit -m 'Polish Prism Overdrive panels cascades and jackpot'
+          git push origin HEAD:main
