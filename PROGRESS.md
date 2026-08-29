@@ -379,3 +379,5 @@ are complete.
 - Added 8-bit CSS shield art to BAR panels and a large board-centered barrier impact overlay.
 - Fully blocked attacks show BLOCK; overflow attacks show SHIELD BREAK before remaining HP damage. PIERCE continues to bypass the shield.
 - Chapter battle rules, damage values, enemy intent order, BUILD effects, and reward balance are unchanged.
+
+- PRISM OVERDRIVE: added a third 3-minute hyper-cluster mode with combo, fever/over-fever, auto cascades, jackpot, score-based 3-choice upgrades, time-stop SKIP behavior, final-30-second overdrive, local high score, and an iPhone-safe third mode-select slot.
