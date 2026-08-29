@@ -60,6 +60,7 @@ type PrismTarget = {
   progress: number;
 };
 type ChargeMap = Record<PanelType, number>;
+type RoutePlan = { ids: number[]; projected: number; type: PanelType; column: number } | null;
 
 const SIZE = 6;
 const RUN_MS = 180_000;
@@ -128,6 +129,34 @@ function pickScanColumn(queues: PanelType[][], target: PrismTarget) {
     if (matches.length) return matches[Math.floor(Math.random() * matches.length)]!;
   }
   return Math.floor(Math.random() * SIZE);
+}
+
+function forecastRoute(tiles: Tile[], queues: PanelType[][], scanColumn: number): RoutePlan {
+  const scanType = queues[scanColumn]?.[0];
+  if (!scanType) return null;
+  const seen = new Set<number>();
+  let best: RoutePlan = null;
+  for (const tile of tiles) {
+    if (seen.has(tile.id)) continue;
+    const group = connectedGroup(tiles, tile);
+    group.forEach((item) => seen.add(item.id));
+    const removedInScan = group.filter((item) => item.col === scanColumn);
+    if (removedInScan.length !== 1) continue;
+    const removed = new Set(group.map((item) => item.id));
+    const preview: Tile[] = [];
+    for (let col = 0; col < SIZE; col += 1) {
+      const survivors = tiles.filter((item) => item.col === col && !removed.has(item.id)).sort((a,b)=>b.row-a.row);
+      survivors.forEach((item, index) => preview.push({ ...item, row: SIZE - 1 - index }));
+    }
+    preview.push({ id: -1000 - tile.id, type: scanType, row: 0, col: scanColumn });
+    const landing = preview[preview.length - 1]!;
+    const projected = connectedGroup(preview, landing).length;
+    if (projected < 3) continue;
+    if (!best || projected > best.projected || (projected === best.projected && group.length < best.ids.length)) {
+      best = { ids: group.map((item) => item.id), projected, type: scanType, column: scanColumn };
+    }
+  }
+  return best;
 }
 
 const UPGRADES: UpgradeDef[] = [
@@ -336,6 +365,11 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [target, setTarget] = useState<PrismTarget>(() => makeTarget("build", 1));
   const [scanColumn, setScanColumn] = useState(0);
   const [targetPulse, setTargetPulse] = useState(false);
+  const [missionStreak, setMissionStreak] = useState(0);
+  const [bossCoreHp, setBossCoreHp] = useState(0);
+  const [bossCoreMax, setBossCoreMax] = useState(0);
+  const [bossBreaks, setBossBreaks] = useState(0);
+  const [routePulse, setRoutePulse] = useState(false);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -356,6 +390,10 @@ export default function PrismOverdrive({ onExit }: Props) {
   const bankRef = useRef(0);
   const targetRef = useRef<PrismTarget>(target);
   const targetTokenRef = useRef(2);
+  const missionStreakRef = useRef(0);
+  const bossCoreHpRef = useRef(0);
+  const bossCoreMaxRef = useRef(0);
+  const bossBreaksRef = useRef(0);
 
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
@@ -369,7 +407,10 @@ export default function PrismOverdrive({ onExit }: Props) {
       setNow(current);
       const delta = Math.min(250, current - lastTickRef.current);
       lastTickRef.current = current;
-      if (current < timeStopUntilRef.current || resolvingRef.current) return;
+      if (current < timeStopUntilRef.current || resolvingRef.current) {
+        if (comboRef.current > 0 && comboExpireRef.current > 0) comboExpireRef.current += delta;
+        return;
+      }
       timeRef.current = Math.max(0, timeRef.current - delta);
       setTimeLeft(timeRef.current);
       const nextPhase = phaseForTime(timeRef.current);
@@ -383,6 +424,10 @@ export default function PrismOverdrive({ onExit }: Props) {
           setComboBank(0);
           setLastRank(`BANK LOST • ${lost.toLocaleString()}`);
           setMessage("COMBO BROKE • CASH OUT EARLIER OR KEEP THE CHAIN ALIVE");
+          if (bossCoreHpRef.current <= 0 && missionStreakRef.current > 0) {
+            missionStreakRef.current = 0;
+            setMissionStreak(0);
+          }
           playOverdriveSfx("cash", .62);
         }
       }
@@ -460,12 +505,64 @@ export default function PrismOverdrive({ onExit }: Props) {
     comboRef.current = 0;
     setCombo(0);
     comboExpireRef.current = 0;
+    if (bossCoreHpRef.current <= 0) {
+      missionStreakRef.current = 0;
+      setMissionStreak(0);
+    }
     addScore(payout, `CASH OUT +${payout.toLocaleString()}`);
     const token = actionFxTokenRef.current++;
     setActionFx({ token, kind: "upgrade", title: "BANK SECURED!", detail: `+${payout.toLocaleString()} • COMBO RESET`, icon: "◆$" });
     setMessage("SAFE SCORE LOCKED • START A NEW COMBO");
     playOverdriveSfx("cash", 1.18);
     window.setTimeout(() => setActionFx((value) => value?.token === token ? null : value), 650);
+  }
+
+  function spawnBossCore() {
+    const hp = 4 + Math.min(2, phaseIndex(phaseRef.current));
+    bossCoreMaxRef.current = hp;
+    bossCoreHpRef.current = hp;
+    setBossCoreMax(hp);
+    setBossCoreHp(hp);
+    missionStreakRef.current = 0;
+    setMissionStreak(0);
+    const token = actionFxTokenRef.current++;
+    setModeFx({ token, kind: "overdrive", title: "BOSS CORE ONLINE", detail: `${hp} ARMOR • RELEASE / ROUTE / CHAIN 2+` });
+    setLastRank(`BOSS CORE • HP ${hp}`);
+    setMessage("BREAK THE CORE WITH CHARGE RELEASE • PLANNED ROUTE • CHAIN 2+");
+    playOverdriveSfx("boss", 1.06 + phaseIndex(phaseRef.current) * .08);
+    window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), 980);
+  }
+
+  function damageBossCore(reason: string, amount = 1) {
+    if (bossCoreHpRef.current <= 0) return false;
+    const next = Math.max(0, bossCoreHpRef.current - amount);
+    bossCoreHpRef.current = next;
+    setBossCoreHp(next);
+    if (next > 0) {
+      setLastRank(`CORE HIT • ${reason} • HP ${next}/${bossCoreMaxRef.current}`);
+      setMessage(`BOSS CORE DAMAGED • ${reason}`);
+      playOverdriveSfx("boss", .82 + (bossCoreMaxRef.current - next) * .08);
+      return true;
+    }
+    const bonus = Math.round((9000 + phaseIndex(phaseRef.current) * 4500) * PHASE_META[phaseRef.current].score);
+    addScore(bonus, `BOSS CORE BREAK +${bonus.toLocaleString()}`);
+    addFever(34);
+    const core = Math.min(3, jackpotRef.current + 1);
+    jackpotRef.current = core;
+    setJackpot(core);
+    const boosted = { ...chargeRef.current };
+    TYPES.forEach((type) => { boosted[type] = clamp(boosted[type] + 20, 0, 100); });
+    chargeRef.current = boosted;
+    setCharge(boosted);
+    bossBreaksRef.current += 1;
+    setBossBreaks(bossBreaksRef.current);
+    const token = actionFxTokenRef.current++;
+    setModeFx({ token, kind: "overdrive", title: "BOSS CORE BREAK", detail: `+${bonus.toLocaleString()} • ALL CHARGE +20 • CORE +1` });
+    setLastRank("BOSS CORE DESTROYED!");
+    setMessage("MID-RUN OBJECTIVE CLEARED • PRISM POWER SURGE");
+    playOverdriveSfx("boss", 1.42);
+    window.setTimeout(() => setModeFx((value) => value?.token === token ? null : value), 1050);
+    return true;
   }
 
   function rollTarget(nextQueues: PanelType[][] = queues) {
@@ -484,7 +581,15 @@ export default function PrismOverdrive({ onExit }: Props) {
     jackpotRef.current = core;
     setJackpot(core);
     setTargetPulse(true);
-    setMessage(`TARGET CLEAR • +${reward.toLocaleString()} • PRISM CORE +1`);
+    if (bossCoreHpRef.current <= 0) {
+      const streak = missionStreakRef.current + 1;
+      missionStreakRef.current = streak;
+      setMissionStreak(streak);
+      if (streak >= 3) spawnBossCore();
+      else setMessage(`TARGET CLEAR • +${reward.toLocaleString()} • MISSION STREAK ${streak}/3`);
+    } else {
+      setMessage(`TARGET CLEAR • +${reward.toLocaleString()} • BOSS CORE ACTIVE`);
+    }
     playOverdriveSfx("target", 1.08 + phaseIndex(phaseRef.current) * .08);
     window.setTimeout(() => setTargetPulse(false), 620);
     rollTarget(nextQueues);
@@ -540,7 +645,10 @@ export default function PrismOverdrive({ onExit }: Props) {
     const blankCharge = emptyCharge(); setCharge(blankCharge); chargeRef.current = blankCharge;
     setComboBank(0); bankRef.current = 0;
     setTarget(firstTarget); targetRef.current = firstTarget; targetTokenRef.current = 2;
-    setScanColumn(pickScanColumn(nextQueues, firstTarget)); setTargetPulse(false);
+    setScanColumn(pickScanColumn(nextQueues, firstTarget)); setTargetPulse(false); setRoutePulse(false);
+    setMissionStreak(0); missionStreakRef.current = 0;
+    setBossCoreHp(0); bossCoreHpRef.current = 0; setBossCoreMax(0); bossCoreMaxRef.current = 0;
+    setBossBreaks(0); bossBreaksRef.current = 0;
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
     lastTickRef.current = performance.now();
@@ -665,6 +773,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     resolvingRef.current = true;
     const group = connectedGroup(tiles, liveSeed);
     const count = group.length;
+    const selectedRoute = routePlan && routePlan.ids.includes(liveSeed.id) ? routePlan : null;
     const comboValue = bumpCombo(liveSeed.type, count);
     const chargeMove = manualCharge(liveSeed.type, count);
     let removed = new Set(group.map((tile) => tile.id));
@@ -716,6 +825,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       fxTitle = `CHARGE RELEASE • ${fxTitle}`;
       fxDetail += ` • BANKED ${chargeMove.release}% → ×${chargeMove.multiplier.toFixed(2)}`;
       setLastRank(`CHARGE RELEASE ×${chargeMove.multiplier.toFixed(2)}`);
+      damageBossCore("CHARGE RELEASE");
       playOverdriveSfx("target", 1.12);
     }
 
@@ -756,7 +866,26 @@ export default function PrismOverdrive({ onExit }: Props) {
     await sleep(330);
     setBoardFx(null);
 
-    const cascadeThreshold = clamp((performance.now() < feverUntilRef.current ? 4 : 6) - (upgrades.includes("chainReactor") ? 1 : 0) - PHASE_META[phaseRef.current].cascadeCut, 3, 6);
+    let routeBoost = 0;
+    if (selectedRoute) {
+      const landing = currentTiles.find((item) => item.col === selectedRoute.column && item.row === 0 && item.type === selectedRoute.type);
+      const actual = landing ? connectedGroup(currentTiles, landing).length : 0;
+      if (actual >= 3) {
+        routeBoost = 1;
+        const routeBonus = Math.round((600 + actual * 260) * PHASE_META[phaseRef.current].score);
+        nextScore = addScore(routeBonus, `SCAN ROUTE +${routeBonus.toLocaleString()}`);
+        addBank(routeBonus, comboRef.current, 1);
+        setRoutePulse(true);
+        setLastRank(`PLANNED ROUTE • ${LABEL[selectedRoute.type]} ×${actual}`);
+        setMessage(`SCAN ROUTE CONNECTED • NEXT CASCADE THRESHOLD -1`);
+        damageBossCore("PLANNED ROUTE");
+        playOverdriveSfx("route", 1.04 + actual * .035);
+        await sleep(260);
+        setRoutePulse(false);
+      }
+    }
+
+    const cascadeThreshold = clamp((performance.now() < feverUntilRef.current ? 4 : 6) - (upgrades.includes("chainReactor") ? 1 : 0) - PHASE_META[phaseRef.current].cascadeCut - routeBoost, 3, 6);
     const cascadeCap = PHASE_META[phaseRef.current].cascadeCap;
     for (let depth = 1; depth <= cascadeCap; depth += 1) {
       const auto = largestGroup(currentTiles);
@@ -781,6 +910,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       nextScore = addScore(autoScore.points, `CHAIN ${depth}!`);
       addBank(autoScore.points, comboRef.current, depth);
       advanceCascadeTarget(depth, currentQueues);
+      if (depth >= 2) damageBossCore(`CHAIN ${depth}`);
       nextScore = scoreRef.current;
       setBoardFx({ token: cascadeToken + 100000, kind: "cascade", phase: "burst", x: cascadeAnchor.x, y: cascadeAnchor.y, points: Math.round(autoScore.points), chain: depth, count: auto.length, columns: cascadeAnchor.columns, links: fxLinks(auto) });
       setMessage(`CHAIN ${depth} SCORE +${Math.round(autoScore.points).toLocaleString()}`);
@@ -837,6 +967,8 @@ export default function PrismOverdrive({ onExit }: Props) {
   const comboWindowMs = Math.max(0, comboExpireRef.current - now);
   const comboWindowMax = 2200 + (upgrades.includes("comboCore") ? 900 : 0) + (upgrades.includes("healLink") ? 900 : 0);
   const scanType = queues[scanColumn]?.[0] ?? "attack";
+  const routePlan = useMemo(() => forecastRoute(tiles, queues, scanColumn), [tiles, queues, scanColumn]);
+  const routeIds = useMemo(() => new Set(routePlan?.ids ?? []), [routePlan]);
   const cashValue = Math.round(comboBank * PHASE_META[runPhase].cash);
 
   if (screen === "intro") {
@@ -847,7 +979,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       <div className={styles.introRules}>
         <b>BUILD → AIM → RELEASE → CASH OUT</b>
         <span>SMALL BREAK = CHARGE</span><span>BIG BREAK = RELEASE</span>
-        <span>TARGET CLEAR = PRISM CORE</span><span>SCAN = ONE NEXT COLUMN</span>
+        <span>TARGET ×3 = BOSS CORE</span><span>SCAN ROUTE = PLANNED CHAIN</span>
       </div>
       <button className={styles.start} type="button" onClick={startRun}>▶ START OVERDRIVE</button>
       <small className={styles.record}>HIGH SCORE {highScore.toLocaleString()}</small>
@@ -871,19 +1003,20 @@ export default function PrismOverdrive({ onExit }: Props) {
     <section className={styles.strategyPanel} data-target-pulse={targetPulse ? "true" : "false"} aria-label="Overdrive strategy panel">
       <div className={styles.phaseCard} data-phase={runPhase}><span>PHASE</span><strong>{PHASE_META[runPhase].label}</strong><em>{PHASE_META[runPhase].note}</em></div>
       <div className={styles.targetCard}><span>PRISM TARGET</span><strong>{target.label}</strong><em>{targetProgressText(target)} • +{target.reward.toLocaleString()}</em></div>
-      <div className={styles.scanCard}><span>NEXT SCAN • COL {scanColumn + 1}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>ONLY THIS COLUMN IS REVEALED</em></div>
-      <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SECURE • RESET COMBO" : "BUILD BANK WITH COMBO"}</em></button>
+      <div className={styles.scanCard} data-route={routePlan ? "ready" : "none"}><span>NEXT SCAN • COL {scanColumn + 1}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>{routePlan ? `ROUTE READY → ${LABEL[routePlan.type]} ×${routePlan.projected}` : "NO ROUTE • SHAPE THE COLUMN"}</em></div>
+      <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SECURE • RESET COMBO + STREAK" : "BUILD BANK WITH COMBO"}</em></button>
+      <div className={styles.missionCard} data-boss={bossCoreHp > 0 ? "active" : "idle"} data-breaks={bossBreaks}><span>{bossCoreHp > 0 ? "BOSS CORE" : "MISSION STREAK"}</span><strong>{bossCoreHp > 0 ? `HP ${bossCoreHp}/${bossCoreMax}` : `${"◆".repeat(missionStreak)}${"◇".repeat(3-missionStreak)}  ${missionStreak}/3`}</strong><em>{bossCoreHp > 0 ? "RELEASE • ROUTE • CHAIN 2+" : "3 TARGETS WITHOUT COMBO BREAK"}</em><u><i style={{ width: `${bossCoreHp > 0 ? bossCoreHp / Math.max(1, bossCoreMax) * 100 : missionStreak / 3 * 100}%` }} /></u></div>
       <div className={styles.chargeRow} aria-label="Prism charge meters">{TYPES.map((type) => <span key={type} className={styles.chargeItem} data-type={type} data-value={charge[type]}><i>{GLYPH[type]}</i><b>{charge[type]}</b><u><em style={{ width: `${charge[type]}%` }} /></u></span>)}</div>
     </section>
 
-    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"}>
+    <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"} data-route-pulse={routePulse ? "true" : "false"}>
       <div className={styles.rank}>{lastRank || (resolving ? "BREAK!" : "KEEP MOVING")}</div>
       <div className={styles.board} aria-label="Prism Overdrive Cluster Break board">
         <div className={styles.scanMarker} data-type={scanType} style={{ left: `${(scanColumn + .5) / SIZE * 100}%` }} aria-hidden="true"><b>▼</b><span>{GLYPH[scanType]}</span></div>
         {tiles.map((tile) => <button
           key={tile.id}
           type="button"
-          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""} ${pressedId === tile.id ? styles.pressed : ""}`}
+          className={`${styles.tile} ${styles[tile.type]} ${focusIds.has(tile.id) ? styles.focused : ""} ${clearingIds.has(tile.id) ? styles.clearing : ""} ${boardFx?.phase === "drop" && boardFx.columns.includes(tile.col) ? styles.dropping : ""} ${pressedId === tile.id ? styles.pressed : ""} ${routeIds.has(tile.id) ? styles.routeReady : ""}`}
           style={{
             left: `calc(${tile.col * (100 / SIZE)}% + 1px)`,
             top: `calc(${tile.row * (100 / SIZE)}% + 1px)`,
@@ -925,7 +1058,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     <section className={styles.actionFeed} data-kind={actionFx?.kind ?? "idle"} aria-live="polite">
       {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
         <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
-      </div> : <div className={styles.actionIdle}><b>PLAN THE BREAK</b><span>CHARGE SMALL → HIT TARGET → RELEASE BIG → CASH OUT OR PUSH</span></div>}
+      </div> : <div className={styles.actionIdle}><b>{routePlan ? "ROUTE READY" : "PLAN THE BREAK"}</b><span>{routePlan ? `HIGHLIGHTED BREAK → SCANNED ${LABEL[routePlan.type]} ×${routePlan.projected}` : "CHARGE → TARGET ×3 → BOSS CORE → CASH OUT OR PUSH"}</span></div>}
     </section>
 
     <section className={styles.runInfo}>
@@ -944,7 +1077,7 @@ export default function PrismOverdrive({ onExit }: Props) {
 
     {screen === "finished" ? <div className={styles.overlay} role="dialog" aria-label="Prism Overdrive result">
       <div className={styles.resultCard}><span>RUN COMPLETE</span><strong>{score.toLocaleString()}</strong>{score >= highScore && score > 0 ? <b>NEW RECORD!</b> : null}
-        <div><span>MAX COMBO <b>×{maxCombo}</b></span><span>OVERDRIVE <b>{runLevel}</b></span><span>HIGH SCORE <b>{Math.max(score, highScore).toLocaleString()}</b></span></div>
+        <div><span>MAX COMBO <b>×{maxCombo}</b></span><span>CORE BREAK <b>×{bossBreaks}</b></span><span>HIGH SCORE <b>{Math.max(score, highScore).toLocaleString()}</b></span></div>
         <button type="button" onClick={startRun}>▶ ONE MORE RUN</button><button type="button" onClick={onExit}>◀ MODE SELECT</button>
       </div>
     </div> : null}

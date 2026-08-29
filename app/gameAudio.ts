@@ -165,7 +165,7 @@ export function setSfxEnabled(enabled: boolean) {
   sfxEnabled = enabled;
 }
 
-export type OverdriveSfx = "attack" | "cascade" | "fever" | "jackpot" | "upgrade" | "drop" | "mega" | "final" | "tap" | "rebuild" | "target" | "cash";
+export type OverdriveSfx = "attack" | "cascade" | "fever" | "jackpot" | "upgrade" | "drop" | "mega" | "final" | "tap" | "rebuild" | "target" | "cash" | "route" | "boss";
 
 /** Dense arcade-style reward sounds used only by PRISM OVERDRIVE. */
 export function playOverdriveSfx(name: OverdriveSfx, intensity = 1) {
@@ -174,6 +174,18 @@ export function playOverdriveSfx(name: OverdriveSfx, intensity = 1) {
   if (!c) return;
   const t = c.currentTime;
   const k = Math.max(0.55, Math.min(1.45, intensity));
+  if (name === "boss") {
+    tone(55, t, .22, .12 * k, "triangle");
+    sweep(110, 880, t, .18, .075 * k, "sawtooth");
+    arp([196, 294, 392, 587, 784, 1175], .04, .055 * k, "square");
+    noise(t + .08, .12, .07 * k);
+    return;
+  }
+  if (name === "route") {
+    arp([659, 784, 1047, 1319, 1568].map((note) => note * (.96 + k * .08)), .025, .046 * k, "triangle");
+    sweep(300, 1520, t + .035, .12, .042 * k, "square");
+    return;
+  }
   if (name === "target") {
     const pitch = .96 + k * .12;
     arp([523, 784, 1047, 1568, 2093].map((note) => note * pitch), .032, .055 * k, "square");
