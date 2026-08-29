@@ -166,3 +166,39 @@
 @keyframes pixelBreakPremium{0%{transform:scale(1);opacity:1}32%{transform:scale(1.12);filter:brightness(3)}64%{transform:scale(.78) rotate(2deg)}100%{transform:scale(.08) rotate(-8deg);opacity:0}}
 
 @media(max-height:700px){.tile b{font-size:clamp(19px,6.8vw,28px)}.tile span{font-size:6px}.actionFeed{height:66px}.actionFx{height:62px!important;min-height:62px!important}}
+
+
+/* PASS 43 — SPATIAL IMPACT / DROP VFX */
+/* Transparent, coordinate-bound effects. They never hide the board state. */
+.spatialFx{position:absolute;inset:0;z-index:18;pointer-events:none;overflow:hidden}
+.impactRing,.impactCore{position:absolute;display:block;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+.impactRing{width:18%;aspect-ratio:1;border:3px solid #fff;box-shadow:0 0 12px currentColor,inset 0 0 9px currentColor;animation:impactRingOut 430ms steps(5,end) forwards}
+.impactCore{width:7%;aspect-ratio:1;background:#fff;box-shadow:0 0 18px 6px currentColor;animation:impactCorePop 280ms steps(4,end) forwards}
+.spatialFx[data-kind="attack"]{color:#ff9a31}.spatialFx[data-kind="heal"]{color:#45f5ad}.spatialFx[data-kind="barrier"]{color:#4bddff}.spatialFx[data-kind="skip"]{color:#ffe96a}.spatialFx[data-kind="cascade"]{color:#b26dff}.spatialFx[data-kind="jackpot"]{color:#fff26b}
+.spatialFx[data-phase="lock"] .impactRing{width:13%;animation:lockPulse 360ms steps(4,end) infinite}.spatialFx[data-phase="lock"] .impactCore{width:4%;opacity:.8;animation:lockCore 180ms steps(2,end) infinite alternate}
+@keyframes lockPulse{50%{width:19%;border-color:currentColor;filter:brightness(2)}}
+@keyframes lockCore{to{transform:translate(-50%,-50%) scale(1.7);filter:brightness(2.4)}}
+@keyframes impactRingOut{0%{opacity:1;width:10%;border-width:5px}65%{opacity:.9;width:36%;border-width:3px}100%{opacity:0;width:62%;border-width:1px}}
+@keyframes impactCorePop{0%{opacity:1;transform:translate(-50%,-50%) scale(.45)}45%{opacity:1;transform:translate(-50%,-50%) scale(1.9)}100%{opacity:0;transform:translate(-50%,-50%) scale(3.3)}}
+.shardField{position:absolute;width:1px;height:1px;pointer-events:none}.shardField i{position:absolute;left:-3px;top:-3px;width:7px;height:7px;background:currentColor;box-shadow:0 0 7px currentColor;animation:shardFly 360ms steps(4,end) forwards}.shardField i:nth-child(1){--sx:42px;--sy:-8px}.shardField i:nth-child(2){--sx:31px;--sy:31px}.shardField i:nth-child(3){--sx:2px;--sy:44px}.shardField i:nth-child(4){--sx:-34px;--sy:29px}.shardField i:nth-child(5){--sx:-46px;--sy:-5px}.shardField i:nth-child(6){--sx:-28px;--sy:-37px}.shardField i:nth-child(7){--sx:4px;--sy:-48px}.shardField i:nth-child(8){--sx:34px;--sy:-33px}.shardField i:nth-child(9){--sx:18px;--sy:50px}.shardField i:nth-child(10){--sx:-14px;--sy:49px}@keyframes shardFly{0%{opacity:1;transform:translate(0,0) scale(1.2)}75%{opacity:1;transform:translate(var(--sx),var(--sy)) rotate(90deg) scale(.8)}100%{opacity:0;transform:translate(calc(var(--sx)*1.25),calc(var(--sy)*1.25)) rotate(180deg) scale(.2)}}
+.scorePop{position:absolute;z-index:4;transform:translate(-50%,-50%);font-size:clamp(15px,5.5vw,26px);line-height:1;color:#fff;text-shadow:3px 3px #000,-2px 0 currentColor,2px 0 currentColor,0 -2px currentColor,0 2px currentColor;white-space:nowrap;animation:scoreLaunch 560ms steps(6,end) forwards}@keyframes scoreLaunch{0%{opacity:0;transform:translate(-50%,-20%) scale(.65)}24%{opacity:1;transform:translate(-50%,-75%) scale(1.22)}72%{opacity:1;transform:translate(-50%,-120%) scale(1)}100%{opacity:0;transform:translate(-50%,-175%) scale(.92)}}
+.chainStamp{position:absolute;z-index:5;transform:translate(-50%,70%);font-style:normal;font-weight:1000;font-size:clamp(10px,3.6vw,16px);letter-spacing:.12em;color:#fff578;text-shadow:2px 2px #000,0 0 8px #b76bff;white-space:nowrap;animation:chainStamp 500ms steps(5,end) forwards}@keyframes chainStamp{0%{opacity:0;transform:translate(-50%,70%) scale(.5)}35%{opacity:1;transform:translate(-50%,72%) scale(1.18)}100%{opacity:0;transform:translate(-50%,115%) scale(1)}}
+.dropField{position:absolute;inset:0;display:block}.dropField i{position:absolute;top:-18%;width:6px;height:55%;transform:translateX(-50%);background:linear-gradient(180deg,transparent,currentColor 55%,#fff 88%,transparent);filter:drop-shadow(0 0 4px currentColor);animation:dropTrace 330ms steps(6,end) forwards}.dropField i::after{content:"";position:absolute;left:50%;bottom:-28%;width:34px;height:10px;border:2px solid currentColor;border-radius:50%;transform:translateX(-50%);animation:landRing 330ms steps(4,end) forwards}@keyframes dropTrace{0%{opacity:0;transform:translate(-50%,-25%)}15%{opacity:1}80%{opacity:1;transform:translate(-50%,118%)}100%{opacity:0;transform:translate(-50%,145%)}}@keyframes landRing{0%,60%{opacity:0;transform:translateX(-50%) scale(.3)}78%{opacity:1;transform:translateX(-50%) scale(1.1)}100%{opacity:0;transform:translateX(-50%) scale(1.8)}}
+
+/* Hype tiers make the cabinet itself feel increasingly unstable without obscuring tiles. */
+.shell[data-hype="mid"] .board{box-shadow:0 0 0 2px #000,inset 0 0 0 2px #152c42,0 0 30px rgba(78,224,255,.38)}
+.shell[data-hype="high"] .board{animation:cabinetCharge 950ms steps(3,end) infinite;box-shadow:0 0 0 2px #000,inset 0 0 0 2px #253653,0 0 34px rgba(177,91,255,.48)}
+.shell[data-hype="max"] .board{animation:cabinetCharge 520ms steps(3,end) infinite;box-shadow:0 0 0 2px #000,inset 0 0 0 2px #fff578,0 0 42px rgba(255,245,120,.56)}
+.shell[data-hype="high"]::after,.shell[data-hype="max"]::after{animation:gridDrive 650ms steps(5,end) infinite}.shell[data-hype="max"]::after{animation-duration:360ms}
+@keyframes cabinetCharge{50%{filter:brightness(1.12);transform:scale(1.003)}}@keyframes gridDrive{50%{opacity:.7;transform:translateY(2px)}}
+
+/* Different impact families get different shard silhouettes. */
+.spatialFx[data-kind="attack"] .shardField i{width:9px;height:5px;transform:skewX(-22deg)}
+.spatialFx[data-kind="heal"] .shardField i{width:6px;height:6px;border-radius:50%}
+.spatialFx[data-kind="barrier"] .shardField i{width:6px;height:9px;transform:rotate(45deg)}
+.spatialFx[data-kind="skip"] .shardField i{width:8px;height:3px}
+.spatialFx[data-kind="cascade"] .impactRing{border-style:double;border-width:5px}.spatialFx[data-kind="cascade"] .shardField i:nth-child(even){background:#68efff}.spatialFx[data-kind="cascade"] .shardField i:nth-child(odd){background:#fff578}
+.spatialFx[data-kind="jackpot"] .impactRing{width:20%;border-width:6px;animation-duration:620ms}.spatialFx[data-kind="jackpot"] .impactCore{width:11%;animation-duration:480ms}.spatialFx[data-kind="jackpot"] .shardField i{background:#fff578;box-shadow:0 0 10px #fff578}
+
+@media(max-height:700px){.scorePop{font-size:17px}.chainStamp{font-size:11px}.dropField i{height:48%}}
+@media(prefers-reduced-motion:reduce){.impactRing,.impactCore,.shardField i,.scorePop,.chainStamp,.dropField i,.dropField i::after{animation-duration:1ms!important}.shell[data-hype="high"] .board,.shell[data-hype="max"] .board,.shell[data-hype="high"]::after,.shell[data-hype="max"]::after{animation:none!important}}
