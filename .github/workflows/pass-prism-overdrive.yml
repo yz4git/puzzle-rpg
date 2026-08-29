@@ -19,7 +19,7 @@ jobs:
         run: python3 scripts/pass-prism-overdrive-integrate.py
       - name: Source assertions
         run: |
-          grep -q 'PRISM OVERDRIVE' app/PrismOverdrive.tsx
+          grep -q '3 MINUTE HYPER CLUSTER' app/PrismOverdrive.tsx
           grep -q 'UPGRADE_THRESHOLDS' app/PrismOverdrive.tsx
           grep -q 'PRISM JACKPOT' app/PrismOverdrive.tsx
           grep -q 'FINAL_MS' app/PrismOverdrive.tsx
@@ -63,13 +63,14 @@ jobs:
           await board.waitFor({ state: 'visible' });
           for (let i = 0; i < 18; i += 1) {
             const buttons = board.locator('button:not([disabled])');
-            if (await buttons.count() === 0) { await page.waitForTimeout(160); continue; }
-            await buttons.nth(i % Math.max(1, await buttons.count())).click();
-            await page.waitForTimeout(170);
+            const count = await buttons.count();
+            if (count === 0) { await page.waitForTimeout(180); continue; }
+            await buttons.nth(i % count).click();
+            await page.waitForTimeout(190);
             const choose = page.getByRole('dialog', { name: /Choose Overdrive upgrade/ });
             if (await choose.isVisible().catch(() => false)) {
               await choose.locator('button').first().click();
-              await page.waitForTimeout(80);
+              await page.waitForTimeout(100);
             }
           }
           const scoreText = await page.locator('header').locator('div').nth(0).locator('strong').textContent();
