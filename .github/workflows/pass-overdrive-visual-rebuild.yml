@@ -1,0 +1,76 @@
+name: Prism Overdrive Visual Reconstruction
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-visual-rebuild.py'
+      - '.github/workflows/pass-overdrive-visual-rebuild.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply visual reconstruction
+        run: python3 scripts/pass-overdrive-visual-rebuild.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/overdrive-visual-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Visual QA
+        run: |
+          mkdir -p /tmp/overdrive-visual-qa
+          cat > qa-overdrive-visual.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          await page.screenshot({path:'/tmp/overdrive-visual-qa/visual-start.jpg',type:'jpeg',quality:92});
+          for(let i=0;i<18;i++){
+            const buttons=board.locator('button:not([disabled])'); const n=await buttons.count();
+            if(n){await buttons.nth((i*5)%n).click(); await page.waitForTimeout(760);}
+          }
+          await page.screenshot({path:'/tmp/overdrive-visual-qa/visual-play.jpg',type:'jpeg',quality:92});
+          const atk=page.locator('[class*="tile"][class*="attack"]').first();
+          const heal=page.locator('[class*="tile"][class*="heal"]').first();
+          const atkColor=await atk.evaluate(el=>getComputedStyle(el).getPropertyValue('--edge'));
+          const healColor=await heal.evaluate(el=>getComputedStyle(el).getPropertyValue('--edge'));
+          const result={errors,atkColor,healColor,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('/tmp/overdrive-visual-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length) throw new Error(errors.join('\n'));
+          if(atkColor===healColor) throw new Error('ATK and HEAL colors are not separated');
+          if(result.scrollWidth>result.innerWidth) throw new Error('horizontal overflow');
+          await browser.close();
+          NODE
+          node qa-overdrive-visual.mjs
+          rm qa-overdrive-visual.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-visual-reconstruction-qa
+          path: /tmp/overdrive-visual-qa
+          retention-days: 1
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-visual-rebuild.py .github/workflows/pass-overdrive-visual-rebuild.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Reconstruct Prism Overdrive visual identity'
+          git push origin HEAD:main
