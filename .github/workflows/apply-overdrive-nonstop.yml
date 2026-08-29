@@ -20,25 +20,21 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('app/PrismOverdrive.tsx')
           s=p.read_text()
           def rep(old,new,label):
               global s
-              if old not in s:
-                  raise SystemExit(f'MISSING {label}')
+              if old not in s: raise SystemExit(f'MISSING {label}')
               s=s.replace(old,new,1)
+          def sub(pattern,new,label):
+              global s
+              s,n=re.subn(pattern,new,s,count=1,flags=re.S)
+              if n != 1: raise SystemExit(f'MISSING {label}: {n}')
 
           rep('if (upgradeChoices.length > 0 || current < timeStopUntilRef.current) return;', 'if (current < timeStopUntilRef.current) return;', 'timer choice pause')
           rep('}, [screen, upgradeChoices.length]);', '}, [screen]);', 'timer deps')
-          rep('''  function maybeOfferUpgrade(nextScore: number) {
-            const threshold = UPGRADE_THRESHOLDS[levelRef.current];
-            if (threshold == null || nextScore < threshold || upgradeChoices.length > 0) return;
-            const choices = chooseUpgrades(upgrades);
-            if (choices.length === 0) return;
-            setUpgradeChoices(choices);
-            setMessage("OVERDRIVE READY • CHOOSE 1");
-            playSfx("skill");
-          }''','''  function maybeOfferUpgrade(nextScore: number) {
+          sub(r'  function maybeOfferUpgrade\(nextScore: number\) \{.*?\n  \}\n\n(?=  function pickUpgrade)', '''  function maybeOfferUpgrade(nextScore: number) {
             const threshold = UPGRADE_THRESHOLDS[levelRef.current];
             if (threshold == null || nextScore < threshold) return;
             const picked = chooseUpgrades(upgrades)[0];
@@ -49,7 +45,9 @@ jobs:
             setLastRank(`LEVEL ${levelRef.current} • ${picked.name}!`);
             setMessage(`${picked.name} AUTO INSTALLED • KEEP BREAKING`);
             playSfx("skill");
-          }''','auto upgrade')
+          }
+
+''', 'auto upgrade')
           rep('if (screen !== "running" || resolving || upgradeChoices.length > 0 || timeRef.current <= 0) return;', 'if (screen !== "running" || resolving || timeRef.current <= 0) return;', 'clear guard')
           rep('setMessage(`TIME STOP ${Math.round(stopMs / 100) / 10}s • +${(addedMs / 1000).toFixed(1)}s`);', 'setLastRank(`TIME STOP! • +${(addedMs / 1000).toFixed(1)} SEC`);\n      setMessage(`SKIP ×${count} • CLOCK FROZEN • KEEP AIMING`);', 'skip feedback')
           rep('setMessage(`FEVER BANK +${count}`);', 'setLastRank(`FEVER +${count * (upgrades.includes("barOvercharge") ? 5 : 2)}`);\n      setMessage(`BAR ×${count} • FEVER CHARGE`);', 'bar feedback')
@@ -113,19 +111,16 @@ jobs:
           const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
           await board.waitFor();
           await page.screenshot({path:'/tmp/overdrive-qa/01-start.jpg',type:'jpeg',quality:88});
-          let maxLevel=0;
           for(let i=0;i<85;i++){
             if(await page.getByRole('dialog',{name:/Choose Overdrive upgrade/}).isVisible().catch(()=>false)) throw new Error('upgrade choice interrupted gameplay');
             const buttons=board.locator('button:not([disabled])');
             const n=await buttons.count();
             if(n){await buttons.nth((i*11)%n).click(); await page.waitForTimeout(145);} else await page.waitForTimeout(90);
-            const text=await page.locator('body').innerText();
-            const m=text.match(/LEVEL\s+(\d+)/); if(m) maxLevel=Math.max(maxLevel,Number(m[1]));
             if(i===35) await page.screenshot({path:'/tmp/overdrive-qa/02-mid.jpg',type:'jpeg',quality:88});
           }
           await page.screenshot({path:'/tmp/overdrive-qa/03-late.jpg',type:'jpeg',quality:88});
           const body=await page.locator('body').innerText();
-          const data={errors,maxLevel,hasChoose1:body.includes('CHOOSE 1'),bodyText:body,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          const data={errors,hasChoose1:body.includes('CHOOSE 1'),bodyText:body,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
           fs.writeFileSync('/tmp/overdrive-qa/review.json',JSON.stringify(data,null,2));
           if(errors.length) throw new Error(errors.join('\n'));
           if(body.includes('CHOOSE 1')) throw new Error('CHOOSE 1 still rendered');
