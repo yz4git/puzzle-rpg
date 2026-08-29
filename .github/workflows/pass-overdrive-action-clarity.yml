@@ -32,7 +32,7 @@ jobs:
       - name: Visual gameplay QA
         run: |
           mkdir -p /tmp/overdrive-clarity-qa
-          cat > /tmp/qa.mjs <<'NODE'
+          cat > qa-overdrive-clarity.mjs <<'NODE'
           import { chromium } from 'playwright';
           import fs from 'node:fs';
           const browser=await chromium.launch({headless:true});
@@ -64,7 +64,8 @@ jobs:
           if(!actionSeen) throw new Error('action feedback was never visible');
           await browser.close();
           NODE
-          node /tmp/qa.mjs
+          node qa-overdrive-clarity.mjs
+          rm qa-overdrive-clarity.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: prism-overdrive-action-clarity-qa
