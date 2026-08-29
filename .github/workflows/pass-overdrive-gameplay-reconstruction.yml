@@ -1,0 +1,150 @@
+name: Prism Overdrive Gameplay Reconstruction
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-gameplay-reconstruction.py'
+      - '.github/workflows/pass-overdrive-gameplay-reconstruction.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply Gameplay Reconstruction Pass
+        run: python3 scripts/pass-overdrive-gameplay-reconstruction.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/gameplay-reconstruction-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Gameplay reconstruction QA
+        run: |
+          mkdir -p /tmp/gameplay-reconstruction-qa
+          cat > qa-gameplay-reconstruction.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser = await chromium.launch({headless:true});
+          const errors=[];
+
+          function parseCells(labels){
+            return labels.map((label,i)=>{const m=label?.match(/^(ATK|HEAL|BAR|SKIP).*row (\d+) column (\d+)$/);return m?{i,type:m[1],r:+m[2]-1,c:+m[3]-1}:null}).filter(Boolean);
+          }
+          function groups(cells){
+            const map=new Map(cells.map(x=>[`${x.r}:${x.c}`,x]));const seen=new Set(),out=[];
+            for(const cell of cells){const key=`${cell.r}:${cell.c}`;if(seen.has(key))continue;const stack=[cell],g=[];seen.add(key);while(stack.length){const x=stack.pop();g.push(x);for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){const k=`${x.r+dr}:${x.c+dc}`,y=map.get(k);if(y&&y.type===cell.type&&!seen.has(k)){seen.add(k);stack.push(y)}}}out.push(g)}return out;
+          }
+
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]');
+          await board.waitFor();
+          const strategy=page.locator('[aria-label="Overdrive strategy panel"]');
+          await strategy.waitFor();
+          const chargeCount=await page.locator('[class*="chargeItem"]').count();
+          const oldNextCount=await page.locator('[aria-label="Overdrive next drop map"]').count();
+          const scanCount=await page.locator('[class*="scanCard"]').count();
+          await page.screenshot({path:'/tmp/gameplay-reconstruction-qa/01-strategy.jpg',type:'jpeg',quality:92});
+
+          let smallClearSeen=false, chargedType='', chargeAfter=0, bankAfter=0, cashOutWorked=false;
+          for(let attempt=0;attempt<14&&!smallClearSeen;attempt++){
+            const buttons=board.locator('button:not([disabled])'); const n=await buttons.count(); const labels=[];
+            for(let i=0;i<n;i++) labels.push(await buttons.nth(i).getAttribute('aria-label'));
+            const gs=groups(parseCells(labels)).filter(g=>g.length>=1&&g.length<=4).sort((a,b)=>b.length-a.length);
+            if(gs.length){
+              const g=gs[0], first=g[0]; chargedType=first.type;
+              const typeMap={ATK:'attack',HEAL:'heal',BAR:'barrier',SKIP:'skip'};
+              const dataType=typeMap[chargedType];
+              await buttons.nth(first.i).click();
+              await board.locator('button:not([disabled])').first().waitFor({timeout:15000});
+              chargeAfter=Number(await page.locator(`[class*="chargeItem"][data-type="${dataType}"]`).getAttribute('data-value'));
+              const cash=page.locator('[class*="cashOut"]');
+              const cashText=await cash.innerText();
+              bankAfter=Number((cashText.match(/\+([\d,]+)/)?.[1]??'0').replaceAll(',',''));
+              if(chargeAfter>0&&bankAfter>0){
+                smallClearSeen=true;
+                await page.screenshot({path:'/tmp/gameplay-reconstruction-qa/02-charge-bank.jpg',type:'jpeg',quality:92});
+                await cash.click();
+                await page.waitForTimeout(120);
+                const afterText=await cash.innerText();
+                const afterValue=Number((afterText.match(/\+([\d,]+)/)?.[1]??'0').replaceAll(',',''));
+                cashOutWorked=afterValue===0;
+              }
+            }
+            if(!smallClearSeen){await page.reload({waitUntil:'networkidle'});await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();await page.getByRole('button',{name:/START OVERDRIVE/}).click();await board.waitFor();}
+          }
+
+          // Deterministic all-ATK board: first clear must hit a color target, proving TARGET -> CORE reward path.
+          const targetPage=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          targetPage.on('pageerror',e=>errors.push(String(e)));
+          await targetPage.addInitScript(()=>{Math.random=()=>0.1});
+          await targetPage.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await targetPage.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await targetPage.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const targetBoard=targetPage.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await targetBoard.waitFor();
+          await targetBoard.locator('button:not([disabled])').first().click();
+          let targetPulseSeen=false;
+          for(let i=0;i<22;i++){await targetPage.waitForTimeout(55);const pulse=targetPage.locator('[aria-label="Overdrive strategy panel"][data-target-pulse="true"]');if(await pulse.isVisible().catch(()=>false)){targetPulseSeen=true;await targetPage.screenshot({path:'/tmp/gameplay-reconstruction-qa/03-target-clear.jpg',type:'jpeg',quality:92});break;}}
+
+          // Accelerated clock verifies all three rule escalations after BUILD.
+          const phasePage=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          phasePage.on('pageerror',e=>errors.push(String(e)));
+          await phasePage.addInitScript(()=>{
+            const real=window.setInterval.bind(window);
+            Object.defineProperty(window,'setInterval',{configurable:true,value:(fn,ms,...args)=>real(fn,Math.min(Number(ms)||0,5),...args)});
+          });
+          await phasePage.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await phasePage.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await phasePage.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const phaseCard=phasePage.locator('[class*="phaseCard"]');
+          let accelSeen=false,overSeen=false,finalSeen=false;
+          for(let i=0;i<950;i++){
+            await phasePage.waitForTimeout(5);
+            const text=(await phaseCard.innerText()).toUpperCase();
+            if(!accelSeen&&text.includes('ACCEL')){accelSeen=true;await phasePage.screenshot({path:'/tmp/gameplay-reconstruction-qa/04-accel.jpg',type:'jpeg',quality:90});}
+            if(!overSeen&&text.includes('OVERDRIVE')){overSeen=true;await phasePage.screenshot({path:'/tmp/gameplay-reconstruction-qa/05-overdrive.jpg',type:'jpeg',quality:90});}
+            if(!finalSeen&&text.includes('FINAL')){finalSeen=true;await phasePage.screenshot({path:'/tmp/gameplay-reconstruction-qa/06-final.jpg',type:'jpeg',quality:92});break;}
+          }
+
+          const b=await board.boundingBox(); const feed=await page.locator('[class*="actionFeed"]').boundingBox();
+          const result={errors,chargeCount,oldNextCount,scanCount,smallClearSeen,chargedType,chargeAfter,bankAfter,cashOutWorked,targetPulseSeen,accelSeen,overSeen,finalSeen,board:b,feed,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('/tmp/gameplay-reconstruction-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length)throw new Error(errors.join('\n'));
+          if(chargeCount!==4||oldNextCount!==0||scanCount!==1)throw new Error(`strategy UI invalid ${JSON.stringify(result)}`);
+          if(!smallClearSeen||!cashOutWorked)throw new Error(`charge/bank loop failed ${JSON.stringify(result)}`);
+          if(!targetPulseSeen)throw new Error(`target reward not observed ${JSON.stringify(result)}`);
+          if(!accelSeen||!overSeen||!finalSeen)throw new Error(`phase escalation incomplete ${JSON.stringify(result)}`);
+          if(b&&feed&&feed.y<b.y+b.height)throw new Error('action feed overlaps board');
+          if(result.scrollWidth>result.innerWidth)throw new Error('horizontal overflow');
+          await browser.close();
+          NODE
+          node qa-gameplay-reconstruction.mjs
+          rm qa-gameplay-reconstruction.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-gameplay-reconstruction-qa
+          path: /tmp/gameplay-reconstruction-qa
+          retention-days: 1
+      - name: Commit implementation and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-gameplay-reconstruction.py
+          rm -f .github/workflows/pass-overdrive-gameplay-reconstruction.yml
+          rm -f .github/workflows/review-overdrive-gameplay.yml
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css app/gameAudio.ts scripts .github/workflows
+          git commit -m 'Reconstruct Prism Overdrive gameplay strategy'
+          git push origin HEAD:main
