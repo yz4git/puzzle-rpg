@@ -1,0 +1,131 @@
+name: Prism Overdrive Route Mission Final
+on:
+  push:
+    paths:
+      - '.github/workflows/pass-overdrive-route-mission-final.yml'
+jobs:
+  final:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Apply route mission implementation
+        run: |
+          python3 scripts/pass-overdrive-route-mission.py
+          python3 scripts/pass-overdrive-route-mission-fix.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/route-mission-final-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+      - name: Planned route and Boss Core QA
+        run: |
+          mkdir -p /tmp/route-mission-final-qa
+          cat > qa-route-mission-final.mjs <<'NODE'
+          import {chromium} from 'playwright';
+          import fs from 'node:fs';
+          const browser=await chromium.launch({headless:true});
+          const errors=[];
+
+          const page=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const board=page.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+          const strategy=page.locator('[aria-label="Overdrive strategy panel"]');
+          let routeSeen=false,routeExecuted=false;
+          for(let turn=0;turn<32;turn++){
+            await board.locator('button:not([disabled])').first().waitFor({timeout:15000});
+            const ready=page.locator('[class*="routeReady"]:not([disabled])');
+            if(await ready.count()>0){
+              routeSeen=true;
+              await page.screenshot({path:'/tmp/route-mission-final-qa/01-route-ready.jpg',type:'jpeg',quality:92});
+              await ready.first().click();
+              for(let i=0;i<100;i++){
+                await page.waitForTimeout(45);
+                const text=(await page.locator('body').innerText()).toUpperCase();
+                if(text.includes('PLANNED ROUTE')||text.includes('SCAN ROUTE CONNECTED')){
+                  routeExecuted=true;
+                  await page.screenshot({path:'/tmp/route-mission-final-qa/02-route-hit.jpg',type:'jpeg',quality:92});
+                  break;
+                }
+                if(await board.locator('button:not([disabled])').count()>0&&i>35) break;
+              }
+              if(routeExecuted) break;
+            }else{
+              await board.locator('button:not([disabled])').first().click();
+              await board.locator('button:not([disabled])').first().waitFor({timeout:15000});
+            }
+          }
+
+          // Fixed all-ATK board produces repeatable target clears. The combo clock must stay
+          // frozen during long cascade animations so Mission Streak can reach 3/3.
+          const boss=await browser.newPage({viewport:{width:402,height:874},deviceScaleFactor:1});
+          boss.on('pageerror',e=>errors.push(String(e)));
+          await boss.addInitScript(()=>{Math.random=()=>0.1});
+          await boss.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+          await boss.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+          await boss.getByRole('button',{name:/START OVERDRIVE/}).click();
+          const bb=boss.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await bb.waitFor();
+          const mission=boss.locator('[class*="missionCard"]');
+          let bossSpawned=false,bossBroken=false,maxStreakText='';
+          for(let turn=0;turn<6;turn++){
+            await bb.locator('button:not([disabled])').first().waitFor({timeout:18000});
+            await bb.locator('button:not([disabled])').first().click();
+            for(let i=0;i<180;i++){
+              await boss.waitForTimeout(50);
+              const txt=(await mission.innerText()).trim(); if(txt.length>maxStreakText.length)maxStreakText=txt;
+              if(!bossSpawned && await boss.locator('[class*="missionCard"][data-boss="active"]').isVisible().catch(()=>false)){
+                bossSpawned=true;
+                await boss.screenshot({path:'/tmp/route-mission-final-qa/03-boss-core.jpg',type:'jpeg',quality:92});
+              }
+              const breaks=Number(await mission.getAttribute('data-breaks')||0);
+              if(breaks>0){
+                bossBroken=true;
+                await boss.screenshot({path:'/tmp/route-mission-final-qa/04-core-break.jpg',type:'jpeg',quality:92});
+                break;
+              }
+              if(await bb.locator('button:not([disabled])').count()>0&&i>45) break;
+            }
+            if(bossBroken) break;
+          }
+
+          const b=await board.boundingBox(); const feed=await page.locator('[class*="actionFeed"]').boundingBox(); const sb=await strategy.boundingBox();
+          const result={errors,routeSeen,routeExecuted,bossSpawned,bossBroken,maxStreakText,strategyHeight:sb?.height,scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth),innerWidth:await page.evaluate(()=>innerWidth),board:b,feed};
+          fs.writeFileSync('/tmp/route-mission-final-qa/review.json',JSON.stringify(result,null,2));
+          if(errors.length)throw new Error(errors.join('\n'));
+          if(!routeSeen||!routeExecuted)throw new Error(`planned route not verified ${JSON.stringify(result)}`);
+          if(!bossSpawned||!bossBroken)throw new Error(`boss loop incomplete ${JSON.stringify(result)}`);
+          if(result.scrollWidth>result.innerWidth)throw new Error('horizontal overflow');
+          if(b&&feed&&feed.y<b.y+b.height)throw new Error('action feed overlaps board');
+          await browser.close();
+          NODE
+          node qa-route-mission-final.mjs
+          rm qa-route-mission-final.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-route-mission-final-qa
+          path: /tmp/route-mission-final-qa
+          retention-days: 1
+      - name: Commit implementation and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-route-mission.py scripts/pass-overdrive-route-mission-fix.py
+          rm -f .github/workflows/pass-overdrive-route-mission.yml .github/workflows/pass-overdrive-route-mission-final.yml
+          rm -f docs/.route-mission-pass-start.txt
+          git config user.name 'yz4git'
+          git config user.email '65384484+yz4git@users.noreply.github.com'
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css app/gameAudio.ts scripts .github/workflows docs
+          git commit -m 'Add planned routes and Boss Core loop to Prism Overdrive'
+          git push origin HEAD:main
