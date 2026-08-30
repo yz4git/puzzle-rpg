@@ -45,5 +45,6 @@ p=Path('app/PrismOverdrive.module.css')
 c=p.read_text()
 marker='PASS 53 — ONE-TIME ONBOARDING / VETERAN FLOW'
 if marker not in c:
-    c += '''\n\n/* PASS 53 — ONE-TIME ONBOARDING / VETERAN FLOW */\n.guideBar[data-learned="true"]{min-height:30px!important;padding-block:3px!important;border-color:#344b61!important;background:#040a11!important}.guideBar[data-learned="true"] strong{font-size:7px!important;color:#75f6ff!important}.guideBar[data-learned="true"] span{font-size:5px!important;color:#8297ac!important}.guideBar[data-learned="true"] button{width:26px!important;height:26px!important;font-size:14px!important}.strategyRouteLesson+.boardWrap{}\n@media(max-height:700px){.guideBar[data-learned="true"]{min-height:26px!important}.guideBar[data-learned="true"] button{width:23px!important;height:23px!important}}\n'''
+    c += '''\n\n/* PASS 53 — ONE-TIME ONBOARDING / VETERAN FLOW */\n.guideBar[data-learned="true"]{min-height:30px!important;padding-block:3px!important;border-color:#344b61!important;background:#040a11!important}.guideBar[data-learned="true"] strong{font-size:7px!important;color:#75f6ff!important}.guideBar[data-learned="true"] span{font-size:5px!important;color:#8297ac!important}.guideBar[data-learned="true"] button{width:26px!important;height:26px!important;font-size:14px!important}\n@media(max-height:700px){.guideBar[data-learned="true"]{min-height:26px!important}.guideBar[data-learned="true"] button{width:23px!important;height:23px!important}}\n'''
 p.write_text(c)
+# trigger persistent onboarding QA
