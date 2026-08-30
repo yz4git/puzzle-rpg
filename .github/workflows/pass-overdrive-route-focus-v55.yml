@@ -1,0 +1,63 @@
+name: Prism Overdrive Route Focus v55
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-route-focus-v55.py'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - name: Apply route focus
+        run: python3 scripts/pass-overdrive-route-focus-v55.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+      - name: Route focus QA
+        run: |
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/route55.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+          mkdir -p /tmp/route55-qa
+          cat > qa-route-v55.mjs <<'NODE'
+          import {chromium} from 'playwright'; import fs from 'node:fs';
+          const r={errors:[],route:{},full:{},scrollWidth:0,innerWidth:0}; let b;
+          const wait=async(board)=>{await board.locator('button:not([disabled])').first().waitFor({timeout:18000}); await new Promise(x=>setTimeout(x,80));};
+          try{
+            b=await chromium.launch({headless:true}); const p=await b.newPage({viewport:{width:402,height:874}}); p.on('pageerror',e=>r.errors.push(String(e)));
+            await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'}); await p.evaluate(()=>localStorage.removeItem('puzzle-rpg:prism-overdrive:onboarding:v1')); await p.reload({waitUntil:'networkidle'});
+            await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click(); await p.getByRole('button',{name:/START OVERDRIVE/}).click();
+            const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+            for(let i=0;i<6;i++){const rec=p.locator('[class*="recommendedLead"]:not([disabled])'); await wait(board); if(await rec.count()) await rec.first().click(); else await board.locator('button:not([disabled])').first().click(); await wait(board);}
+            r.route.targetCards=await p.locator('[class*="targetCard"]').count(); r.route.scanCards=await p.locator('[class*="scanCard"]').count(); r.route.guide=(await p.locator('[class*="guideBar"] strong').textContent()||'').trim();
+            if(r.route.targetCards!==0) r.errors.push(`route lesson target cards ${r.route.targetCards}`); if(r.route.scanCards!==1) r.errors.push(`route lesson scan cards ${r.route.scanCards}`);
+            await p.screenshot({path:'/tmp/route55-qa/01-route-only.jpg',type:'jpeg',quality:92});
+            for(let i=0;i<4;i++){await wait(board); const card=p.locator('[class*="scanCard"]'); const route=await card.getAttribute('data-route'); if(route==='ready'){const rr=p.locator('[class*="routeReady"]:not([disabled])'); if(await rr.count()) await rr.first().click(); else await board.locator('button:not([disabled])').first().click();} else {const txt=(await card.textContent()||''); const m=txt.match(/SCANNED COLUMN\s+(\d+)/i); const col=m?Number(m[1]):1; const c=board.locator(`button[aria-label$="column ${col}"]:not([disabled])`).first(); if(await c.count()) await c.click(); else await board.locator('button:not([disabled])').first().click();} await wait(board);}
+            r.full.hype=await p.locator('[class*="hypeRow"]').count(); r.full.target=await p.locator('[class*="targetCard"]').count(); r.full.cash=await p.locator('[class*="cashOut"]').count();
+            if(r.full.hype!==1||r.full.target!==1||r.full.cash!==1) r.errors.push(`full systems missing ${JSON.stringify(r.full)}`);
+            await p.screenshot({path:'/tmp/route55-qa/02-full-systems.jpg',type:'jpeg',quality:92});
+            r.scrollWidth=await p.evaluate(()=>document.documentElement.scrollWidth); r.innerWidth=await p.evaluate(()=>innerWidth); if(r.scrollWidth>r.innerWidth)r.errors.push('horizontal overflow');
+          }catch(e){r.errors.push(String(e));} finally{fs.writeFileSync('/tmp/route55-qa/review.json',JSON.stringify(r,null,2)); if(b)await b.close();}
+          if(r.errors.length)process.exitCode=1;
+          NODE
+          node qa-route-v55.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: prism-overdrive-route-focus-v55-qa, path: /tmp/route55-qa, retention-days: 1}
+      - name: Commit and cleanup
+        if: success()
+        run: |
+          rm -f scripts/pass-overdrive-route-focus-v55.py .github/workflows/pass-overdrive-route-focus-v55.yml qa-route-v55.mjs
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Focus Prism Overdrive route tutorial'
+          git push origin HEAD:main
