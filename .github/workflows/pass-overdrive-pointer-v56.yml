@@ -1,0 +1,105 @@
+name: Prism Overdrive Beginner Pointer v56
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-pointer-v56.py'
+      - '.github/workflows/pass-overdrive-pointer-v56.yml'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - name: Apply pointer polish
+        run: python3 scripts/pass-overdrive-pointer-v56.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+      - name: Progressive onboarding visual QA
+        run: |
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/overdrive-v56.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+          mkdir -p /tmp/overdrive-v56
+          cat > qa-overdrive-v56.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 402, height: 874 } });
+          const review = { errors: [], stages: {}, pointer: {}, scrollWidth: 0, innerWidth: 0 };
+          page.on('pageerror', e => review.errors.push(String(e)));
+          const boardSel = '[aria-label="Prism Overdrive Cluster Break board"]';
+          async function settle() {
+            await page.waitForTimeout(140);
+            await page.waitForFunction((sel) => {
+              const board = document.querySelector(sel);
+              return !!board && [...board.querySelectorAll('button')].some((b) => !b.disabled);
+            }, boardSel, { timeout: 25000 });
+          }
+          async function move(preferRoute = false) {
+            const board = page.locator(boardSel);
+            let pick = preferRoute ? page.locator('[class*="routeReady"]:not([disabled])').first() : page.locator('[class*="recommendedLead"]:not([disabled])').first();
+            if (await pick.count() === 0) pick = board.locator('button:not([disabled])').first();
+            await pick.click();
+            await settle();
+          }
+          try {
+            await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle' });
+            await page.getByRole('button', { name: /PRISM OVERDRIVE/ }).click();
+            await page.getByRole('button', { name: /START OVERDRIVE/ }).click();
+            const board = page.locator(boardSel); await board.waitFor(); await settle();
+            const lead = page.locator('[class*="recommendedLead"]').first();
+            review.pointer = await lead.evaluate((el) => ({
+              after: getComputedStyle(el, '::after').content,
+              backgroundColor: getComputedStyle(el).backgroundColor,
+              backgroundImage: getComputedStyle(el).backgroundImage,
+              boxShadow: getComputedStyle(el).boxShadow,
+            }));
+            if (!review.pointer.after.includes('▼')) review.errors.push('beginner pointer is not a small arrow');
+            if (review.pointer.after.includes('TAP')) review.errors.push('old TAP badge still visible');
+            await page.screenshot({ path: '/tmp/overdrive-v56/01-step1-arrow.jpg', type: 'jpeg', quality: 92 });
+            review.stages.step1 = { recommended: await page.locator('[class*="recommended"]').count(), hype: await page.locator('[class*="hypeRow"]').count() };
+            await move(); await move();
+            await page.screenshot({ path: '/tmp/overdrive-v56/02-target.jpg', type: 'jpeg', quality: 92 });
+            review.stages.target = { strategy: await page.locator('[aria-label="Overdrive strategy panel"]').count(), hype: await page.locator('[class*="hypeRow"]').count() };
+            for (let i=0;i<4;i++) await move();
+            await page.screenshot({ path: '/tmp/overdrive-v56/03-route.jpg', type: 'jpeg', quality: 92 });
+            review.stages.route = { scanLane: await page.locator('[class*="scanLane"]').count(), targetCards: await page.locator('[class*="targetCard"]').count(), scanCards: await page.locator('[class*="scanCard"]').count() };
+            for (let i=0;i<4;i++) await move(true);
+            await page.screenshot({ path: '/tmp/overdrive-v56/04-full-systems.jpg', type: 'jpeg', quality: 92 });
+            review.stages.full = { hype: await page.locator('[class*="hypeRow"]').count(), cash: await page.locator('[class*="cashOut"]').count(), target: await page.locator('[class*="targetCard"]').count() };
+            review.scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+            review.innerWidth = await page.evaluate(() => innerWidth);
+            if (review.scrollWidth > review.innerWidth) review.errors.push('horizontal overflow');
+            if (review.stages.step1.hype !== 0) review.errors.push('advanced HUD visible on first move');
+            if (review.stages.target.strategy !== 1 || review.stages.target.hype !== 0) review.errors.push('target lesson progression incorrect');
+            if (review.stages.route.scanLane !== 1 || review.stages.route.targetCards !== 0 || review.stages.route.scanCards !== 1) review.errors.push('route lesson is not isolated');
+            if (review.stages.full.hype !== 1 || review.stages.full.cash !== 1 || review.stages.full.target !== 1) review.errors.push('full systems did not unlock');
+          } catch (e) { review.errors.push(String(e)); }
+          fs.writeFileSync('/tmp/overdrive-v56/review.json', JSON.stringify(review, null, 2));
+          await browser.close();
+          if (review.errors.length) process.exitCode = 1;
+          NODE
+          node qa-overdrive-v56.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prism-overdrive-beginner-pointer-v56-qa
+          path: /tmp/overdrive-v56
+          retention-days: 1
+      - name: Commit and cleanup
+        if: success()
+        run: |
+          rm -f qa-overdrive-v56.mjs scripts/pass-overdrive-pointer-v56.py .github/workflows/pass-overdrive-pointer-v56.yml
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Polish Prism Overdrive beginner guidance'
+          git push origin HEAD:main
