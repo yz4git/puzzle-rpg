@@ -1007,8 +1007,9 @@ export default function PrismOverdrive({ onExit }: Props) {
     return new Set(largestGroup(tiles).map((tile) => tile.id));
   }, [tiles, moves, target]);
   const recommendedLead = [...recommended][0] ?? -1;
-  const guideTitle = moves === 0 ? "STEP 1  TAP A GLOWING GROUP" : moves < 2 ? "STEP 2  MAKE BIG GROUPS" : moves < 6 ? "STEP 3  MATCH THE TARGET" : moves < 10 ? "STEP 4  USE ROUTE" : learnedRun ? "PRISM OVERDRIVE" : "FULL SYSTEMS ONLINE";
-  const guideText = moves === 0 ? "Connected tiles break together. Follow TAP." : moves < 2 ? "Bigger connected group = bigger score." : moves < 6 ? "Clear the simple TARGET below. Follow TAP when it helps." : moves < 10 ? "ROUTE marks a move that sets up the scanned next tile." : learnedRun ? "TARGET • ROUTE • CASH OUT • BOSS CORE" : "CASH OUT saves score. Three TARGETS summon BOSS CORE. Tap ? anytime.";
+  const routeLessonReady = routeLesson && Boolean(routePlan);
+  const guideTitle = moves === 0 ? "STEP 1  TAP A GLOWING GROUP" : moves < 2 ? "STEP 2  MAKE BIG GROUPS" : moves < 6 ? "STEP 3  MATCH THE TARGET" : moves < 10 ? (routeLessonReady ? "STEP 4  TAP THE ROUTE" : "STEP 4  SHAPE THE SCAN") : learnedRun ? "PRISM OVERDRIVE" : "FULL SYSTEMS ONLINE";
+  const guideText = moves === 0 ? "Connected tiles break together. Follow the arrow." : moves < 2 ? "Bigger connected group = bigger score." : moves < 6 ? "Clear the simple TARGET below. Follow the arrow when it helps." : moves < 10 ? (routeLessonReady ? "The glowing ROUTE sets up the scanned next tile. Tap it now." : `Column ${scanColumn + 1} is scanned. Clear one connected group in that lane.`) : learnedRun ? "TARGET • ROUTE • CASH OUT • BOSS CORE" : "CASH OUT saves score. Three TARGETS summon BOSS CORE. Tap ? anytime.";
 
   if (screen === "intro") {
     return <main className={styles.shell} data-screen="intro">
@@ -1048,7 +1049,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     {(!beginner || showBeginnerTarget) ? <section className={`${styles.strategyPanel} ${beginner ? styles.strategyBeginner : routeLesson ? styles.strategyRouteLesson : ""}`} data-target-pulse={targetPulse ? "true" : "false"} aria-label="Overdrive strategy panel">
       {fullSystems ? <div className={styles.phaseCard} data-phase={runPhase}><span>PHASE</span><strong>{PHASE_META[runPhase].label}</strong><em>{PHASE_META[runPhase].note}</em></div> : null}
       <div className={styles.targetCard}><span>{beginner ? "YOUR TARGET" : "PRISM TARGET"}</span><strong>{target.label}</strong><em>{beginner ? "MATCH THIS FOR A BONUS" : `${targetProgressText(target)} • +${target.reward.toLocaleString()}`}</em></div>
-      {moves >= 6 ? <div className={styles.scanCard} data-route={routePlan ? "ready" : "none"}><span>NEXT SCAN • COL {scanColumn + 1}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>{routePlan ? `ROUTE READY → ${LABEL[routePlan.type]} ×${routePlan.projected}` : "NO ROUTE • SHAPE THE COLUMN"}</em></div> : null}
+      {moves >= 6 ? <div className={styles.scanCard} data-route={routePlan ? "ready" : "none"}><span>{routeLesson ? `SCANNED COLUMN ${scanColumn + 1}` : `NEXT SCAN • COL ${scanColumn + 1}`}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>{routePlan ? (routeLesson ? `ROUTE READY • TAP GLOWING GROUP` : `ROUTE READY → ${LABEL[routePlan.type]} ×${routePlan.projected}`) : (routeLesson ? "CLEAR 1 GROUP IN THIS LANE" : "NO ROUTE • SHAPE THE COLUMN")}</em></div> : null}
       {fullSystems ? <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SAVE SCORE / END COMBO" : "COMBO BUILDS THE BANK"}</em></button> : null}
       {fullSystems ? <div className={styles.missionCard} data-boss={bossCoreHp > 0 ? "active" : "idle"} data-breaks={bossBreaks}><span>{bossCoreHp > 0 ? "BOSS CORE" : "MISSION STREAK"}</span><strong>{bossCoreHp > 0 ? `HP ${bossCoreHp}/${bossCoreMax}` : `${"◆".repeat(missionStreak)}${"◇".repeat(3-missionStreak)}  ${missionStreak}/3`}</strong><em>{bossCoreHp > 0 ? "HIT WITH RELEASE / ROUTE / CHAIN" : "CLEAR 3 TARGETS IN ONE COMBO"}</em><u><i style={{ width: `${bossCoreHp > 0 ? bossCoreHp / Math.max(1, bossCoreMax) * 100 : missionStreak / 3 * 100}%` }} /></u></div> : null}
       {fullSystems ? <div className={styles.chargeRow} aria-label="Prism charge meters">{TYPES.map((type) => <span key={type} className={styles.chargeItem} data-type={type} data-value={charge[type]}><i>{GLYPH[type]}</i><b>{charge[type]}</b><u><em style={{ width: `${charge[type]}%` }} /></u></span>)}</div> : null}
@@ -1057,6 +1058,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"} data-route-pulse={routePulse ? "true" : "false"}>
       <div className={styles.rank}>{lastRank || (resolving ? "BREAK!" : "KEEP MOVING")}</div>
       <div className={styles.board} aria-label="Prism Overdrive Cluster Break board">
+        {routeLesson ? <div className={styles.scanLane} data-ready={routeLessonReady ? "true" : "false"} style={{ left: `${scanColumn / SIZE * 100}%`, width: `${100 / SIZE}%` }} aria-hidden="true"><span>{routeLessonReady ? "ROUTE" : "SCAN"}</span></div> : null}
         {moves >= 6 ? <div className={styles.scanMarker} data-type={scanType} style={{ left: `${(scanColumn + .5) / SIZE * 100}%` }} aria-hidden="true"><b>▼</b><span>{GLYPH[scanType]}</span></div> : null}
         {tiles.map((tile) => <button
           key={tile.id}

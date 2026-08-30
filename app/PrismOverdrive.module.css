@@ -425,3 +425,16 @@
 /* PASS 53 — ONE-TIME ONBOARDING / VETERAN FLOW */
 .guideBar[data-learned="true"]{min-height:30px!important;padding-block:3px!important;border-color:#344b61!important;background:#040a11!important}.guideBar[data-learned="true"] strong{font-size:7px!important;color:#75f6ff!important}.guideBar[data-learned="true"] span{font-size:5px!important;color:#8297ac!important}.guideBar[data-learned="true"] button{width:26px!important;height:26px!important;font-size:14px!important}
 @media(max-height:700px){.guideBar[data-learned="true"]{min-height:26px!important}.guideBar[data-learned="true"] button{width:23px!important;height:23px!important}}
+
+
+/* PASS 54 — ROUTE LESSON STATE CLARITY */
+.scanLane{position:absolute;z-index:2;top:0;bottom:0;pointer-events:none;box-sizing:border-box;border-inline:2px dashed rgba(99,232,255,.78);background:linear-gradient(180deg,rgba(99,232,255,.12),rgba(99,232,255,.025) 42%,rgba(99,232,255,.09));box-shadow:inset 5px 0 8px rgba(99,232,255,.05),inset -5px 0 8px rgba(99,232,255,.05);animation:scanLanePulse 780ms steps(2,end) infinite}
+.scanLane span{position:absolute;left:50%;top:21px;transform:translateX(-50%);padding:2px 3px;border:1px solid #62eaff;background:#03121a;color:#8af6ff;font:1000 5px/1 monospace;letter-spacing:.08em;box-shadow:2px 2px #000}
+.scanLane[data-ready="true"]{border-color:#62ffd6;background:linear-gradient(180deg,rgba(98,255,214,.14),rgba(98,255,214,.025) 42%,rgba(98,255,214,.1));box-shadow:inset 5px 0 8px rgba(98,255,214,.06),inset -5px 0 8px rgba(98,255,214,.06),0 0 8px rgba(98,255,214,.24)}
+.scanLane[data-ready="true"] span{border-color:#62ffd6;color:#9affdf;background:#03150f}
+.strategyRouteLesson .scanCard[data-route="none"]{border-color:#4d8aa4!important;background:#041018!important;box-shadow:inset 0 0 0 1px #102f3d}
+.strategyRouteLesson .scanCard[data-route="none"] em{color:#8ee9ff!important;font-weight:900}
+.strategyRouteLesson .scanCard[data-route="ready"] em{color:#9affdf!important;font-weight:1000}
+@keyframes scanLanePulse{50%{border-inline-width:3px;filter:brightness(1.25)}}
+@media(max-height:700px){.scanLane span{top:18px;font-size:4px}}
+@media(prefers-reduced-motion:reduce){.scanLane{animation:none!important}}
