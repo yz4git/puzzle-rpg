@@ -73,6 +73,7 @@ const LABEL: Record<PanelType, string> = { attack: "ATK", heal: "HEAL", barrier:
 const GLYPH: Record<PanelType, string> = { attack: "▲", heal: "♥", barrier: "◆", skip: "⏱" };
 const HIGH_SCORE_KEY = "puzzle-rpg:prism-overdrive:high-score:v1";
 const ONBOARDING_KEY = "puzzle-rpg:prism-overdrive:onboarding:v1";
+const MOMENTUM_GOAL = 3;
 const PHASE_META: Record<RunPhase, { label: string; note: string; score: number; charge: number; cascadeCut: number; cascadeCap: number; cash: number }> = {
   build: { label: "BUILD", note: "MAKE CHARGE", score: 1, charge: 1, cascadeCut: 0, cascadeCap: 4, cash: 1 },
   accel: { label: "ACCEL", note: "FASTER LINKS", score: 1.15, charge: 1.25, cascadeCut: 1, cascadeCap: 4, cash: 1.08 },
@@ -379,6 +380,8 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [showHelp, setShowHelp] = useState(false);
   const [moves, setMoves] = useState(0);
   const [tutorialSeen, setTutorialSeen] = useState(false);
+  const [momentum, setMomentum] = useState(0);
+  const [surgeReady, setSurgeReady] = useState(false);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -403,6 +406,8 @@ export default function PrismOverdrive({ onExit }: Props) {
   const bossCoreHpRef = useRef(0);
   const bossCoreMaxRef = useRef(0);
   const bossBreaksRef = useRef(0);
+  const momentumRef = useRef(0);
+  const surgeReadyRef = useRef(false);
 
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
@@ -498,6 +503,8 @@ export default function PrismOverdrive({ onExit }: Props) {
     return { multiplier: 1, gain: 0, release: 0 };
   }
 
+  function addMomentum(amount = 1) { if (surgeReadyRef.current) return; const next=Math.min(MOMENTUM_GOAL,momentumRef.current+amount); momentumRef.current=next; setMomentum(next); if(next>=MOMENTUM_GOAL){surgeReadyRef.current=true;setSurgeReady(true);setLastRank("PRISM SURGE READY!");setMessage("NEXT BIG BREAK GETS ×2 • BUILD ×5+");playOverdriveSfx("target",1.16);} }
+  function consumeSurge(count:number){if(!surgeReadyRef.current||count<5)return 1;surgeReadyRef.current=false;setSurgeReady(false);momentumRef.current=0;setMomentum(0);setLastRank("PRISM SURGE ×2!");setMessage("SURGE RELEASE • BIG BREAK DOUBLED");playOverdriveSfx("mega",1.38);return 2;}
   function addBank(points: number, comboValue: number, chainDepth = 0) {
     const ratio = clamp(.18 + comboValue * .018 + chainDepth * .09, .18, .78);
     const gain = Math.max(1, Math.round(points * ratio));
@@ -659,6 +666,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     setMissionStreak(0); missionStreakRef.current = 0;
     setBossCoreHp(0); bossCoreHpRef.current = 0; setBossCoreMax(0); bossCoreMaxRef.current = 0;
     setBossBreaks(0); bossBreaksRef.current = 0;
+    setMomentum(0); momentumRef.current=0; setSurgeReady(false); surgeReadyRef.current=false;
     setShowHelp(false); setMoves(tutorialSeen ? 10 : 0);
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
@@ -853,10 +861,12 @@ export default function PrismOverdrive({ onExit }: Props) {
     setBoardFx({ token: actionToken, kind: liveSeed.type, phase: "lock", x: impactAnchor.x, y: impactAnchor.y, points: 0, chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
     await sleep(380);
 
-    const scored = scoreCluster(liveSeed.type, removed.size, 0, chargeMove.multiplier);
-    let nextScore = addScore(scored.points, scored.rank);
+    const surgeMult=consumeSurge(count);
+    const scored = scoreCluster(liveSeed.type, removed.size, 0, chargeMove.multiplier*surgeMult);
+    let nextScore = addScore(scored.points, surgeMult>1 ? "PRISM SURGE ×2!" : scored.rank);
     const bankGain = addBank(scored.points, comboValue, 0);
     advanceManualTarget(liveSeed.type, count);
+    if(count>=6)addMomentum(1);
     nextScore = scoreRef.current;
     setMessage((current) => chargeMove.release > 0 ? `${current} • BANK +${bankGain.toLocaleString()}` : current);
     setBoardFx({ token: actionToken + 100000, kind: liveSeed.type, phase: "burst", x: impactAnchor.x, y: impactAnchor.y, points: Math.round(scored.points), chain: 0, count: removed.size, columns: impactAnchor.columns, mega: attackBlast });
@@ -896,6 +906,7 @@ export default function PrismOverdrive({ onExit }: Props) {
         setLastRank(`PLANNED ROUTE • ${LABEL[selectedRoute.type]} ×${actual}`);
         setMessage(`SCAN ROUTE CONNECTED • NEXT CASCADE THRESHOLD -1`);
         damageBossCore("PLANNED ROUTE");
+        addMomentum(1);
         playOverdriveSfx("route", 1.04 + actual * .035);
         await sleep(260);
         setRoutePulse(false);
@@ -928,6 +939,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       addBank(autoScore.points, comboRef.current, depth);
       advanceCascadeTarget(depth, currentQueues);
       if (depth >= 2) damageBossCore(`CHAIN ${depth}`);
+      addMomentum(depth>=2?2:1);
       nextScore = scoreRef.current;
       setBoardFx({ token: cascadeToken + 100000, kind: "cascade", phase: "burst", x: cascadeAnchor.x, y: cascadeAnchor.y, points: Math.round(autoScore.points), chain: depth, count: auto.length, columns: cascadeAnchor.columns, links: fxLinks(auto) });
       setMessage(`CHAIN ${depth} SCORE +${Math.round(autoScore.points).toLocaleString()}`);
@@ -1054,6 +1066,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       {fullSystems ? <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SAVE SCORE / END COMBO" : "COMBO BUILDS THE BANK"}</em></button> : null}
       {fullSystems ? <div className={styles.missionCard} data-boss={bossCoreHp > 0 ? "active" : "idle"} data-breaks={bossBreaks}><span>{bossCoreHp > 0 ? "BOSS CORE" : "MISSION STREAK"}</span><strong>{bossCoreHp > 0 ? `HP ${bossCoreHp}/${bossCoreMax}` : `${"◆".repeat(missionStreak)}${"◇".repeat(3-missionStreak)}  ${missionStreak}/3`}</strong><em>{bossCoreHp > 0 ? "HIT WITH RELEASE / ROUTE / CHAIN" : "CLEAR 3 TARGETS IN ONE COMBO"}</em><u><i style={{ width: `${bossCoreHp > 0 ? bossCoreHp / Math.max(1, bossCoreMax) * 100 : missionStreak / 3 * 100}%` }} /></u></div> : null}
       {fullSystems ? <div className={styles.chargeRow} aria-label="Prism charge meters">{TYPES.map((type) => <span key={type} className={styles.chargeItem} data-type={type} data-value={charge[type]}><i>{GLYPH[type]}</i><b>{charge[type]}</b><u><em style={{ width: `${charge[type]}%` }} /></u></span>)}</div> : null}
+      {fullSystems ? <div className={styles.momentumCard} data-ready={surgeReady ? "true" : "false"}><span>PRISM SURGE</span><strong>{surgeReady ? "READY ×2" : `${"◆".repeat(momentum)}${"◇".repeat(MOMENTUM_GOAL-momentum)} ${momentum}/${MOMENTUM_GOAL}`}</strong><em>{surgeReady ? "NEXT ×5+ BREAK DOUBLES" : "BIG BREAK / ROUTE / CHAIN FILLS"}</em></div> : null}
     </section> : null}
 
     <section className={styles.boardWrap} data-impact={actionFx?.kind ?? "idle"} data-phase={boardFx?.phase ?? "idle"} data-chain={boardFx?.chain ?? 0} data-jackpot={jackpotFlash ? "true" : "false"} data-afterglow={jackpotAfterglow ? "true" : "false"} data-route-pulse={routePulse ? "true" : "false"}>
@@ -1106,7 +1119,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     </div> : null}
 
     <section className={styles.actionFeed} data-kind={actionFx?.kind ?? "idle"} aria-live="polite">
-      {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
+      {surgeReady && !actionFx ? <div className={styles.surgePrompt}><b>PRISM SURGE READY</b><span>MAKE ANY ×5+ GROUP • NEXT BIG BREAK ×2</span></div> : actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
         <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
       </div> : beginner ? <div className={styles.actionIdle}><b>FOLLOW TAP</b><span>CONNECTED TILES BREAK TOGETHER</span></div> : routeLesson ? <div className={styles.actionIdle}><b>{routePlan ? "ROUTE READY" : "MAKE A ROUTE"}</b><span>{routePlan ? "CLEAR THE HIGHLIGHTED GROUP" : "CLEAR A GROUP IN THE SCANNED COLUMN"}</span></div> : <div className={styles.actionIdle}><b>{routePlan ? "ROUTE READY" : "PLAN THE BREAK"}</b><span>{routePlan ? `HIGHLIGHTED BREAK → SCANNED ${LABEL[routePlan.type]} ×${routePlan.projected}` : "CHARGE → TARGET ×3 → BOSS CORE → CASH OUT OR PUSH"}</span></div>}
     </section>
