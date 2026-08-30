@@ -753,6 +753,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   }
 
   async function maybeOfferUpgrade(nextScore: number) {
+    if (moves < 10) return;
     const threshold = UPGRADE_THRESHOLDS[levelRef.current];
     if (threshold == null || nextScore < threshold) return;
     const picked = chooseUpgrades(upgrades)[0];
@@ -1048,7 +1049,7 @@ export default function PrismOverdrive({ onExit }: Props) {
 
     {(!beginner || showBeginnerTarget) ? <section className={`${styles.strategyPanel} ${beginner ? styles.strategyBeginner : routeLesson ? styles.strategyRouteLesson : ""}`} data-target-pulse={targetPulse ? "true" : "false"} aria-label="Overdrive strategy panel">
       {fullSystems ? <div className={styles.phaseCard} data-phase={runPhase}><span>PHASE</span><strong>{PHASE_META[runPhase].label}</strong><em>{PHASE_META[runPhase].note}</em></div> : null}
-      <div className={styles.targetCard}><span>{beginner ? "YOUR TARGET" : "PRISM TARGET"}</span><strong>{target.label}</strong><em>{beginner ? "MATCH THIS FOR A BONUS" : `${targetProgressText(target)} • +${target.reward.toLocaleString()}`}</em></div>
+      {!routeLesson ? <div className={styles.targetCard}><span>{beginner ? "YOUR TARGET" : "PRISM TARGET"}</span><strong>{target.label}</strong><em>{beginner ? "MATCH THIS FOR A BONUS" : `${targetProgressText(target)} • +${target.reward.toLocaleString()}`}</em></div> : null}
       {moves >= 6 ? <div className={styles.scanCard} data-route={routePlan ? "ready" : "none"}><span>{routeLesson ? `SCANNED COLUMN ${scanColumn + 1}` : `NEXT SCAN • COL ${scanColumn + 1}`}</span><strong data-type={scanType}>{GLYPH[scanType]} {LABEL[scanType]}</strong><em>{routePlan ? (routeLesson ? `ROUTE READY • TAP GLOWING GROUP` : `ROUTE READY → ${LABEL[routePlan.type]} ×${routePlan.projected}`) : (routeLesson ? "CLEAR 1 GROUP IN THIS LANE" : "NO ROUTE • SHAPE THE COLUMN")}</em></div> : null}
       {fullSystems ? <button className={styles.cashOut} type="button" disabled={comboBank <= 0 || resolving} onClick={cashOut}><span>CASH OUT</span><strong>+{cashValue.toLocaleString()}</strong><em>{comboBank > 0 ? "SAVE SCORE / END COMBO" : "COMBO BUILDS THE BANK"}</em></button> : null}
       {fullSystems ? <div className={styles.missionCard} data-boss={bossCoreHp > 0 ? "active" : "idle"} data-breaks={bossBreaks}><span>{bossCoreHp > 0 ? "BOSS CORE" : "MISSION STREAK"}</span><strong>{bossCoreHp > 0 ? `HP ${bossCoreHp}/${bossCoreMax}` : `${"◆".repeat(missionStreak)}${"◇".repeat(3-missionStreak)}  ${missionStreak}/3`}</strong><em>{bossCoreHp > 0 ? "HIT WITH RELEASE / ROUTE / CHAIN" : "CLEAR 3 TARGETS IN ONE COMBO"}</em><u><i style={{ width: `${bossCoreHp > 0 ? bossCoreHp / Math.max(1, bossCoreMax) * 100 : missionStreak / 3 * 100}%` }} /></u></div> : null}
