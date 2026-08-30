@@ -72,6 +72,7 @@ const TYPES: PanelType[] = ["attack", "heal", "barrier", "skip"];
 const LABEL: Record<PanelType, string> = { attack: "ATK", heal: "HEAL", barrier: "BAR", skip: "SKIP" };
 const GLYPH: Record<PanelType, string> = { attack: "▲", heal: "♥", barrier: "◆", skip: "⏱" };
 const HIGH_SCORE_KEY = "puzzle-rpg:prism-overdrive:high-score:v1";
+const ONBOARDING_KEY = "puzzle-rpg:prism-overdrive:onboarding:v1";
 const PHASE_META: Record<RunPhase, { label: string; note: string; score: number; charge: number; cascadeCut: number; cascadeCap: number; cash: number }> = {
   build: { label: "BUILD", note: "MAKE CHARGE", score: 1, charge: 1, cascadeCut: 0, cascadeCap: 4, cash: 1 },
   accel: { label: "ACCEL", note: "FASTER LINKS", score: 1.15, charge: 1.25, cascadeCut: 1, cascadeCap: 4, cash: 1.08 },
@@ -377,6 +378,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   const [routePulse, setRoutePulse] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [moves, setMoves] = useState(0);
+  const [tutorialSeen, setTutorialSeen] = useState(false);
 
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
@@ -405,6 +407,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   useEffect(() => {
     const stored = Number(window.localStorage.getItem(HIGH_SCORE_KEY) ?? 0);
     if (Number.isFinite(stored)) setHighScore(Math.max(0, stored));
+    try { setTutorialSeen(window.localStorage.getItem(ONBOARDING_KEY) === "1"); } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -656,7 +659,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     setMissionStreak(0); missionStreakRef.current = 0;
     setBossCoreHp(0); bossCoreHpRef.current = 0; setBossCoreMax(0); bossCoreMaxRef.current = 0;
     setBossBreaks(0); bossBreaksRef.current = 0;
-    setShowHelp(false); setMoves(0);
+    setShowHelp(false); setMoves(tutorialSeen ? 10 : 0);
     setResolving(false); resolvingRef.current = false; setLastGain(0); setLastRank("");
     feverUntilRef.current = 0; overFeverUntilRef.current = 0; timeStopUntilRef.current = 0; comboExpireRef.current = 0; finalTriggeredRef.current = false;
     lastTickRef.current = performance.now();
@@ -678,6 +681,10 @@ export default function PrismOverdrive({ onExit }: Props) {
     if (finalScore > highScore) {
       setHighScore(finalScore);
       try { window.localStorage.setItem(HIGH_SCORE_KEY, String(finalScore)); } catch { /* ignore */ }
+    }
+    if (!tutorialSeen && moves >= 10) {
+      setTutorialSeen(true);
+      try { window.localStorage.setItem(ONBOARDING_KEY, "1"); } catch { /* ignore */ }
     }
   }
 
@@ -982,6 +989,7 @@ export default function PrismOverdrive({ onExit }: Props) {
   const beginner = moves < 6;
   const routeLesson = moves >= 6 && moves < 10;
   const fullSystems = moves >= 10;
+  const learnedRun = tutorialSeen && fullSystems;
   const showBeginnerTarget = moves >= 2;
   const recommended = useMemo(() => {
     const wanted = moves >= 2 ? desiredTargetType(target) : null;
@@ -999,8 +1007,8 @@ export default function PrismOverdrive({ onExit }: Props) {
     return new Set(largestGroup(tiles).map((tile) => tile.id));
   }, [tiles, moves, target]);
   const recommendedLead = [...recommended][0] ?? -1;
-  const guideTitle = moves === 0 ? "STEP 1  TAP A GLOWING GROUP" : moves < 2 ? "STEP 2  MAKE BIG GROUPS" : moves < 6 ? "STEP 3  MATCH THE TARGET" : moves < 10 ? "STEP 4  USE ROUTE" : "FULL SYSTEMS ONLINE";
-  const guideText = moves === 0 ? "Connected tiles break together. Follow TAP." : moves < 2 ? "Bigger connected group = bigger score." : moves < 6 ? "Clear the simple TARGET below. Follow TAP when it helps." : moves < 10 ? "ROUTE marks a move that sets up the scanned next tile." : "CASH OUT saves score. Three TARGETS summon BOSS CORE. Tap ? anytime.";
+  const guideTitle = moves === 0 ? "STEP 1  TAP A GLOWING GROUP" : moves < 2 ? "STEP 2  MAKE BIG GROUPS" : moves < 6 ? "STEP 3  MATCH THE TARGET" : moves < 10 ? "STEP 4  USE ROUTE" : learnedRun ? "PRISM OVERDRIVE" : "FULL SYSTEMS ONLINE";
+  const guideText = moves === 0 ? "Connected tiles break together. Follow TAP." : moves < 2 ? "Bigger connected group = bigger score." : moves < 6 ? "Clear the simple TARGET below. Follow TAP when it helps." : moves < 10 ? "ROUTE marks a move that sets up the scanned next tile." : learnedRun ? "TARGET • ROUTE • CASH OUT • BOSS CORE" : "CASH OUT saves score. Three TARGETS summon BOSS CORE. Tap ? anytime.";
 
   if (screen === "intro") {
     return <main className={styles.shell} data-screen="intro">
@@ -1032,7 +1040,7 @@ export default function PrismOverdrive({ onExit }: Props) {
       <div className={styles.jackpot}><span>JACKPOT</span><strong>{"◆".repeat(jackpot)}{"◇".repeat(3 - jackpot)}</strong></div>
     </section> : null}
 
-    <section className={styles.guideBar} data-done={beginner ? "false" : "true"}>
+    <section className={styles.guideBar} data-done={beginner ? "false" : "true"} data-learned={learnedRun ? "true" : "false"}>
       <div><strong>{guideTitle}</strong><span>{guideText}</span></div>
       <button type="button" aria-label="Help" onClick={() => { lastTickRef.current = performance.now(); setShowHelp(true); }}>?</button>
     </section>
@@ -1097,7 +1105,7 @@ export default function PrismOverdrive({ onExit }: Props) {
     <section className={styles.actionFeed} data-kind={actionFx?.kind ?? "idle"} aria-live="polite">
       {actionFx ? <div key={actionFx.token} className={styles.actionFx} data-kind={actionFx.kind} role="status">
         <i>{actionFx.icon}</i><strong>{actionFx.title}</strong><span>{actionFx.detail}</span>
-      </div> : beginner ? <div className={styles.actionIdle}><b>FOLLOW TAP</b><span>CONNECTED TILES BREAK TOGETHER</span></div> : <div className={styles.actionIdle}><b>{routePlan ? "ROUTE READY" : "PLAN THE BREAK"}</b><span>{routePlan ? `HIGHLIGHTED BREAK → SCANNED ${LABEL[routePlan.type]} ×${routePlan.projected}` : "CHARGE → TARGET ×3 → BOSS CORE → CASH OUT OR PUSH"}</span></div>}
+      </div> : beginner ? <div className={styles.actionIdle}><b>FOLLOW TAP</b><span>CONNECTED TILES BREAK TOGETHER</span></div> : routeLesson ? <div className={styles.actionIdle}><b>{routePlan ? "ROUTE READY" : "MAKE A ROUTE"}</b><span>{routePlan ? "CLEAR THE HIGHLIGHTED GROUP" : "CLEAR A GROUP IN THE SCANNED COLUMN"}</span></div> : <div className={styles.actionIdle}><b>{routePlan ? "ROUTE READY" : "PLAN THE BREAK"}</b><span>{routePlan ? `HIGHLIGHTED BREAK → SCANNED ${LABEL[routePlan.type]} ×${routePlan.projected}` : "CHARGE → TARGET ×3 → BOSS CORE → CASH OUT OR PUSH"}</span></div>}
     </section>
 
     {fullSystems ? <>

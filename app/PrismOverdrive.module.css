@@ -420,3 +420,8 @@
 .recommended::after{content:""!important;position:absolute!important;inset:auto!important;width:0!important;height:0!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
 .recommendedLead::after{content:"▼"!important;position:absolute!important;inset:auto 2px auto auto!important;width:10px!important;height:10px!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;color:#fff36d!important;text-shadow:1px 1px #000,-1px -1px #000!important;font:1000 9px/10px monospace!important;opacity:1!important;z-index:8!important;pointer-events:none!important}
 @keyframes recommendedOutline{0%,100%{box-shadow:inset 0 0 0 2px #fff36d,inset 0 0 0 4px var(--edge),0 0 6px rgba(255,243,109,.55)}50%{box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px var(--edge),0 0 10px rgba(255,243,109,.85)}}
+
+
+/* PASS 53 — ONE-TIME ONBOARDING / VETERAN FLOW */
+.guideBar[data-learned="true"]{min-height:30px!important;padding-block:3px!important;border-color:#344b61!important;background:#040a11!important}.guideBar[data-learned="true"] strong{font-size:7px!important;color:#75f6ff!important}.guideBar[data-learned="true"] span{font-size:5px!important;color:#8297ac!important}.guideBar[data-learned="true"] button{width:26px!important;height:26px!important;font-size:14px!important}
+@media(max-height:700px){.guideBar[data-learned="true"]{min-height:26px!important}.guideBar[data-learned="true"] button{width:23px!important;height:23px!important}}
