@@ -1,0 +1,73 @@
+name: Prism Overdrive Fun Loop
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/pass-overdrive-fun-loop.py']
+permissions:
+  contents: write
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22.13.1', cache: npm}
+      - name: Apply fun loop
+        run: python3 scripts/pass-overdrive-fun-loop.py
+      - name: Install
+        run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Browser setup
+        run: npm install --no-save playwright@1.55.0 && npx playwright install --with-deps chromium
+      - name: Gameplay QA
+        run: |
+          cat > overdrive-fun-qa.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'fs';
+          import { spawn } from 'child_process';
+          const server=spawn('npm',['run','dev','--','--host','127.0.0.1'],{stdio:'ignore'});
+          await new Promise(r=>setTimeout(r,2500));
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:402,height:874}});
+          const errors=[]; page.on('pageerror',e=>errors.push(String(e)));
+          await page.goto('http://127.0.0.1:5173',{waitUntil:'networkidle'});
+          await page.evaluate(()=>localStorage.setItem('puzzle-rpg:prism-overdrive:onboarding:v1','1'));
+          await page.reload({waitUntil:'networkidle'});
+          await page.getByRole('button',{name:/PRISM OVERDRIVE/i}).click();
+          await page.getByRole('button',{name:/START OVERDRIVE/i}).click();
+          const tile=page.locator('button[aria-label*="cluster panel"]');
+          for(let i=0;i<24;i++){
+            await tile.first().waitFor({state:'visible'});
+            await page.waitForFunction(()=>[...document.querySelectorAll('button[aria-label*="cluster panel"]')].some(x=>!x.disabled));
+            const labels=await tile.evaluateAll(els=>els.map(e=>e.getAttribute('aria-label')));
+            const cells=labels.map((x,i)=>{const m=x.match(/^(ATK|HEAL|BAR|SKIP).*row (\d+) column (\d+)/);return m?{i,t:m[1],r:+m[2]-1,c:+m[3]-1}:null}).filter(Boolean);
+            const by=new Map(cells.map(x=>[`${x.r},${x.c}`,x])); let best=[]; const seen=new Set();
+            for(const x of cells){if(seen.has(x.i))continue;const q=[x],g=[];seen.add(x.i);while(q.length){const a=q.pop();g.push(a);for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){const b=by.get(`${a.r+dr},${a.c+dc}`);if(b&&b.t===x.t&&!seen.has(b.i)){seen.add(b.i);q.push(b)}}}if(g.length>best.length)best=g}
+            if(!best.length)break; await tile.nth(best[0].i).click(); await page.waitForTimeout(120);
+            const ready=await page.locator('[data-ready="true"]').filter({hasText:'PRISM SURGE'}).count();
+            if(ready){await page.screenshot({path:'surge-ready.jpg',fullPage:true});break}
+          }
+          const state={errors, surge:await page.locator('[data-ready="true"]').filter({hasText:'PRISM SURGE'}).count(), momentum:await page.locator('text=PRISM SURGE').count(), scrollWidth:await page.evaluate(()=>document.documentElement.scrollWidth), innerWidth:await page.evaluate(()=>innerWidth)};
+          fs.writeFileSync('review.json',JSON.stringify(state,null,2));
+          await page.screenshot({path:'final.jpg',fullPage:true}); await browser.close(); server.kill('SIGTERM');
+          if(errors.length||state.scrollWidth>state.innerWidth) process.exit(1);
+          EOF
+          node overdrive-fun-qa.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prism-overdrive-fun-loop-qa
+          path: |
+            review.json
+            surge-ready.jpg
+            final.jpg
+          retention-days: 1
+      - name: Commit and cleanup
+        run: |
+          rm -f scripts/pass-overdrive-fun-loop.py .github/workflows/pass-overdrive-fun-loop.yml overdrive-fun-qa.mjs
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add -A
+          git commit -m 'Add Prism Overdrive short-term surge payoff'
+          git push origin main
