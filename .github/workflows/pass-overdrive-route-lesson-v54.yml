@@ -1,0 +1,103 @@
+name: Prism Overdrive Route Lesson v54
+on:
+  push:
+    paths:
+      - 'scripts/pass-overdrive-route-lesson-v54.py'
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22.13.1, cache: npm}
+      - name: Apply route lesson clarity
+        run: python3 scripts/pass-overdrive-route-lesson-v54.py
+      - run: npm ci
+      - name: Production build
+        run: bash scripts/sites-env.sh -- ./node_modules/.bin/vinext build
+      - name: Browser QA setup
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.0
+          npx playwright install chromium
+      - name: Route lesson QA
+        run: |
+          bash scripts/sites-env.sh -- ./node_modules/.bin/vinext start --port 4173 >/tmp/route54.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173 >/dev/null && break; sleep 1; done
+          mkdir -p /tmp/route54-qa
+          cat > qa-route-v54.mjs <<'NODE'
+          import {chromium} from 'playwright';
+          import fs from 'node:fs';
+          const result={errors:[],states:[],scrollWidth:0,innerWidth:0};
+          let browser;
+          const waitReady=async(board)=>{await board.locator('button:not([disabled])').first().waitFor({timeout:18000}); await new Promise(r=>setTimeout(r,80));};
+          try{
+            browser=await chromium.launch({headless:true});
+            const p=await browser.newPage({viewport:{width:402,height:874}});
+            p.on('pageerror',e=>result.errors.push(String(e)));
+            await p.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+            await p.evaluate(()=>localStorage.removeItem('puzzle-rpg:prism-overdrive:onboarding:v1'));
+            await p.reload({waitUntil:'networkidle'});
+            await p.getByRole('button',{name:/PRISM OVERDRIVE/}).click();
+            await p.getByRole('button',{name:/START OVERDRIVE/}).click();
+            const board=p.locator('[aria-label="Prism Overdrive Cluster Break board"]'); await board.waitFor();
+            await p.screenshot({path:'/tmp/route54-qa/01-arrow-first-move.jpg',type:'jpeg',quality:92});
+            for(let i=0;i<6;i++){
+              const rec=p.locator('[class*="recommendedLead"]:not([disabled])');
+              const enabled=board.locator('button:not([disabled])'); await waitReady(board);
+              if(await rec.count()) await rec.first().click(); else await enabled.first().click();
+              await waitReady(board);
+            }
+            const guideStrong=p.locator('[class*="guideBar"] strong');
+            const scanCard=p.locator('[class*="scanCard"]');
+            const lane=p.locator('[class*="scanLane"]');
+            if(await lane.count()!==1) result.errors.push(`scan lane count ${await lane.count()}`);
+            const inspect=async(label)=>{
+              const route=await scanCard.getAttribute('data-route');
+              const guide=(await guideStrong.textContent()||'').trim();
+              const laneReady=await lane.getAttribute('data-ready');
+              const scanText=(await scanCard.textContent()||'').replace(/\s+/g,' ').trim();
+              result.states.push({label,route,guide,laneReady,scanText});
+              if(route==='ready' && !guide.includes('TAP THE ROUTE')) result.errors.push(`ready state guide mismatch: ${guide}`);
+              if(route!=='ready' && !guide.includes('SHAPE THE SCAN')) result.errors.push(`shape state guide mismatch: ${guide}`);
+              if((route==='ready') !== (laneReady==='true')) result.errors.push(`lane ready mismatch ${route}/${laneReady}`);
+            };
+            await inspect('route-start');
+            await p.screenshot({path:'/tmp/route54-qa/02-route-state.jpg',type:'jpeg',quality:92});
+            let readyShot=false;
+            for(let n=0;n<3;n++){
+              const route=await scanCard.getAttribute('data-route');
+              if(route==='ready'){
+                await p.screenshot({path:'/tmp/route54-qa/03-route-ready.jpg',type:'jpeg',quality:92}); readyShot=true; break;
+              }
+              const txt=(await scanCard.textContent()||''); const m=txt.match(/SCANNED COLUMN\s+(\d+)/i);
+              const col=m?Number(m[1]):1;
+              const candidate=board.locator(`button[aria-label$="column ${col}"]:not([disabled])`).first();
+              if(await candidate.count()) await candidate.click(); else await board.locator('button:not([disabled])').first().click();
+              await waitReady(board); await inspect(`after-shape-${n+1}`);
+            }
+            if(!readyShot && (await scanCard.getAttribute('data-route'))==='ready') await p.screenshot({path:'/tmp/route54-qa/03-route-ready.jpg',type:'jpeg',quality:92});
+            result.scrollWidth=await p.evaluate(()=>document.documentElement.scrollWidth); result.innerWidth=await p.evaluate(()=>innerWidth);
+            if(result.scrollWidth>result.innerWidth) result.errors.push('horizontal overflow');
+          }catch(e){result.errors.push(String(e));}
+          finally{fs.writeFileSync('/tmp/route54-qa/review.json',JSON.stringify(result,null,2)); if(browser) await browser.close();}
+          if(result.errors.length) process.exitCode=1;
+          NODE
+          node qa-route-v54.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prism-overdrive-route-lesson-v54-qa
+          path: /tmp/route54-qa
+          retention-days: 1
+      - name: Commit and cleanup
+        if: success()
+        run: |
+          rm -f scripts/pass-overdrive-route-lesson-v54.py .github/workflows/pass-overdrive-route-lesson-v54.yml qa-route-v54.mjs
+          git config user.name yz4git
+          git config user.email 65384484+yz4git@users.noreply.github.com
+          git add app/PrismOverdrive.tsx app/PrismOverdrive.module.css scripts .github/workflows
+          git commit -m 'Clarify Prism Overdrive route lesson'
+          git push origin HEAD:main
