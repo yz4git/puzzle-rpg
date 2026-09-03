@@ -145,7 +145,7 @@ jobs:
             techniques: [],
             techniqueSlots: 2,
             memos: [{ id: 'journey', title: '最初の旅', text: '村の長から北のOld Templeについて聞く。', read: false }],
-            flags: [],
+            flags: ['story:openingSeen'],
             openedChests: [],
             defeatedEncounters: [],
             defeatedEnemies: {},
@@ -164,7 +164,7 @@ jobs:
           if (await continueButton.count()) await continueButton.first().tap();
           await page.waitForTimeout(450);
           const field = await snapshot('01-seeded-field');
-          report.assertions.push({ name: 'Seeded save reaches PRISM ROAD', pass: /PRISM ROAD/i.test(field.bodyText) });
+          report.assertions.push({ name: 'Seeded save reaches PRISM ROAD', pass: /PRISM ROAD/i.test(field.bodyText) && /Move right/i.test(JSON.stringify(field.buttons)) });
 
           for (let step = 0; step < 6; step++) {
             if (await page.locator('main[data-enemy]').count()) break;
