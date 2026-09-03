@@ -25,24 +25,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22.13.0
-          cache: npm
 
-      - name: Install app dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Install Playwright browser
+      - name: Install isolated Playwright browser
         run: |
-          npm install --no-save --package-lock=false playwright@latest
+          mkdir -p /tmp/playcheck-runner
+          cd /tmp/playcheck-runner
+          npm init -y
+          npm install --no-audit --no-fund playwright@latest
           npx playwright install --with-deps chromium
 
       - name: Run iPhone-sized live playcheck
         run: |
-          mkdir -p playcheck-artifacts
-          cat > /tmp/puzzle-rpg-playcheck.mjs <<'EOF'
+          mkdir -p "$GITHUB_WORKSPACE/playcheck-artifacts"
+          cat > /tmp/playcheck-runner/playcheck.mjs <<'EOF'
           import { chromium } from 'playwright';
           import { writeFile } from 'node:fs/promises';
+          import path from 'node:path';
 
           const url = process.env.PLAYCHECK_URL;
+          const outputDir = path.join(process.env.GITHUB_WORKSPACE, 'playcheck-artifacts');
           const report = { url, startedAt: new Date().toISOString(), scenes: [], consoleErrors: [], pageErrors: [], failedResponses: [] };
           const browser = await chromium.launch({ headless: true });
 
@@ -74,6 +75,7 @@ jobs:
                 return {
                   index,
                   text: (el.innerText || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+                  aria: el.getAttribute('aria-label') || '',
                   x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height),
                   inViewport: r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth,
                 };
@@ -81,22 +83,24 @@ jobs:
               const all = [...document.querySelectorAll('body *')];
               const overflow = all.map(el => {
                 const r = el.getBoundingClientRect();
-                return { tag: el.tagName, cls: typeof el.className === 'string' ? el.className : '', x: r.x, right: r.right, width: r.width };
+                return { tag: el.tagName, cls: typeof el.className === 'string' ? el.className : '', x: Math.round(r.x), right: Math.round(r.right), width: Math.round(r.width) };
               }).filter(v => v.width > 1 && (v.x < -2 || v.right > innerWidth + 2)).slice(0, 40);
+              const tinyButtons = interactive.filter(b => b.width < 44 || b.height < 44);
               return {
                 title: document.title,
                 bodyText: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
                 viewport: { width: innerWidth, height: innerHeight },
                 document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
                 buttons: interactive,
+                tinyButtons,
                 overflow,
               };
             });
             report.scenes.push({ name, ...metrics });
-            await page.screenshot({ path: `playcheck-artifacts/${name}.png`, fullPage: true });
+            await page.screenshot({ path: path.join(outputDir, `${name}.png`), fullPage: true });
           }
 
-          // Title -> RPG Mode -> New Game -> a few movement/control taps.
+          // Title -> RPG Mode -> New Game -> movement and action controls.
           {
             const { context, page } = await makePage();
             await page.goto(`${url}?live_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
@@ -106,22 +110,26 @@ jobs:
             await page.getByRole('button', { name: /NEW GAME/i }).click();
             await snapshot(page, '03-rpg-world');
 
-            // Exercise visible virtual controls without assuming implementation-specific class names.
-            const visibleButtons = page.locator('button:visible');
-            const count = await visibleButtons.count();
-            for (let i = 0; i < Math.min(count, 12); i++) {
-              const b = visibleButtons.nth(i);
-              const text = ((await b.innerText().catch(() => '')) || (await b.getAttribute('aria-label').catch(() => '')) || '').trim();
-              if (/^(↑|↓|←|→|A|B|UP|DOWN|LEFT|RIGHT)$/i.test(text)) {
-                await b.click({ trial: false }).catch(() => {});
+            for (const label of ['Move up', 'Move right', 'Move down', 'Move left']) {
+              const control = page.getByRole('button', { name: label });
+              if (await control.count()) {
+                await control.dispatchEvent('pointerdown', { pointerId: 1, pointerType: 'touch', isPrimary: true });
+                await page.waitForTimeout(90);
+                await control.dispatchEvent('pointerup', { pointerId: 1, pointerType: 'touch', isPrimary: true });
                 await page.waitForTimeout(120);
               }
+            }
+            const a = page.getByRole('button', { name: /A\s*CHECK/i });
+            if (await a.count()) {
+              await a.dispatchEvent('pointerdown', { pointerId: 2, pointerType: 'touch', isPrimary: true }).catch(() => {});
+              await page.waitForTimeout(100);
+              await a.dispatchEvent('pointerup', { pointerId: 2, pointerType: 'touch', isPrimary: true }).catch(() => {});
             }
             await snapshot(page, '04-rpg-after-controls');
             await context.close();
           }
 
-          // Fresh title -> Chapter Battle -> interact with likely board buttons.
+          // Fresh title -> Chapter Battle -> interact with one board cell.
           {
             const { context, page } = await makePage();
             await page.goto(`${url}?chapter_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
@@ -134,10 +142,9 @@ jobs:
               const b = candidates.nth(i);
               const box = await b.boundingBox().catch(() => null);
               if (!box) continue;
-              // Prefer square-ish board cells near the middle of the phone screen.
-              if (box.width >= 32 && box.width <= 85 && box.height >= 32 && box.height <= 85 && box.y > 230 && box.y < 720) {
+              if (box.width >= 32 && box.width <= 85 && box.height >= 32 && box.height <= 85 && box.y > 220 && box.y < 720) {
                 await b.click().catch(() => {});
-                await page.waitForTimeout(500);
+                await page.waitForTimeout(650);
                 break;
               }
             }
@@ -146,17 +153,14 @@ jobs:
           }
 
           report.finishedAt = new Date().toISOString();
-          await writeFile('playcheck-artifacts/report.json', JSON.stringify(report, null, 2));
+          await writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
           await browser.close();
 
-          if (report.pageErrors.length || report.failedResponses.some(r => r.status >= 500)) {
-            console.error(JSON.stringify(report, null, 2));
-            process.exitCode = 1;
-          } else {
-            console.log(JSON.stringify(report, null, 2));
-          }
+          console.log(JSON.stringify(report, null, 2));
+          if (report.pageErrors.length || report.failedResponses.some(r => r.status >= 500)) process.exitCode = 1;
           EOF
-          node /tmp/puzzle-rpg-playcheck.mjs
+          cd /tmp/playcheck-runner
+          node playcheck.mjs
 
       - name: Upload playcheck screenshots
         if: always()
