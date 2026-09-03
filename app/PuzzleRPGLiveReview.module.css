@@ -1,0 +1,85 @@
+.reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
+  justify-content: center !important;
+  gap: 9px !important;
+}
+
+.reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3)) {
+  margin-top: 8px !important;
+  margin-bottom: 0 !important;
+}
+
+.reviewScope :global(main[aria-label="Puzzle RPG mode title"] > footer) {
+  margin-top: 5px !important;
+  margin-bottom: 0 !important;
+}
+
+/*
+ * Live Pages review showed that the field gained a FIELD STATUS row after the
+ * original five-row layout was authored. Give all six primary children an
+ * explicit row so the status and touch controls cannot be clipped below 100dvh.
+ */
+.reviewScope :global(main[data-map][data-screen]) {
+  grid-template-rows: auto auto auto auto auto minmax(146px, 1fr) !important;
+  align-content: stretch !important;
+}
+
+.reviewScope :global(main[data-map][data-screen] > section[aria-label="Field status"]) {
+  min-height: 0 !important;
+  max-height: 82px;
+  overflow: hidden;
+}
+
+.reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"]) {
+  box-sizing: border-box;
+  min-height: 146px !important;
+  align-self: stretch;
+  padding: 36px 14px 9px !important;
+}
+
+/* 44 CSS px is the minimum comfortable touch target for the directional pad. */
+.reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"] > div:first-child) {
+  width: 132px !important;
+  height: 132px !important;
+  grid-template-columns: repeat(3, 44px) !important;
+  grid-template-rows: repeat(3, 44px) !important;
+}
+
+.reviewScope :global(main[data-map][data-screen] button[aria-label^="Move "]) {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+@media (max-height: 700px) {
+  .reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
+    gap: 5px !important;
+  }
+
+  .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3)) {
+    margin-top: 3px !important;
+  }
+
+  .reviewScope :global(main[data-map][data-screen]) {
+    grid-template-rows: auto auto auto auto auto minmax(132px, 1fr) !important;
+  }
+
+  .reviewScope :global(main[data-map][data-screen] > section[aria-label="Field status"]) {
+    max-height: 64px;
+  }
+
+  .reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"]) {
+    min-height: 132px !important;
+    padding: 31px 10px 6px !important;
+  }
+
+  .reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"] > div:first-child) {
+    width: 120px !important;
+    height: 120px !important;
+    grid-template-columns: repeat(3, 40px) !important;
+    grid-template-rows: repeat(3, 40px) !important;
+  }
+
+  .reviewScope :global(main[data-map][data-screen] button[aria-label^="Move "]) {
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+}
