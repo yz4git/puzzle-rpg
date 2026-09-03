@@ -4,6 +4,10 @@ on:
   workflow_run:
     workflows: ["Deploy Puzzle RPG to GitHub Pages"]
     types: [completed]
+  push:
+    paths:
+      - scripts/live-playcheck.mjs
+      - .github/workflows/puzzle-rpg-playcheck.yml
   workflow_dispatch:
 
 permissions:
@@ -11,12 +15,13 @@ permissions:
 
 env:
   PLAYCHECK_URL: https://yz4git.github.io/puzzle-rpg/
+  PLAYCHECK_OUTPUT: ${{ github.workspace }}/playcheck-artifacts
 
 jobs:
   playcheck:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,187 +33,19 @@ jobs:
         with:
           node-version: 22.13.0
 
-      - name: Install isolated Playwright browser
+      - name: Install one isolated Playwright browser
         run: |
-          mkdir -p /tmp/playcheck-runner
-          cd /tmp/playcheck-runner
+          mkdir -p /tmp/puzzle-rpg-playcheck
+          cd /tmp/puzzle-rpg-playcheck
           npm init -y
           npm install --no-audit --no-fund playwright@latest
           npx playwright install --with-deps chromium
+          cp "$GITHUB_WORKSPACE/scripts/live-playcheck.mjs" ./live-playcheck.mjs
 
-      - name: Run iPhone-sized live playcheck
+      - name: Run comprehensive iPhone-sized public Pages playcheck
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/playcheck-artifacts"
-          cat > /tmp/playcheck-runner/playcheck.mjs <<'EOF'
-          import { chromium } from 'playwright';
-          import { writeFile } from 'node:fs/promises';
-          import path from 'node:path';
-
-          const url = process.env.PLAYCHECK_URL;
-          const outputDir = path.join(process.env.GITHUB_WORKSPACE, 'playcheck-artifacts');
-          const report = { url, startedAt: new Date().toISOString(), scenes: [], consoleErrors: [], pageErrors: [], failedResponses: [], assertions: [] };
-          const browser = await chromium.launch({ headless: true });
-
-          async function makePage() {
-            const context = await browser.newContext({
-              viewport: { width: 393, height: 852 },
-              screen: { width: 393, height: 852 },
-              deviceScaleFactor: 2,
-              isMobile: true,
-              hasTouch: true,
-              locale: 'ja-JP',
-              colorScheme: 'dark',
-            });
-            const page = await context.newPage();
-            page.on('console', msg => { if (msg.type() === 'error') report.consoleErrors.push(msg.text()); });
-            page.on('pageerror', err => report.pageErrors.push(String(err)));
-            page.on('response', res => { if (res.status() >= 400) report.failedResponses.push({ status: res.status(), url: res.url() }); });
-            return { context, page };
-          }
-
-          async function snapshot(page, name) {
-            await page.waitForTimeout(500);
-            const metrics = await page.evaluate(() => {
-              const buttons = [...document.querySelectorAll('button')].filter(el => {
-                const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none';
-              });
-              const interactive = buttons.map((el, index) => {
-                const r = el.getBoundingClientRect();
-                return {
-                  index,
-                  text: (el.innerText || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-                  aria: el.getAttribute('aria-label') || '',
-                  x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height),
-                  inViewport: r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth,
-                };
-              });
-              const all = [...document.querySelectorAll('body *')];
-              const overflow = all.map(el => {
-                const r = el.getBoundingClientRect();
-                return { tag: el.tagName, cls: typeof el.className === 'string' ? el.className : '', x: Math.round(r.x), right: Math.round(r.right), width: Math.round(r.width) };
-              }).filter(v => v.width > 1 && (v.x < -2 || v.right > innerWidth + 2)).slice(0, 40);
-              const tinyButtons = interactive.filter(b => b.width < 44 || b.height < 44);
-              return {
-                title: document.title,
-                bodyText: document.body.innerText.replace(/\s+/g, ' ').slice(0, 5000),
-                viewport: { width: innerWidth, height: innerHeight },
-                document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
-                buttons: interactive,
-                tinyButtons,
-                overflow,
-              };
-            });
-            report.scenes.push({ name, ...metrics });
-            await page.screenshot({ path: path.join(outputDir, `${name}.png`), fullPage: true });
-            return metrics;
-          }
-
-          async function advanceStory(page) {
-            for (let i = 0; i < 12; i++) {
-              const overlay = page.locator('[data-page]').first();
-              if (!(await overlay.count())) return;
-              await overlay.tap({ force: true }).catch(async () => {
-                await overlay.click({ force: true }).catch(() => {});
-              });
-              await page.waitForTimeout(180);
-            }
-          }
-
-          async function tapTouch(page, label) {
-            const control = page.getByRole('button', { name: label });
-            if (!(await control.count())) return false;
-            await control.tap({ force: true });
-            await page.waitForTimeout(150);
-            return true;
-          }
-
-          // Title -> RPG Mode -> New Game -> story -> real touch controls -> menu.
-          {
-            const { context, page } = await makePage();
-            await page.goto(`${url}?live_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
-            await snapshot(page, '01-title');
-            await page.getByRole('button', { name: /RPG MODE/i }).tap();
-            await snapshot(page, '02-rpg-choice');
-            await page.getByRole('button', { name: /NEW GAME/i }).tap();
-            await snapshot(page, '03-rpg-intro');
-            await advanceStory(page);
-            const fieldBefore = await snapshot(page, '04-rpg-field');
-
-            for (const label of ['Move up', 'Move right', 'Move right', 'Move down', 'Move down', 'Move left', 'Move left', 'Move up']) {
-              await tapTouch(page, label).catch(() => {});
-            }
-            const fieldAfter = await snapshot(page, '05-rpg-after-controls');
-            const beforeSteps = Number(fieldBefore.bodyText.match(/JOURNEY\s*•\s*(\d+)\s*STEPS/i)?.[1] ?? 0);
-            const afterSteps = Number(fieldAfter.bodyText.match(/JOURNEY\s*•\s*(\d+)\s*STEPS/i)?.[1] ?? 0);
-            report.assertions.push({ name: 'RPG touch movement advances steps', pass: afterSteps > beforeSteps, beforeSteps, afterSteps });
-
-            const menuButton = page.getByRole('button', { name: /B\s*MENU/i });
-            if (await menuButton.count()) {
-              await menuButton.tap({ force: true });
-              await page.waitForTimeout(250);
-              await snapshot(page, '06-rpg-menu');
-              const close = page.getByRole('button', { name: /B\s*•?\s*CLOSE/i });
-              if (await close.count()) await close.tap({ force: true }).catch(() => {});
-            }
-            await context.close();
-          }
-
-          // Fresh title -> Chapter Battle -> start -> perform one valid adjacent cluster.
-          {
-            const { context, page } = await makePage();
-            await page.goto(`${url}?chapter_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
-            await page.getByRole('button', { name: /CHAPTER BATTLE/i }).tap();
-            await snapshot(page, '07-chapter-intro');
-            const start = page.getByRole('button', { name: /BATTLE START/i });
-            if (await start.count()) await start.tap();
-            await page.waitForTimeout(350);
-            const battleBefore = await snapshot(page, '08-chapter-live');
-
-            const cells = page.locator('button:visible');
-            const cellData = [];
-            for (let i = 0; i < await cells.count(); i++) {
-              const b = cells.nth(i);
-              const box = await b.boundingBox().catch(() => null);
-              if (!box || box.width < 48 || box.width > 72 || box.height < 48 || box.height > 72) continue;
-              if (box.y < 250 || box.y > 760) continue;
-              const text = (await b.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
-              if (!/ATK|HEAL|BAR|SKIP/i.test(text)) continue;
-              cellData.push({ locator: b, box, text });
-            }
-            let picked = null;
-            for (let i = 0; i < cellData.length && !picked; i++) {
-              for (let j = i + 1; j < cellData.length; j++) {
-                if (cellData[i].text !== cellData[j].text) continue;
-                const dx = Math.abs(cellData[i].box.x - cellData[j].box.x);
-                const dy = Math.abs(cellData[i].box.y - cellData[j].box.y);
-                if ((dx < 4 && dy > 50 && dy < 70) || (dy < 4 && dx > 50 && dx < 70)) {
-                  picked = cellData[i].locator;
-                  break;
-                }
-              }
-            }
-            if (picked) {
-              await picked.tap({ force: true }).catch(async () => picked.click().catch(() => {}));
-              await page.waitForTimeout(750);
-            }
-            const battleAfter = await snapshot(page, '09-chapter-after-move');
-            const beforeTurn = Number(battleBefore.bodyText.match(/TURN\s+(\d+)/i)?.[1] ?? 0);
-            const afterTurn = Number(battleAfter.bodyText.match(/TURN\s+(\d+)/i)?.[1] ?? 0);
-            report.assertions.push({ name: 'Chapter Battle valid cluster advances turn', pass: afterTurn > beforeTurn, beforeTurn, afterTurn });
-            await context.close();
-          }
-
-          report.finishedAt = new Date().toISOString();
-          await writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
-          await browser.close();
-
-          console.log(JSON.stringify(report, null, 2));
-          const assetFailures = report.failedResponses.filter(r => r.url.includes('/assets/'));
-          const assertionFailures = report.assertions.filter(result => !result.pass);
-          if (report.pageErrors.length || assetFailures.length || assertionFailures.length || report.failedResponses.some(r => r.status >= 500)) process.exitCode = 1;
-          EOF
-          cd /tmp/playcheck-runner
-          node playcheck.mjs
+          cd /tmp/puzzle-rpg-playcheck
+          node live-playcheck.mjs
 
       - name: Upload playcheck screenshots
         if: always()
