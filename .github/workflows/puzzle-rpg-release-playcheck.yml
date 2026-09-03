@@ -83,6 +83,19 @@ jobs:
             return true;
           }
 
+          async function talkOnce() {
+            const launcher = page.getByRole('button', { name: /RPG COMMAND/i });
+            if (!(await launcher.count())) return false;
+            await launcher.first().tap({ force: true });
+            const commandWindow = page.locator('[class*="commandWindow"]');
+            await commandWindow.waitFor({ state: 'visible', timeout: 2500 });
+            const talkButton = commandWindow.locator('button').filter({ hasText: 'TALK' }).first();
+            if (!(await talkButton.count())) return false;
+            await talkButton.tap({ force: true });
+            await commandWindow.waitFor({ state: 'hidden', timeout: 2500 });
+            return true;
+          }
+
           const save = {
             version: 1, playerName: 'LIO', level: 1, exp: 0, hp: 22, maxHp: 22, gold: 18,
             mapId: 'world', position: { x: 10, y: 19 }, direction: 'right',
@@ -110,10 +123,9 @@ jobs:
           assert('A CHECK opens fixed FOREST WISP battle', /FOREST WISP/i.test(battle.text) && /TURN 1/i.test(battle.text));
 
           for (let index = 1; index <= 3; index++) {
-            await tap(/RPG COMMAND/i);
-            await page.waitForTimeout(120);
-            await tap(/^TALK/i);
-            await page.waitForTimeout(index === 3 ? 1300 : 1550);
+            const talked = await talkOnce();
+            assert(`TALK ${index} command is clickable`, talked);
+            await page.waitForTimeout(index === 3 ? 1350 : 1600);
             if (index < 3) {
               const scene = await shot(`0${index + 2}-after-talk-${index}`);
               assert(`TALK ${index} remains in battle`, new RegExp(`TURN ${index + 1}`).test(scene.text) && /FOREST WISP/i.test(scene.text));
