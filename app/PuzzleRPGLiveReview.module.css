@@ -3,25 +3,32 @@
   gap: 7px !important;
 }
 
-/* Keep the strong logo/hero opening, then deliberately move the actual choice
- * into the lower-middle of the phone instead of pinning it to an extreme edge. */
+/* The live iPhone capture showed almost half of the lower screen unused. Keep
+ * the logo/hero opening intact, then place the actual mode choice in the lower
+ * half where the thumb naturally reaches it. */
 .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3)) {
-  margin-top: clamp(58px, 9dvh, 82px) !important;
+  margin-top: clamp(170px, 28dvh, 245px) !important;
   margin-bottom: 0 !important;
 }
 
+.reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3) > button:nth-child(3)) {
+  padding-left: 48px !important;
+}
+
 .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > footer) {
-  margin-top: 8px !important;
+  margin-top: 10px !important;
   margin-bottom: 0 !important;
 }
 
 /*
  * Live Pages review showed that the field gained a FIELD STATUS row after the
  * original five-row layout was authored. Give all six primary children an
- * explicit row so the status and touch controls cannot be clipped below 100dvh.
+ * explicit row so status and touch controls cannot be clipped below 100dvh.
+ * On tall phones the control deck also consumes the previously-empty lower
+ * strip instead of ending ~120 CSS px above the bottom edge.
  */
 .reviewScope :global(main[data-map][data-screen]) {
-  grid-template-rows: auto auto auto auto auto minmax(146px, 1fr) !important;
+  grid-template-rows: auto auto auto auto auto minmax(clamp(180px, 31dvh, 268px), 1fr) !important;
   align-content: stretch !important;
 }
 
@@ -33,7 +40,7 @@
 
 .reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"]) {
   box-sizing: border-box;
-  min-height: 146px !important;
+  min-height: clamp(180px, 31dvh, 268px) !important;
   align-self: stretch;
   padding: 36px 14px 9px !important;
 }
@@ -51,6 +58,12 @@
   min-height: 44px !important;
 }
 
+/* FIELD MENU header close control measured only 40px high in the live capture. */
+.reviewScope :global(main[data-map][data-screen] > div > div > header > button) {
+  min-height: 44px !important;
+  padding-block: 7px !important;
+}
+
 @media (max-height: 700px) {
   .reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
     gap: 4px !important;
@@ -58,6 +71,10 @@
 
   .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3)) {
     margin-top: 18px !important;
+  }
+
+  .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3) > button:nth-child(3)) {
+    padding-left: 40px !important;
   }
 
   .reviewScope :global(main[data-map][data-screen]) {
