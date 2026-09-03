@@ -2154,6 +2154,22 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   const nearPortal = findAt(map.portals);
   const terrainLabel = isRoadTile(currentTile) ? "ROAD • SAFE" : isDangerTile(currentTile) ? "DANGER • HIGH ENCOUNTER" : map.kind === "town" ? "TOWN • SAFE" : map.kind === "training" ? "TRAINING • SAFE" : "FIELD • ENCOUNTER";
   const activeMemo = save.memos.find((memo) => !memo.read) ?? save.memos[save.memos.length - 1];
+const fieldGoal = (() => {
+  const flag = (id: string) => save.flags.includes(id);
+  const fourSchools: TechniqueId[] = ["flameLore", "firstAid", "fortress", "timeTheft"];
+  const missingSchools = fourSchools.filter((id) => !save.techniques.includes(id));
+  if (flag("story:ending") || flag("boss:prismSovereign")) return { title: "旅の答え", text: "PRISM ROADに残した声と選択をMEMOで振り返る。" };
+  if (flag("gate:citadel") || flag("boss:nullExecutioner")) return { title: "PRISM CITADEL", text: "北東のPRISM CITADELへ進み、PRISM SOVEREIGNと向き合う。" };
+  if (flag("void:clear")) {
+    if (!flag("key:mirror")) return { title: "MIRROR TOWER", text: "最後の門には鏡鍵が必要だ。北のMIRROR TOWERで鍵を得る。" };
+    if (missingSchools.length) return { title: "四つの修行印", text: `残る修行は${missingSchools.length}つ。炎・癒し・鉄壁・時の師を訪ねる。` };
+    return { title: "PRISM CITADEL", text: "VOIDの証・鏡鍵・四つの修行印が揃った。北東の最後の門へ進む。" };
+  }
+  if (flag("boss:ironTyrant")) return { title: "VOID PASS", text: "IRON CITYの北門が開いた。北東のVOID PASSを突破する。" };
+  if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、IRON TYRANTと向き合う。" };
+  if (flag("boss:templeKeeper")) return { title: "CRIMSON MARSH", text: "古寺の橋印を得た。IRON TYRANTへの道を開くため、東のCRIMSON MARSHでSCARLET ORACLEを越える。" };
+  return { title: activeMemo?.title ?? map.name, text: activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。" };
+})();
   const armorLabel = save.equipment.armor ? EQUIPMENT[save.equipment.armor].name : "NO ARMOR";
   const encounterLabel = map.kind === "town" || map.kind === "training" || isRoadTile(currentTile) ? "SAFE" : `${save.encounterMeter} STEP`;
 
@@ -2191,7 +2207,7 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       <div className={styles.memoStrip}><span><RPGIcon name="memo" size={10} /> MEMO {save.memos.filter((memo) => !memo.read).length ? `NEW ${save.memos.filter((memo) => !memo.read).length}` : save.memos.length}</span><strong>JOURNEY • {save.steps} STEPS</strong></div>
 
       <section className={styles.fieldBrief} aria-label="Field status">
-        <div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{activeMemo?.title ?? map.name}</strong><small>{activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。"}</small></div>
+        <div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{fieldGoal.title}</strong><small>{fieldGoal.text}</small></div>
         <div className={styles.fieldQuick}>
           <div><span>NEXT LV</span><strong>{Math.max(0, expForNextLevel(save.level) - save.exp)} EXP</strong></div>
           <div><span>ARMOR</span><strong>{armorLabel}</strong></div>

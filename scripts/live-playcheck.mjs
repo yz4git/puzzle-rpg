@@ -467,6 +467,7 @@ async function storedSave(page) {
   await page.waitForTimeout(500);
   const templeReturn = await snapshot(page, '20-temple-return');
   assert('Boss victory returns to OLD TEMPLE', /OLD TEMPLE/i.test(templeReturn.text) && !/YOU AWAKEN/i.test(templeReturn.text));
+  assert('NEXT GOAL advances from Old Temple to Crimson Marsh', /NEXT GOAL\s+CRIMSON MARSH/i.test(templeReturn.text) && !/北のOld Templeへ向かう/i.test(templeReturn.text), { text: templeReturn.text.slice(0, 1400) });
   await tap(page, /A\s*CHECK/i);
   await page.waitForTimeout(500);
   assert('Cleared boss does not reopen when checked again', await page.locator('main[data-enemy]').count() === 0 && !/OLD TEMPLE KEEPER/i.test(await bodyText(page)));
