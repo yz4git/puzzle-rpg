@@ -1,0 +1,94 @@
+name: One-shot RPG command race fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-command-race-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch command resolution race and live playcheck
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          battle_path = Path('app/rpg/RPGPuzzleBattle.tsx')
+          battle = battle_path.read_text()
+          old_button = '''      <button className={styles.commandButton} type="button" onClick={() => { primeAudio(); playSfx("uiSelect"); setCommandOpen(true); setCommandPage("root"); }}><RPGIcon name="talk" size={14} /> B • RPG COMMAND</button>'''
+          new_button = '''      <button className={styles.commandButton} type="button" disabled={resolving} onClick={() => { if (resolving) return; primeAudio(); playSfx("uiSelect"); setCommandOpen(true); setCommandPage("root"); }}><RPGIcon name="talk" size={14} /> B • RPG COMMAND</button>'''
+          if old_button not in battle:
+              raise SystemExit('RPG command button pattern not found')
+          battle_path.write_text(battle.replace(old_button, new_button, 1))
+
+          script_path = Path('scripts/live-playcheck.mjs')
+          script = script_path.read_text()
+          old_open = '''async function openCommand(page) {
+            const launcher = page.getByRole('button', { name: /RPG COMMAND/i });
+            if (!(await launcher.count())) return null;
+            await launcher.first().tap({ force: true });
+            const win = page.locator('[class*="commandWindow"]');
+            await win.waitFor({ state: 'visible', timeout: 2500 });
+            return win;
+          }'''
+          new_open = '''async function openCommand(page) {
+            const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
+            if (!(await launcher.count())) return null;
+            await launcher.waitFor({ state: 'visible', timeout: 2500 });
+            const ready = await launcher.isEnabled().catch(() => false)
+              || await launcher.waitFor({ state: 'attached', timeout: 2500 }).then(async () => {
+                const started = Date.now();
+                while (Date.now() - started < 3200) {
+                  if (await launcher.isEnabled().catch(() => false)) return true;
+                  await page.waitForTimeout(120);
+                }
+                return false;
+              }).catch(() => false);
+            if (!ready) return null;
+            await launcher.tap();
+            const win = page.locator('[class*="commandWindow"]');
+            await win.waitFor({ state: 'visible', timeout: 2500 });
+            return win;
+          }'''
+          if old_open not in script:
+              raise SystemExit('openCommand pattern not found')
+          script = script.replace(old_open, new_open, 1)
+
+          old_talk = '''async function talkOnce(page) {
+            const win = await openCommand(page);
+            if (!win) return false;
+            const talk = win.locator('button').filter({ hasText: 'TALK' }).first();
+            if (!(await talk.count())) return false;
+            await talk.tap({ force: true });
+            await win.waitFor({ state: 'hidden', timeout: 2500 }).catch(() => {});
+            return true;
+          }'''
+          new_talk = '''async function talkOnce(page) {
+            const win = await openCommand(page);
+            if (!win) return false;
+            const talk = win.locator('button').filter({ hasText: 'TALK' }).first();
+            if (!(await talk.count()) || !(await talk.isEnabled().catch(() => false))) return false;
+            await talk.tap();
+            return win.waitFor({ state: 'hidden', timeout: 2500 }).then(() => true).catch(() => false);
+          }'''
+          if old_talk not in script:
+              raise SystemExit('talkOnce pattern not found')
+          script_path.write_text(script.replace(old_talk, new_talk, 1))
+          PY
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/rpg/RPGPuzzleBattle.tsx scripts/live-playcheck.mjs
+          git diff --cached --check
+          git commit -m 'Fix RPG command resolution race'
+          git push origin HEAD:main
