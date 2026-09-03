@@ -85,6 +85,15 @@
   min-height: 46px !important;
 }
 
+/* The alternative-resolution live run exposed one final undersized action:
+ * the reward/results CONTINUE button was only 41px tall. Make the battle report
+ * hand-off intentionally thumb-sized because every victory/release route uses it. */
+.reviewScope :global(main[data-map][data-screen] [class*="resultCard"] > button) {
+  min-height: 48px !important;
+  padding-block: 9px !important;
+  touch-action: manipulation;
+}
+
 @media (max-height: 700px) {
   .reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
     gap: 4px !important;
@@ -127,5 +136,9 @@
   .reviewScope :global(main[data-enemy] > button),
   .reviewScope :global(main[data-enemy] [class*="commandWindow"] button) {
     min-height: 44px !important;
+  }
+
+  .reviewScope :global(main[data-map][data-screen] [class*="resultCard"] > button) {
+    min-height: 48px !important;
   }
 }
