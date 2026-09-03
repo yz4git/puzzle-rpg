@@ -23,9 +23,8 @@ jobs:
 
           mode_path = Path('app/rpg/RPGMode.tsx')
           mode = mode_path.read_text()
-          old_goal = '''  const activeMemo = save.memos.find((memo) => !memo.read) ?? save.memos[save.memos.length - 1];
-          const armorLabel = save.equipment.armor ? EQUIPMENT[save.equipment.armor].name : "NO ARMOR";'''
-          new_goal = '''  const activeMemo = save.memos.find((memo) => !memo.read) ?? save.memos[save.memos.length - 1];
+          memo_marker = '  const activeMemo = save.memos.find((memo) => !memo.read) ?? save.memos[save.memos.length - 1];'
+          goal_block = '''
           const fieldGoal = (() => {
             const flag = (id: string) => save.flags.includes(id);
             const fourSchools: TechniqueId[] = ["flameLore", "firstAid", "fortress", "timeTheft"];
@@ -41,28 +40,24 @@ jobs:
             if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、IRON TYRANTと向き合う。" };
             if (flag("boss:templeKeeper")) return { title: "CRIMSON MARSH", text: "古寺の橋印を得た。IRON TYRANTへの道を開くため、東のCRIMSON MARSHでSCARLET ORACLEを越える。" };
             return { title: activeMemo?.title ?? map.name, text: activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。" };
-          })();
-          const armorLabel = save.equipment.armor ? EQUIPMENT[save.equipment.armor].name : "NO ARMOR";'''
-          if old_goal not in mode:
-              raise SystemExit('activeMemo anchor not found')
-          mode = mode.replace(old_goal, new_goal, 1)
+          })();'''
+          if memo_marker not in mode:
+              raise SystemExit('activeMemo marker not found')
+          mode = mode.replace(memo_marker, memo_marker + goal_block, 1)
 
-          old_render = '''<div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{activeMemo?.title ?? map.name}</strong><small>{activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。"}</small></div>'''
-          new_render = '''<div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{fieldGoal.title}</strong><small>{fieldGoal.text}</small></div>'''
+          old_render = '<div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{activeMemo?.title ?? map.name}</strong><small>{activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。"}</small></div>'
+          new_render = '<div className={styles.fieldGoal}><span>NEXT GOAL</span><strong>{fieldGoal.title}</strong><small>{fieldGoal.text}</small></div>'
           if old_render not in mode:
               raise SystemExit('fieldGoal render anchor not found')
           mode_path.write_text(mode.replace(old_render, new_render, 1))
 
           script_path = Path('scripts/live-playcheck.mjs')
           script = script_path.read_text()
-          old_assert = '''  assert('Boss victory returns to OLD TEMPLE', /OLD TEMPLE/i.test(templeReturn.text) && !/YOU AWAKEN/i.test(templeReturn.text));
-          await tap(page, /A\\s*CHECK/i);'''
-          new_assert = '''  assert('Boss victory returns to OLD TEMPLE', /OLD TEMPLE/i.test(templeReturn.text) && !/YOU AWAKEN/i.test(templeReturn.text));
-          assert('NEXT GOAL advances from Old Temple to Crimson Marsh', /NEXT GOAL\\s+CRIMSON MARSH/i.test(templeReturn.text) && !/北のOld Templeへ向かう/i.test(templeReturn.text), { text: templeReturn.text.slice(0, 1400) });
-          await tap(page, /A\\s*CHECK/i);'''
-          if old_assert not in script:
-              raise SystemExit('boss return assertion anchor not found')
-          script_path.write_text(script.replace(old_assert, new_assert, 1))
+          assert_marker = "  assert('Boss victory returns to OLD TEMPLE', /OLD TEMPLE/i.test(templeReturn.text) && !/YOU AWAKEN/i.test(templeReturn.text));"
+          next_assert = "\n  assert('NEXT GOAL advances from Old Temple to Crimson Marsh', /NEXT GOAL\\s+CRIMSON MARSH/i.test(templeReturn.text) && !/北のOld Templeへ向かう/i.test(templeReturn.text), { text: templeReturn.text.slice(0, 1400) });"
+          if assert_marker not in script:
+              raise SystemExit('boss return assertion marker not found')
+          script_path.write_text(script.replace(assert_marker, assert_marker + next_assert, 1))
           PY
       - name: Commit fix and remove this one-shot workflow
         shell: bash
