@@ -1,5 +1,6 @@
 name: Deploy Puzzle RPG to GitHub Pages
 
+# Public deployment for the iPhone/Web build.
 on:
   push:
     branches: [main]
