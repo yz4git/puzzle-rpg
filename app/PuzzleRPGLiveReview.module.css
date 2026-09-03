@@ -64,6 +64,29 @@
   padding-block: 7px !important;
 }
 
+/* Deep live playcheck: the RPG battle board itself was excellent at 60px, but
+ * the command launcher measured only 29px and modal actions 36-43px. Preserve
+ * the dense battle composition while making every non-board action a reliable
+ * iPhone touch target. The selectors stay under data-enemy so Chapter Battle
+ * and field controls are unaffected. */
+.reviewScope :global(main[data-enemy] > button) {
+  min-height: 44px !important;
+  padding-block: 8px !important;
+}
+
+.reviewScope :global(main[data-enemy] [role="dialog"] button) {
+  min-height: 44px !important;
+  padding-block: 8px !important;
+  touch-action: manipulation;
+}
+
+/* The command/status close row is intentionally a little larger than the bare
+ * minimum because it sits at the bottom edge of an overlay and is frequently
+ * used with the thumb. */
+.reviewScope :global(main[data-enemy] [role="dialog"] button:last-child) {
+  min-height: 46px !important;
+}
+
 @media (max-height: 700px) {
   .reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
     gap: 4px !important;
@@ -100,5 +123,12 @@
   .reviewScope :global(main[data-map][data-screen] button[aria-label^="Move "]) {
     min-width: 40px !important;
     min-height: 40px !important;
+  }
+
+  /* Do not shrink battle command actions below the iOS comfort target even on
+   * shorter portrait screens; the fixed overlay can use its own available room. */
+  .reviewScope :global(main[data-enemy] > button),
+  .reviewScope :global(main[data-enemy] [role="dialog"] button) {
+    min-height: 44px !important;
   }
 }
