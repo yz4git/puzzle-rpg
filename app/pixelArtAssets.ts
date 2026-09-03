@@ -2,20 +2,20 @@ export type PixelEnemyKind = "warden" | "bastion" | "oracle" | "null" | "trickst
 export type PixelOrbKind = "fire" | "water" | "light" | "heart" | "guard";
 
 export const PIXEL_ART_ASSETS = {
-  hero: "/assets/pixel8/hero.png",
+  hero: "./assets/pixel8/hero.png",
   enemies: {
-    warden: "/assets/pixel8/warden.png",
-    bastion: "/assets/pixel8/bastion.png",
-    oracle: "/assets/pixel8/oracle.png",
-    null: "/assets/pixel8/null-knight.png",
-    trickster: "/assets/pixel8/trickster.png",
+    warden: "./assets/pixel8/warden.png",
+    bastion: "./assets/pixel8/bastion.png",
+    oracle: "./assets/pixel8/oracle.png",
+    null: "./assets/pixel8/null-knight.png",
+    trickster: "./assets/pixel8/trickster.png",
   } satisfies Record<PixelEnemyKind, string>,
   orbs: {
-    fire: "/assets/pixel8/orbs/fire.png",
-    water: "/assets/pixel8/orbs/water.png",
-    light: "/assets/pixel8/orbs/light.png",
-    heart: "/assets/pixel8/orbs/heart.png",
-    guard: "/assets/pixel8/orbs/guard.png",
+    fire: "./assets/pixel8/orbs/fire.png",
+    water: "./assets/pixel8/orbs/water.png",
+    light: "./assets/pixel8/orbs/light.png",
+    heart: "./assets/pixel8/orbs/heart.png",
+    guard: "./assets/pixel8/orbs/guard.png",
   } satisfies Record<PixelOrbKind, string>,
 } as const;
 
