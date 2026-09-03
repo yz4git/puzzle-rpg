@@ -1,15 +1,17 @@
 .reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
-  justify-content: center !important;
-  gap: 9px !important;
+  justify-content: flex-start !important;
+  gap: 7px !important;
 }
 
+/* Keep the strong logo/hero opening, then deliberately move the actual choice
+ * into the lower-middle of the phone instead of pinning it to an extreme edge. */
 .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3)) {
-  margin-top: 8px !important;
+  margin-top: clamp(58px, 9dvh, 82px) !important;
   margin-bottom: 0 !important;
 }
 
 .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > footer) {
-  margin-top: 5px !important;
+  margin-top: 8px !important;
   margin-bottom: 0 !important;
 }
 
@@ -51,11 +53,11 @@
 
 @media (max-height: 700px) {
   .reviewScope :global(main[aria-label="Puzzle RPG mode title"]) {
-    gap: 5px !important;
+    gap: 4px !important;
   }
 
   .reviewScope :global(main[aria-label="Puzzle RPG mode title"] > div:nth-of-type(3)) {
-    margin-top: 3px !important;
+    margin-top: 18px !important;
   }
 
   .reviewScope :global(main[data-map][data-screen]) {
