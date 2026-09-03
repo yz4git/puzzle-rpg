@@ -1,10 +1,9 @@
 name: Puzzle RPG Live Playcheck
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/puzzle-rpg-playcheck.yml
+  workflow_run:
+    workflows: ["Deploy Puzzle RPG to GitHub Pages"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -15,11 +14,14 @@ env:
 
 jobs:
   playcheck:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -65,7 +67,7 @@ jobs:
           }
 
           async function snapshot(page, name) {
-            await page.waitForTimeout(700);
+            await page.waitForTimeout(500);
             const metrics = await page.evaluate(() => {
               const buttons = [...document.querySelectorAll('button')].filter(el => {
                 const s = getComputedStyle(el); return s.visibility !== 'hidden' && s.display !== 'none';
@@ -88,7 +90,7 @@ jobs:
               const tinyButtons = interactive.filter(b => b.width < 44 || b.height < 44);
               return {
                 title: document.title,
-                bodyText: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
+                bodyText: document.body.innerText.replace(/\s+/g, ' ').slice(0, 5000),
                 viewport: { width: innerWidth, height: innerHeight },
                 document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
                 buttons: interactive,
@@ -100,7 +102,27 @@ jobs:
             await page.screenshot({ path: path.join(outputDir, `${name}.png`), fullPage: true });
           }
 
-          // Title -> RPG Mode -> New Game -> movement and action controls.
+          async function advanceStory(page) {
+            for (let i = 0; i < 12; i++) {
+              const overlay = page.locator('[data-page]').first();
+              if (!(await overlay.count())) return;
+              await overlay.dispatchEvent('pointerdown', { pointerId: 10 + i, pointerType: 'touch', isPrimary: true }).catch(() => {});
+              await overlay.dispatchEvent('pointerup', { pointerId: 10 + i, pointerType: 'touch', isPrimary: true }).catch(() => {});
+              await page.waitForTimeout(180);
+            }
+          }
+
+          async function tapTouch(page, label, pointerId) {
+            const control = page.getByRole('button', { name: label });
+            if (!(await control.count())) return false;
+            await control.dispatchEvent('pointerdown', { pointerId, pointerType: 'touch', isPrimary: true });
+            await page.waitForTimeout(100);
+            await control.dispatchEvent('pointerup', { pointerId, pointerType: 'touch', isPrimary: true });
+            await page.waitForTimeout(130);
+            return true;
+          }
+
+          // Title -> RPG Mode -> New Game -> story -> field -> controls -> menu.
           {
             const { context, page } = await makePage();
             await page.goto(`${url}?live_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
@@ -108,47 +130,66 @@ jobs:
             await page.getByRole('button', { name: /RPG MODE/i }).click();
             await snapshot(page, '02-rpg-choice');
             await page.getByRole('button', { name: /NEW GAME/i }).click();
-            await snapshot(page, '03-rpg-world');
+            await snapshot(page, '03-rpg-intro');
+            await advanceStory(page);
+            await snapshot(page, '04-rpg-field');
 
+            let pointerId = 30;
             for (const label of ['Move up', 'Move right', 'Move down', 'Move left']) {
-              const control = page.getByRole('button', { name: label });
-              if (await control.count()) {
-                await control.dispatchEvent('pointerdown', { pointerId: 1, pointerType: 'touch', isPrimary: true });
-                await page.waitForTimeout(90);
-                await control.dispatchEvent('pointerup', { pointerId: 1, pointerType: 'touch', isPrimary: true });
-                await page.waitForTimeout(120);
-              }
+              await tapTouch(page, label, pointerId++).catch(() => {});
             }
-            const a = page.getByRole('button', { name: /A\s*CHECK/i });
-            if (await a.count()) {
-              await a.dispatchEvent('pointerdown', { pointerId: 2, pointerType: 'touch', isPrimary: true }).catch(() => {});
-              await page.waitForTimeout(100);
-              await a.dispatchEvent('pointerup', { pointerId: 2, pointerType: 'touch', isPrimary: true }).catch(() => {});
+            await snapshot(page, '05-rpg-after-controls');
+
+            const menuButton = page.getByRole('button', { name: /B\s*MENU/i });
+            if (await menuButton.count()) {
+              await menuButton.dispatchEvent('pointerdown', { pointerId: pointerId++, pointerType: 'touch', isPrimary: true }).catch(() => {});
+              await page.waitForTimeout(250);
+              await snapshot(page, '06-rpg-menu');
+              const close = page.getByRole('button', { name: /B\s*•?\s*CLOSE/i });
+              if (await close.count()) await close.click().catch(() => {});
             }
-            await snapshot(page, '04-rpg-after-controls');
             await context.close();
           }
 
-          // Fresh title -> Chapter Battle -> interact with one board cell.
+          // Fresh title -> Chapter Battle -> start -> perform one valid adjacent cluster.
           {
             const { context, page } = await makePage();
             await page.goto(`${url}?chapter_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
             await page.getByRole('button', { name: /CHAPTER BATTLE/i }).click();
-            await snapshot(page, '05-chapter-battle');
+            await snapshot(page, '07-chapter-intro');
+            const start = page.getByRole('button', { name: /BATTLE START/i });
+            if (await start.count()) await start.click();
+            await page.waitForTimeout(350);
+            await snapshot(page, '08-chapter-live');
 
-            const candidates = page.locator('button:visible');
-            const count = await candidates.count();
-            for (let i = 0; i < count; i++) {
-              const b = candidates.nth(i);
+            const cells = page.locator('button:visible');
+            const cellData = [];
+            for (let i = 0; i < await cells.count(); i++) {
+              const b = cells.nth(i);
               const box = await b.boundingBox().catch(() => null);
-              if (!box) continue;
-              if (box.width >= 32 && box.width <= 85 && box.height >= 32 && box.height <= 85 && box.y > 220 && box.y < 720) {
-                await b.click().catch(() => {});
-                await page.waitForTimeout(650);
-                break;
+              if (!box || box.width < 48 || box.width > 72 || box.height < 48 || box.height > 72) continue;
+              if (box.y < 250 || box.y > 760) continue;
+              const text = (await b.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+              if (!/ATK|HEAL|BAR|SKIP/i.test(text)) continue;
+              cellData.push({ locator: b, box, text });
+            }
+            let picked = null;
+            for (let i = 0; i < cellData.length && !picked; i++) {
+              for (let j = i + 1; j < cellData.length; j++) {
+                if (cellData[i].text !== cellData[j].text) continue;
+                const dx = Math.abs(cellData[i].box.x - cellData[j].box.x);
+                const dy = Math.abs(cellData[i].box.y - cellData[j].box.y);
+                if ((dx < 4 && dy > 50 && dy < 70) || (dy < 4 && dx > 50 && dx < 70)) {
+                  picked = cellData[i].locator;
+                  break;
+                }
               }
             }
-            await snapshot(page, '06-chapter-after-move');
+            if (picked) {
+              await picked.click().catch(() => {});
+              await page.waitForTimeout(750);
+            }
+            await snapshot(page, '09-chapter-after-move');
             await context.close();
           }
 
@@ -157,7 +198,8 @@ jobs:
           await browser.close();
 
           console.log(JSON.stringify(report, null, 2));
-          if (report.pageErrors.length || report.failedResponses.some(r => r.status >= 500)) process.exitCode = 1;
+          const assetFailures = report.failedResponses.filter(r => r.url.includes('/assets/'));
+          if (report.pageErrors.length || assetFailures.length || report.failedResponses.some(r => r.status >= 500)) process.exitCode = 1;
           EOF
           cd /tmp/playcheck-runner
           node playcheck.mjs
