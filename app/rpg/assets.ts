@@ -1,16 +1,16 @@
 import type { Direction, MapDefinition, NPCDefinition } from "./types";
 
 export const RPG_ASSETS = {
-  hero: "/assets/rpg/atlas/hero.png",
-  heroTitle: "/assets/rpg/atlas/hero-title.png",
-  npcs: "/assets/rpg/atlas/npcs.png",
-  field: "/assets/rpg/atlas/field.png",
-  town: "/assets/rpg/atlas/town.png",
-  dungeon: "/assets/rpg/atlas/dungeon.png",
-  enemyA: "/assets/rpg/atlas/enemy-a.png",
-  enemyB: "/assets/rpg/atlas/enemy-b.png",
-  bosses: "/assets/rpg/atlas/boss.png",
-  ui: "/assets/rpg/atlas/ui.png",
+  hero: "./assets/rpg/atlas/hero.png",
+  heroTitle: "./assets/rpg/atlas/hero-title.png",
+  npcs: "./assets/rpg/atlas/npcs.png",
+  field: "./assets/rpg/atlas/field.png",
+  town: "./assets/rpg/atlas/town.png",
+  dungeon: "./assets/rpg/atlas/dungeon.png",
+  enemyA: "./assets/rpg/atlas/enemy-a.png",
+  enemyB: "./assets/rpg/atlas/enemy-b.png",
+  bosses: "./assets/rpg/atlas/boss.png",
+  ui: "./assets/rpg/atlas/ui.png",
 } as const;
 
 export type AtlasKey = "field" | "town" | "dungeon";
