@@ -64,26 +64,24 @@
   padding-block: 7px !important;
 }
 
-/* Deep live playcheck: the RPG battle board itself was excellent at 60px, but
- * the command launcher measured only 29px and modal actions 36-43px. Preserve
- * the dense battle composition while making every non-board action a reliable
- * iPhone touch target. The selectors stay under data-enemy so Chapter Battle
- * and field controls are unaffected. */
+/* Deep live playcheck: the RPG battle board is already 60px, but the launcher
+ * was 29px and command/status actions were 36-43px. The command overlay does
+ * not expose role=dialog, so target its real CSS-module class rather than an
+ * assumed ARIA structure. */
 .reviewScope :global(main[data-enemy] > button) {
-  min-height: 44px !important;
-  padding-block: 8px !important;
-}
-
-.reviewScope :global(main[data-enemy] [role="dialog"] button) {
   min-height: 44px !important;
   padding-block: 8px !important;
   touch-action: manipulation;
 }
 
-/* The command/status close row is intentionally a little larger than the bare
- * minimum because it sits at the bottom edge of an overlay and is frequently
- * used with the thumb. */
-.reviewScope :global(main[data-enemy] [role="dialog"] button:last-child) {
+.reviewScope :global(main[data-enemy] [class*="commandWindow"] button) {
+  min-height: 44px !important;
+  padding-block: 8px !important;
+  touch-action: manipulation;
+}
+
+/* CLOSE is a frequent thumb action at the bottom edge of the modal. */
+.reviewScope :global(main[data-enemy] [class*="commandWindow"] > button:last-child) {
   min-height: 46px !important;
 }
 
@@ -101,7 +99,7 @@
   }
 
   .reviewScope :global(main[data-map][data-screen]) {
-    grid-template-rows: auto auto auto auto auto minmax(132px, 1fr) !important;
+    grid-template-rows: auto auto auto auto auto minmax(140px, 1fr) !important;
   }
 
   .reviewScope :global(main[data-map][data-screen] > section[aria-label="Field status"]) {
@@ -109,26 +107,25 @@
   }
 
   .reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"]) {
-    min-height: 132px !important;
+    min-height: 140px !important;
     padding: 31px 10px 6px !important;
   }
 
+  /* Never shrink touch targets below 44px on shorter iPhones. */
   .reviewScope :global(main[data-map][data-screen] > section[aria-label="RPG touch controls"] > div:first-child) {
-    width: 120px !important;
-    height: 120px !important;
-    grid-template-columns: repeat(3, 40px) !important;
-    grid-template-rows: repeat(3, 40px) !important;
+    width: 132px !important;
+    height: 132px !important;
+    grid-template-columns: repeat(3, 44px) !important;
+    grid-template-rows: repeat(3, 44px) !important;
   }
 
   .reviewScope :global(main[data-map][data-screen] button[aria-label^="Move "]) {
-    min-width: 40px !important;
-    min-height: 40px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
   }
 
-  /* Do not shrink battle command actions below the iOS comfort target even on
-   * shorter portrait screens; the fixed overlay can use its own available room. */
   .reviewScope :global(main[data-enemy] > button),
-  .reviewScope :global(main[data-enemy] [role="dialog"] button) {
+  .reviewScope :global(main[data-enemy] [class*="commandWindow"] button) {
     min-height: 44px !important;
   }
 }
