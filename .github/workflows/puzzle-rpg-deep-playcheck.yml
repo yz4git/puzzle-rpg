@@ -1,0 +1,223 @@
+name: Puzzle RPG Deep Live Playcheck
+
+on:
+  workflow_run:
+    workflows: ["Deploy Puzzle RPG to GitHub Pages"]
+    types: [completed]
+  push:
+    paths:
+      - .github/workflows/puzzle-rpg-deep-playcheck.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PLAYCHECK_URL: https://yz4git.github.io/puzzle-rpg/
+
+jobs:
+  deep-playcheck:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Install isolated Playwright browser
+        run: |
+          mkdir -p /tmp/puzzle-rpg-deep-check
+          cd /tmp/puzzle-rpg-deep-check
+          npm init -y
+          npm install --no-audit --no-fund playwright@latest
+          npx playwright install --with-deps chromium
+
+      - name: Run seeded field to battle playcheck
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/deep-playcheck-artifacts"
+          cat > /tmp/puzzle-rpg-deep-check/check.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import { writeFile } from 'node:fs/promises';
+          import path from 'node:path';
+
+          const url = process.env.PLAYCHECK_URL;
+          const outputDir = path.join(process.env.GITHUB_WORKSPACE, 'deep-playcheck-artifacts');
+          const report = { url, startedAt: new Date().toISOString(), scenes: [], assertions: [], consoleErrors: [], pageErrors: [], failedResponses: [] };
+          const browser = await chromium.launch({ headless: true });
+          const context = await browser.newContext({
+            viewport: { width: 393, height: 852 },
+            screen: { width: 393, height: 852 },
+            deviceScaleFactor: 2,
+            isMobile: true,
+            hasTouch: true,
+            locale: 'ja-JP',
+            colorScheme: 'dark',
+          });
+          const page = await context.newPage();
+          page.on('console', msg => { if (msg.type() === 'error') report.consoleErrors.push(msg.text()); });
+          page.on('pageerror', err => report.pageErrors.push(String(err)));
+          page.on('response', res => { if (res.status() >= 400) report.failedResponses.push({ status: res.status(), url: res.url() }); });
+
+          async function snapshot(name) {
+            await page.waitForTimeout(450);
+            const metrics = await page.evaluate(() => {
+              const buttons = [...document.querySelectorAll('button')].filter(el => {
+                const style = getComputedStyle(el);
+                return style.visibility !== 'hidden' && style.display !== 'none';
+              }).map(el => {
+                const r = el.getBoundingClientRect();
+                return {
+                  text: (el.innerText || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+                  aria: el.getAttribute('aria-label') || '',
+                  x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height),
+                  inViewport: r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth,
+                };
+              });
+              const overflow = [...document.querySelectorAll('body *')].map(el => {
+                const r = el.getBoundingClientRect();
+                return { tag: el.tagName, cls: typeof el.className === 'string' ? el.className : '', x: Math.round(r.x), right: Math.round(r.right), width: Math.round(r.width) };
+              }).filter(v => v.width > 1 && (v.x < -2 || v.right > innerWidth + 2)).slice(0, 30);
+              return {
+                bodyText: document.body.innerText.replace(/\s+/g, ' ').slice(0, 8000),
+                viewport: { width: innerWidth, height: innerHeight },
+                document: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight },
+                buttons,
+                tinyButtons: buttons.filter(b => b.width < 44 || b.height < 44),
+                overflow,
+              };
+            });
+            report.scenes.push({ name, ...metrics });
+            await page.screenshot({ path: path.join(outputDir, `${name}.png`), fullPage: true });
+            return metrics;
+          }
+
+          async function tapButton(name) {
+            const button = page.getByRole('button', { name });
+            if (!(await button.count())) return false;
+            await button.first().tap({ force: true });
+            await page.waitForTimeout(180);
+            return true;
+          }
+
+          async function tapCluster() {
+            const cells = page.locator('button[aria-label*=" row "][aria-label*=" column "]');
+            const data = [];
+            for (let i = 0; i < await cells.count(); i++) {
+              const cell = cells.nth(i);
+              const aria = await cell.getAttribute('aria-label');
+              const match = aria?.match(/^(ATK|HEAL|BAR|SKIP) row (\d+) column (\d+)$/i);
+              if (!match) continue;
+              data.push({ locator: cell, type: match[1], row: Number(match[2]), col: Number(match[3]) });
+            }
+            for (const a of data) {
+              const adjacent = data.find(b => b !== a && b.type === a.type && Math.abs(b.row - a.row) + Math.abs(b.col - a.col) === 1);
+              if (!adjacent) continue;
+              await a.locator.tap({ force: true });
+              return true;
+            }
+            return false;
+          }
+
+          await page.goto(`${url}?deep_live_playcheck=${Date.now()}`, { waitUntil: 'networkidle', timeout: 60000 });
+          const seededSave = {
+            version: 1,
+            playerName: 'LIO',
+            level: 1,
+            exp: 0,
+            hp: 22,
+            maxHp: 22,
+            gold: 18,
+            mapId: 'world',
+            position: { x: 8, y: 23 },
+            direction: 'right',
+            lastInn: { mapId: 'hearthVillage', position: { x: 8, y: 10 } },
+            inventory: [{ id: 'herb', count: 2 }, { id: 'smoke', count: 1 }],
+            inventorySlots: 4,
+            equipmentOwned: ['travellerCoat'],
+            equipment: { weapon: null, armor: 'travellerCoat', charm: null },
+            techniques: [],
+            techniqueSlots: 2,
+            memos: [{ id: 'journey', title: '最初の旅', text: '村の長から北のOld Templeについて聞く。', read: false }],
+            flags: [],
+            openedChests: [],
+            defeatedEncounters: [],
+            defeatedEnemies: {},
+            releasedEnemies: {},
+            battleLog: [],
+            steps: 20,
+            playSeconds: 60,
+            encounterMeter: 3,
+            settings: { music: false, sfx: false },
+          };
+          await page.evaluate(save => localStorage.setItem('puzzle-rpg:rpg-mode:v1', JSON.stringify(save)), seededSave);
+          await page.reload({ waitUntil: 'networkidle' });
+
+          await page.getByRole('button', { name: /RPG MODE/i }).tap();
+          const continueButton = page.getByRole('button', { name: /CONTINUE/i });
+          if (await continueButton.count()) await continueButton.first().tap();
+          await page.waitForTimeout(450);
+          const field = await snapshot('01-seeded-field');
+          report.assertions.push({ name: 'Seeded save reaches PRISM ROAD', pass: /PRISM ROAD/i.test(field.bodyText) });
+
+          for (let step = 0; step < 6; step++) {
+            if (await page.locator('main[data-enemy]').count()) break;
+            await tapButton('Move right');
+            await page.waitForTimeout(250);
+          }
+          await page.waitForTimeout(900);
+          const battle = await snapshot('02-rpg-encounter');
+          const battleVisible = await page.locator('main[data-enemy]').count() > 0;
+          report.assertions.push({ name: 'Field movement triggers RPG encounter', pass: battleVisible });
+
+          if (battleVisible) {
+            const beforeTurn = Number(battle.bodyText.match(/TURN\s+(\d+)/i)?.[1] ?? 0);
+            await tapButton(/RPG COMMAND/i);
+            const command = await snapshot('03-rpg-command');
+            report.assertions.push({ name: 'RPG command exposes TALK ITEM STATUS RUN', pass: /TALK/i.test(command.bodyText) && /ITEM/i.test(command.bodyText) && /STATUS/i.test(command.bodyText) && /RUN/i.test(command.bodyText) });
+
+            await tapButton(/STATUS/i);
+            const status = await snapshot('04-rpg-status');
+            report.assertions.push({ name: 'STATUS opens without leaving battle', pass: /STATUS/i.test(status.bodyText) && /TECHNIQUES/i.test(status.bodyText) });
+            await tapButton(/BACK/i);
+            await tapButton(/B\s*•\s*CLOSE/i);
+
+            const clusterTapped = await tapCluster();
+            await page.waitForTimeout(1400);
+            const afterMove = await snapshot('05-rpg-after-cluster');
+            const afterTurn = Number(afterMove.bodyText.match(/TURN\s+(\d+)/i)?.[1] ?? 0);
+            report.assertions.push({ name: 'RPG battle cluster advances turn', pass: clusterTapped && afterTurn > beforeTurn, beforeTurn, afterTurn, clusterTapped });
+
+            await tapButton(/RPG COMMAND/i);
+            await tapButton(/TALK/i);
+            await page.waitForTimeout(1250);
+            const afterTalk = await snapshot('06-rpg-after-talk');
+            const talkTurn = Number(afterTalk.bodyText.match(/TURN\s+(\d+)/i)?.[1] ?? 0);
+            report.assertions.push({ name: 'TALK consumes a turn and returns to battle', pass: talkTurn > afterTurn && await page.locator('main[data-enemy]').count() > 0, afterTurn, talkTurn });
+          }
+
+          report.finishedAt = new Date().toISOString();
+          await writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
+          console.log(JSON.stringify(report, null, 2));
+          await browser.close();
+
+          const assertionFailures = report.assertions.filter(item => !item.pass);
+          const assetFailures = report.failedResponses.filter(item => item.url.includes('/assets/'));
+          if (assertionFailures.length || report.pageErrors.length || assetFailures.length || report.failedResponses.some(item => item.status >= 500)) process.exitCode = 1;
+          EOF
+          cd /tmp/puzzle-rpg-deep-check
+          node check.mjs
+
+      - name: Upload deep playcheck screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: puzzle-rpg-deep-live-playcheck
+          path: deep-playcheck-artifacts
+          retention-days: 2
