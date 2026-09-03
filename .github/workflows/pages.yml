@@ -1,0 +1,71 @@
+name: Deploy Puzzle RPG to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - app/**
+      - public/**
+      - pages-entry.tsx
+      - index.html
+      - package.json
+      - package-lock.json
+      - vite.pages.config.ts
+      - scripts/build-pages.sh
+      - tests/rendered-html.test.mjs
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Build static Pages artifact
+        run: npm run build:pages
+
+      - name: Verify rendered Pages shell
+        run: node --test tests/rendered-html.test.mjs
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
