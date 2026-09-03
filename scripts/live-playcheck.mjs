@@ -132,9 +132,20 @@ async function tap(page, name) {
 }
 
 async function openCommand(page) {
-  const launcher = page.getByRole('button', { name: /RPG COMMAND/i });
+  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
   if (!(await launcher.count())) return null;
-  await launcher.first().tap({ force: true });
+  await launcher.waitFor({ state: 'visible', timeout: 2500 });
+  const ready = await launcher.isEnabled().catch(() => false)
+    || await launcher.waitFor({ state: 'attached', timeout: 2500 }).then(async () => {
+      const started = Date.now();
+      while (Date.now() - started < 3200) {
+        if (await launcher.isEnabled().catch(() => false)) return true;
+        await page.waitForTimeout(120);
+      }
+      return false;
+    }).catch(() => false);
+  if (!ready) return null;
+  await launcher.tap();
   const win = page.locator('[class*="commandWindow"]');
   await win.waitFor({ state: 'visible', timeout: 2500 });
   return win;
@@ -144,10 +155,9 @@ async function talkOnce(page) {
   const win = await openCommand(page);
   if (!win) return false;
   const talk = win.locator('button').filter({ hasText: 'TALK' }).first();
-  if (!(await talk.count())) return false;
-  await talk.tap({ force: true });
-  await win.waitFor({ state: 'hidden', timeout: 2500 }).catch(() => {});
-  return true;
+  if (!(await talk.count()) || !(await talk.isEnabled().catch(() => false))) return false;
+  await talk.tap();
+  return win.waitFor({ state: 'hidden', timeout: 2500 }).then(() => true).catch(() => false);
 }
 
 async function boardGroups(page) {

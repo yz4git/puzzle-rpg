@@ -673,7 +673,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
         {PANEL_TYPES.map((type) => <span className={styles[type]} key={type}>{LABEL[type]} <b>×{largest[type]}</b></span>)}
       </section>
       <div className={styles.message} role="status">{message}</div>
-      <button className={styles.commandButton} type="button" onClick={() => { primeAudio(); playSfx("uiSelect"); setCommandOpen(true); setCommandPage("root"); }}><RPGIcon name="talk" size={14} /> B • RPG COMMAND</button>
+      <button className={styles.commandButton} type="button" disabled={resolving} onClick={() => { if (resolving) return; primeAudio(); playSfx("uiSelect"); setCommandOpen(true); setCommandPage("root"); }}><RPGIcon name="talk" size={14} /> B • RPG COMMAND</button>
 
       {commandOpen ? <div className={styles.overlay} onClick={() => { setCommandOpen(false); setCommandPage("root"); }}>
         <div className={styles.commandWindow} onClick={(event) => event.stopPropagation()}>
