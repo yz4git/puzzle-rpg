@@ -34,14 +34,35 @@ jobs:
           new = "  return { actions, herbsUsed, guardStonesUsed, decisions, text: await bodyText(page) };\n}\n\n// 6) First dungeon boss"
           if old not in s: raise SystemExit('fightBossSmart return anchor not found')
           s = s.replace(old, new, 1)
-          old = "  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\\\\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n\n  const ironSeed = {\n    ...scarletSave,\n    mapId: 'ironCity',\n    position: { x: 9, y: 6 },\n    direction: 'up',\n    hp: scarletSave.maxHp,\n    inventory: [{ id: 'herb', count: 2 }],\n    encounterMeter: 99,\n  };\n"
-          new = "  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\\\\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n  assert('Iron City goal teaches boss preparation', /GUARD STONE/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n\n  // Guaranteed boss rewards leave 105G. IRON SWORD (55G) + GUARD STONE x2 (40G) is an affordable minimum setup.\n  const ironSeed = {\n    ...scarletSave,\n    mapId: 'ironCity',\n    position: { x: 9, y: 6 },\n    direction: 'up',\n    hp: scarletSave.maxHp,\n    gold: Math.max(0, scarletSave.gold - 95),\n    inventory: [{ id: 'guardStone', count: 2 }],\n    equipmentOwned: [...new Set([...(scarletSave.equipmentOwned ?? []), 'ironSword'])],\n    equipment: { ...scarletSave.equipment, weapon: 'ironSword' },\n    encounterMeter: 99,\n  };\n"
-          if old not in s: raise SystemExit('iron seed anchor not found')
-          s = s.replace(old, new, 1)
-          old = "  const ironStart = await snapshot(page, '24-iron-tyrant');\n  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));\n"
-          new = "  const ironStart = await snapshot(page, '24-iron-tyrant');\n  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));\n  const preparedIronSave = await storedSave(page);\n  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });\n"
-          if old not in s: raise SystemExit('iron start assertion anchor not found')
-          p.write_text(s.replace(old, new, 1))
+
+          route = s.index('// 7) Midgame chain:')
+          seed_start = s.index('  const ironSeed = {', route)
+          seed_end = s.index('  };', seed_start) + len('  };')
+          iron_seed = """  // Guaranteed boss rewards leave 105G. IRON SWORD (55G) + GUARD STONE x2 (40G) is an affordable minimum setup.
+          const ironSeed = {
+            ...scarletSave,
+            mapId: 'ironCity',
+            position: { x: 9, y: 6 },
+            direction: 'up',
+            hp: scarletSave.maxHp,
+            gold: Math.max(0, scarletSave.gold - 95),
+            inventory: [{ id: 'guardStone', count: 2 }],
+            equipmentOwned: [...new Set([...(scarletSave.equipmentOwned ?? []), 'ironSword'])],
+            equipment: { ...scarletSave.equipment, weapon: 'ironSword' },
+            encounterMeter: 99,
+          };"""
+          s = s[:seed_start] + iron_seed + s[seed_end:]
+
+          goal_pos = s.index("  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle'", route)
+          goal_end = s.index('\n', goal_pos) + 1
+          s = s[:goal_end] + "  assert('Iron City goal teaches boss preparation', /GUARD STONE/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n" + s[goal_end:]
+
+          iron_start = "  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));\n"
+          iron_extra = "  const preparedIronSave = await storedSave(page);\n  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });\n"
+          if iron_start not in s: raise SystemExit('iron start assertion anchor not found')
+          s = s.replace(iron_start, iron_start + iron_extra, 1)
+          p.write_text(s)
+
           p = Path('app/rpg/RPGMode.tsx')
           s = p.read_text()
           old = 'if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、IRON TYRANTと向き合う。" };'
