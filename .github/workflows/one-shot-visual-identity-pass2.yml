@@ -1,0 +1,30 @@
+name: One-shot RPG visual identity pass 2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-visual-identity-pass2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply grass de-tiling and playcheck hardening
+        run: python3 .github/visual-pass2/patch.py
+      - name: Commit and clean helper files
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-visual-identity-pass2.yml
+          git rm -r .github/visual-pass2
+          git add app/rpg/RPGMode.tsx scripts/live-playcheck.mjs
+          git diff --cached --check
+          git commit -m 'De-tile world grass visual language'
+          git push origin HEAD:main
