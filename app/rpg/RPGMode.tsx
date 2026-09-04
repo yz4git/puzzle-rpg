@@ -2304,7 +2304,18 @@ const fieldGoal = (() => {
         </div>
         <div className={styles.abButtons}>
           <button type="button" className={styles.bButton} onClick={openMenu}><b>B</b><small>MENU</small></button>
-          <button type="button" className={styles.aButton} onClick={interact}><b>A</b><small>CHECK</small></button>
+          <button
+  type="button"
+  className={styles.aButton}
+  data-rpg-screen={screen}
+  data-movement-locked={movementLockedRef.current ? "true" : "false"}
+  data-step-encounter-pending={stepEncounterTimer.current !== null ? "true" : "false"}
+  data-encounter-timer-pending={encounterTimer.current !== null ? "true" : "false"}
+  data-encounter-cue={encounterCue?.enemyId ?? ""}
+  data-nearby-threat={nearbyThreat?.entry.id ?? ""}
+  data-nearby-distance={nearbyThreat?.distance ?? -1}
+  onClick={interact}
+><b>A</b><small>CHECK</small></button>
         </div>
       </section>
 
