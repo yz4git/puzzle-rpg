@@ -1,0 +1,44 @@
+name: One-shot adjacent encounter interaction fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-adjacent-confront-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Make adjacent encounter prompt truthful
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/rpg/RPGMode.tsx')
+          text = path.read_text()
+          old = '''    const fixed = findAt(visibleFixed);\n    if (fixed) { startBattle(fixed.enemyId, { fixedId: fixed.id, afterFlag: fixed.afterFlag }); return; }\n'''
+          new = '''    // FIELD threat UI promises “A • CONFRONT” whenever a fixed enemy is one tile\n    // away. Honor that promise even if the hero is not already facing the exact\n    // cardinal direction; touch users should not get a silent A-button no-op.\n    const fixed = findAt(visibleFixed) ?? visibleFixed.find((entry) =>\n      Math.abs(entry.x - save.position.x) + Math.abs(entry.y - save.position.y) === 1\n    );\n    if (fixed) {\n      const dx = fixed.x - save.position.x;\n      const dy = fixed.y - save.position.y;\n      const face: Direction = Math.abs(dx) > Math.abs(dy)\n        ? (dx > 0 ? "right" : "left")\n        : (dy > 0 ? "down" : "up");\n      if (face !== save.direction) commit((current) => ({ ...current, direction: face }));\n      startBattle(fixed.enemyId, { fixedId: fixed.id, afterFlag: fixed.afterFlag });\n      return;\n    }\n'''
+          if old not in text:
+              if new in text:
+                  raise SystemExit(0)
+              raise SystemExit('fixed encounter interaction anchor not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit fix and remove one-shot runner
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-adjacent-confront-fix.yml
+          git add app/rpg/RPGMode.tsx
+          git commit -m 'Fix adjacent fixed encounter interaction'
+          git push
