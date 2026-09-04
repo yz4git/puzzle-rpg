@@ -1,0 +1,27 @@
+name: One-shot fix item playcheck binding
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-fix-item-win-binding.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fix mutable item command window binding
+        run: perl -0pi -e "s/const win = await openCommand\(page\);\n  if \(!win\) throw new Error\('RPG COMMAND launcher was visible but could not open'\);/let win = await openCommand(page);\n  if (!win) throw new Error('RPG COMMAND launcher was visible but could not open');/" scripts/live-playcheck.mjs
+      - name: Commit patch and clean runner
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-fix-item-win-binding.yml
+          git add scripts/live-playcheck.mjs
+          git commit -m 'Fix mutable item command window in live playcheck'
+          git push
