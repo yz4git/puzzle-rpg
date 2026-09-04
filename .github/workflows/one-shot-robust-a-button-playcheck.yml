@@ -1,0 +1,74 @@
+name: One-shot robust A button playcheck
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-robust-a-button-playcheck.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Make field A action selector independent of label text
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/live-playcheck.mjs')
+          s = p.read_text()
+          old = """async function startFixedBattle(page, expectedName, attempts = 6) {
+  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
+  const fieldAction = /A(?:\\s*•)?\\s*(?:CHECK|CONFRONT)/i;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (await launcher.isVisible().catch(() => false)) {
+      return expectedName.test(await bodyText(page));
+    }
+    const action = page.getByRole('button', { name: fieldAction }).first();
+    if (await action.count()) await action.tap({ force: true });
+    await page.waitForTimeout(720);
+  }
+  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
+  return ready && expectedName.test(await bodyText(page));
+}"""
+          new = """async function tapFieldA(page) {
+  const action = page.locator('button[class*=\"aButton\"]').first();
+  if (!(await action.count())) return false;
+  await action.tap({ force: true });
+  await page.waitForTimeout(140);
+  return true;
+}
+
+async function startFixedBattle(page, expectedName, attempts = 6) {
+  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (await launcher.isVisible().catch(() => false)) {
+      return expectedName.test(await bodyText(page));
+    }
+    await tapFieldA(page);
+    await page.waitForTimeout(580);
+  }
+  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
+  return ready && expectedName.test(await bodyText(page));
+}"""
+          if old not in s:
+              raise SystemExit('startFixedBattle block not found')
+          s = s.replace(old, new)
+          # Field-only A checks outside startFixedBattle should use the stable control locator too.
+          s = s.replace("await tap(page, /A(?:\\s*•)?\\s*(?:CHECK|CONFRONT)/i);", "await tapFieldA(page);")
+          p.write_text(s)
+          PY
+      - name: Commit patch and remove runner
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-robust-a-button-playcheck.yml
+          git add scripts/live-playcheck.mjs
+          git commit -m 'Make live playcheck field A selector robust'
+          git push
