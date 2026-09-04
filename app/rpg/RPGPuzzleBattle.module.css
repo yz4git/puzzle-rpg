@@ -175,3 +175,50 @@
 .commandButton{min-height:44px;margin:0 7px;border:0;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);background:linear-gradient(90deg,color-mix(in srgb,var(--sceneAccent) 16%,#111019),#09090f 72%,rgba(9,9,15,.5));box-shadow:inset 3px 0 var(--sceneAccent);color:#f3e5aa;letter-spacing:.06em}
 .overlay{background:rgba(2,2,5,.75);backdrop-filter:blur(3px)}.commandWindow{border:0;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);background:linear-gradient(180deg,#0d0e16,#07080d);box-shadow:0 16px 42px rgba(0,0,0,.62),inset 3px 0 var(--sceneAccent)}.commandWindow button{border:0;border-left:2px solid #41424d;background:rgba(255,255,255,.025);box-shadow:none}.commandWindow button:active{border-left-color:var(--gold);background:rgba(240,212,119,.08)}.statusPanel{border:0;border-left:2px solid #55ccef;background:#0b0c12}
 .talkMoment{border:0;border-left:4px solid var(--sceneAccent);clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px));background:rgba(7,8,13,.96);box-shadow:0 12px 34px rgba(0,0,0,.62)}
+
+
+/* Play review pass 35 — tactical bottom command sheet */
+.overlay{
+  place-items:end center;
+  padding:0 8px max(8px,env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,rgba(2,2,5,.12),rgba(2,2,5,.42) 48%,rgba(2,2,5,.82));
+  backdrop-filter:blur(1.5px);
+}
+.commandWindow{
+  width:min(100%,430px);
+  max-height:52dvh;
+  overflow:auto;
+  padding:8px 8px 7px;
+  border-top:2px solid color-mix(in srgb,var(--sceneAccent) 74%,#fff1b3);
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%,0 10px);
+  background:linear-gradient(180deg,rgba(13,14,22,.97),rgba(5,6,10,.985));
+  box-shadow:0 -12px 34px rgba(0,0,0,.55),inset 3px 0 var(--sceneAccent);
+}
+.commandWindow>span{
+  padding:3px 6px 5px 8px;
+  background:transparent;
+  border-bottom:1px solid color-mix(in srgb,var(--sceneAccent) 45%,#55545e);
+  font-size:9px;
+}
+.commandWindow:has(> button:nth-of-type(5)){
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:4px;
+}
+.commandWindow:has(> button:nth-of-type(5))>span,
+.commandWindow:has(> button:nth-of-type(5))>.statusPanel,
+.commandWindow:has(> button:nth-of-type(5))>.close{
+  grid-column:1/-1;
+}
+.commandWindow button{
+  min-height:52px;
+  padding:6px 8px 6px 19px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+}
+.commandWindow button>b{font-size:9px}
+.commandWindow small{font-size:6.5px}
+.close{min-height:44px!important;margin-top:1px}
+@media(max-height:700px){
+  .commandWindow{max-height:56dvh;padding:6px}
+  .commandWindow button{min-height:48px}
+  .close{min-height:44px!important}
+}

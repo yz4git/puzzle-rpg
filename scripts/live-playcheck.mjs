@@ -299,6 +299,20 @@ async function storedSave(page) {
   await context.close();
 }
 
+// Visual review: town and first dungeon composition after the world-first viewport pass.
+{
+  const { context, page } = await makePage('visual-areas');
+  await enterSeededRpg(page, 'visual-town', baseSave({ mapId: 'hearthVillage', position: { x: 8, y: 10 }, direction: 'up' }));
+  await snapshot(page, '09a-hearth-village');
+  await context.close();
+}
+{
+  const { context, page } = await makePage('visual-temple');
+  await enterSeededRpg(page, 'visual-temple', baseSave({ mapId: 'oldTemple', position: { x: 10, y: 21 }, direction: 'up' }));
+  await snapshot(page, '09b-old-temple');
+  await context.close();
+}
+
 // 3) Forest Wisp non-violent alternative resolution and persistence.
 {
   const { context, page } = await makePage('release');
@@ -329,23 +343,17 @@ async function storedSave(page) {
   const { context, page } = await makePage('items');
   await enterSeededRpg(page, 'items', baseSave({ hp: 10, gold: 30, position: { x: 10, y: 19 }, direction: 'right' }));
   await tap(page, /A\s*CHECK/i);
-  // Fixed encounters can spend a short moment in the encounter cue before the
-  // battle root mounts. Wait for the real battle instead of assuming 650ms is enough.
-  let itemBattleReady = false;
-  for (let attempt = 0; attempt < 3 && !itemBattleReady; attempt += 1) {
-    itemBattleReady = await page.locator('main[data-enemy]').waitFor({ state: 'visible', timeout: 1600 }).then(() => true).catch(() => false);
-    if (!itemBattleReady) {
-      await tap(page, /A\s*CHECK/i);
-      await page.waitForTimeout(280);
-    }
-  }
+  // Wait on the actual player-facing command launcher. This survives cue timing
+  // changes and avoids relying on an implementation-specific battle root selector.
+  const itemLauncher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
+  const itemBattleReady = await itemLauncher.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
   assert('Item route opens FOREST WISP battle', itemBattleReady && /FOREST WISP/i.test(await bodyText(page)));
-  let win = null;
-  for (let attempt = 0; attempt < 3 && !win; attempt += 1) {
-    win = await openCommand(page);
-    if (!win) await page.waitForTimeout(360);
+  if (!itemBattleReady) {
+    await snapshot(page, '13-item-route-diagnostic');
+    throw new Error('RPG COMMAND did not become available in item route');
   }
-  if (!win) throw new Error('RPG COMMAND did not become available in item route');
+  const win = await openCommand(page);
+  if (!win) throw new Error('RPG COMMAND launcher was visible but could not open');
   await win.locator('button').filter({ hasText: 'ITEM' }).first().tap({ force: true });
   win = page.locator('[class*="commandWindow"]');
   await win.locator('button').filter({ hasText: /HERB.*×2/i }).first().tap({ force: true });
