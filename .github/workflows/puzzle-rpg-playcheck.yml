@@ -1,6 +1,6 @@
 name: Puzzle RPG Live Playcheck
 
-# One browser install covers the full public gameplay regression suite; field A is selected by its stable control class, not its changing CHECK/CONFRONT label.
+# One browser install covers the full public gameplay regression suite; field A uses its stable control class and item-route command windows use mutable bindings.
 on:
   workflow_run:
     workflows: ["Deploy Puzzle RPG to GitHub Pages"]
