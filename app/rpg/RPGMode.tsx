@@ -2245,7 +2245,7 @@ const fieldGoal = (() => {
     return { title: "PRISM CITADEL", text: "VOIDの証・鏡鍵・四つの修行印が揃った。北東の最後の門へ進む。" };
   }
   if (flag("boss:ironTyrant")) return { title: "VOID PASS", text: "IRON CITYの北門が開いた。北東のVOID PASSを突破する。" };
-  if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、鍛冶屋で装備とGUARD STONEを整えてIRON TYRANTと向き合う。" };
+  if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "鍛冶屋でIRON SWORD + GUARD STONEを準備 → 王座のIRON TYRANTへ。" };
   if (flag("boss:templeKeeper")) return { title: "CRIMSON MARSH", text: "古寺の橋印を得た。IRON TYRANTへの道を開くため、東のCRIMSON MARSHでSCARLET ORACLEを越える。" };
   return { title: activeMemo?.title ?? map.name, text: activeMemo?.text ?? "PRISM ROADを進み、次の手掛かりを探す。" };
 })();

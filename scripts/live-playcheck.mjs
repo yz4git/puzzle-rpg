@@ -646,7 +646,8 @@ const ironSeed = {
   assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 6 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 1 && preparedIronSave.inventory?.find?.(item => item.id === 'herb')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });
   const ironTalk = await talkOnce(page);
   await page.waitForTimeout(1200);
-  assert('Iron Tyrant accepts armor-weakening TALK', ironTalk && /IRON TYRANT/i.test(await bodyText(page)));
+  const ironAfterTalk = await bodyText(page);
+  assert('Iron Tyrant TALK weakens the immediate counterattack', ironTalk && /HP\s+20\/24/i.test(ironAfterTalk) && /TALKで構え崩れ/i.test(ironAfterTalk) && /BAR\+2/i.test(ironAfterTalk), { text: ironAfterTalk.slice(0, 1400) });
   const ironFight = await fightBossSmart(page, 70, 2);
   const ironResult = await snapshot(page, '25-iron-result');
   assert('Iron Tyrant is beatable with post-Scarlet resources', /VICTORY/i.test(ironResult.text), ironFight);

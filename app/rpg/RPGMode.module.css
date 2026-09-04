@@ -442,3 +442,10 @@
   .fieldGoal{min-height:31px}
   .controls{min-height:132px}
 }
+
+
+/* Iron Tyrant guidance readability — portrait iPhone */
+.fieldGoal{min-height:46px}
+.fieldGoal small{display:block;margin-top:2px;color:#bdb7c1;font-size:6.2px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-height:700px){.fieldGoal{min-height:39px}.fieldGoal small{display:block;font-size:5.5px;margin-top:1px}}
+@media(max-height:620px){.fieldGoal small{display:none}}

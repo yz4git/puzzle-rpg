@@ -189,7 +189,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     return values;
   }, [preview, tiles]);
 
-  function adjustedIntent(step: number, currentEnemyHp: number, currentHp: number): EnemyIntentDefinition {
+  function adjustedIntent(step: number, currentEnemyHp: number, currentHp: number, overrides: { armorWeakened?: boolean; drainWeakened?: boolean } = {}): EnemyIntentDefinition {
+    const effectiveArmorWeakened = overrides.armorWeakened ?? armorWeakened;
+    const effectiveDrainWeakened = overrides.drainWeakened ?? drainWeakened;
     const base = effectiveEnemy.intents[step % effectiveEnemy.intents.length]!;
     let power = base.power;
     let detail = base.detail;
@@ -203,8 +205,8 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       if (releases >= 4) { power = Math.max(1, power - 1); detail += " • 聞いた声で弱体"; }
     }
     if (enemy.id === "citadelEye" && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 3) power = Math.max(1, power - 1);
-    if (drainWeakened && base.kind === "drain") { power = Math.max(1, power - 2); detail = "TALKで弱体化"; }
-    if (enemy.id === "ironTyrant" && armorWeakened) { power = Math.max(1, power - 1); detail = `${detail} • TALKで構え崩れ`; }
+    if (effectiveDrainWeakened && base.kind === "drain") { power = Math.max(1, power - 2); detail = "TALKで弱体化"; }
+    if (enemy.id === "ironTyrant" && effectiveArmorWeakened) { power = Math.max(1, power - 1); detail = `${detail} • TALKで構え崩れ • BAR+2`; }
     return { ...base, power, detail };
   }
 
@@ -298,6 +300,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (type === "barrier") {
       if (count >= 6 && hasTechnique("fortress")) bonus += 2;
       if (currentHp <= 8 && hasTechnique("lastStand")) bonus += 3;
+      // Once TALK breaks the Tyrant's shield rhythm, even modest BAR clusters
+      // become a reliable counter to his 4/6 adjusted attack cycle.
+      if (enemy.id === "ironTyrant" && armorWeakened) bonus += 2;
     }
     if (type === "skip") {
       if (count >= 4 && hasTechnique("timeTheft")) bonus += 1;
@@ -352,7 +357,9 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       const raised = Math.min(30, nextBarrier + power);
       const gain = raised - nextBarrier;
       nextBarrier = raised;
-      setBarrier(nextBarrier); setMessage(`BAR×${count} → BAR +${gain}`); showEffect(`+${gain} BAR`, "barrier"); playSfx("shield");
+      setBarrier(nextBarrier);
+      const ironRhythm = enemy.id === "ironTyrant" && armorWeakened ? " • GUARD RHYTHM +2" : "";
+      setMessage(`BAR×${count} → BAR +${gain}${ironRhythm}`); showEffect(`+${gain} BAR`, "barrier"); playSfx("shield");
     } else {
       const power = count + bonus;
       nextFree += power;
@@ -387,7 +394,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     setResolving(false);
   }
 
-  async function resolveEnemyTurn(currentHp: number, currentBarrier: number, currentEnemyHp: number, currentFree: number, currentStats: BattleStats) {
+  async function resolveEnemyTurn(currentHp: number, currentBarrier: number, currentEnemyHp: number, currentFree: number, currentStats: BattleStats, intentOverrides: { armorWeakened?: boolean; drainWeakened?: boolean } = {}) {
     if (currentFree > 0) {
       const remaining = currentFree - 1;
       setSkipFx({ value: remaining, phase: "tick" });
@@ -405,7 +412,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       return { hp: currentHp, barrier: currentBarrier, enemyHp: currentEnemyHp, free: remaining, stats: currentStats };
     }
 
-    const action = adjustedIntent(intentStep, currentEnemyHp, currentHp);
+    const action = adjustedIntent(intentStep, currentEnemyHp, currentHp, intentOverrides);
     let damage = action.power;
     let blocked = 0;
     if (action.kind !== "pierce") {
@@ -487,8 +494,12 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
       });
       return;
     }
-    if (enemy.id.includes("iron") || enemy.id === "ironTyrant") setArmorWeakened(true);
-    if ((enemy.id === "scarletOracle" && save.memos.some((memo) => memo.id === "red-spring")) || enemy.id === "redHermit") setDrainWeakened(true);
+    // React state updates are asynchronous, so carry the newly activated TALK
+    // weakness into this very enemy response instead of waiting one extra turn.
+    const nextArmorWeakened = armorWeakened || enemy.id.includes("iron");
+    const nextDrainWeakened = drainWeakened || ((enemy.id === "scarletOracle" && save.memos.some((memo) => memo.id === "red-spring")) || enemy.id === "redHermit");
+    if (nextArmorWeakened !== armorWeakened) setArmorWeakened(true);
+    if (nextDrainWeakened !== drainWeakened) setDrainWeakened(true);
     let nextFree = free;
     if (enemy.id === "voidHerald" && nextStats.skipUses >= 2) { nextFree += 1; setFree(nextFree); setSkipFx({ value: nextFree, phase: "armed" }); }
     if (enemy.id === "ashCrow" && nextStats.skipUses >= 3) { nextFree += 1; setFree(nextFree); setSkipFx({ value: nextFree, phase: "armed" }); }
@@ -500,7 +511,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     setTalkOverlay({ speaker: enemy.name, text: talkLine });
     await delay(900);
     setTalkOverlay(null);
-    const result = await resolveEnemyTurn(hp, barrier, enemyHp, nextFree, nextStats);
+    const result = await resolveEnemyTurn(hp, barrier, enemyHp, nextFree, nextStats, { armorWeakened: nextArmorWeakened, drainWeakened: nextDrainWeakened });
     if (trainingComplete(result.stats)) finish("victory", result.hp, inventory, result.stats, { acquiredTechnique: training!.technique });
     setResolving(false);
   }
