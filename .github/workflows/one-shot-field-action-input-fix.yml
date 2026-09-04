@@ -1,0 +1,53 @@
+name: One-shot field action input reliability fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-field-action-input-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix field A/B tap reliability and stale lock recovery
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/rpg/RPGMode.tsx')
+          text = path.read_text()
+
+          old_lock = '''  function interact() {\n    if (movementLockedRef.current) return;\n'''
+          new_lock = '''  function interact() {\n    // A stale movement lock must never permanently disable field actions. Only an\n    // actually pending encounter transition is allowed to consume A input. This\n    // also recovers safely after iOS page/animation timing interruptions.\n    if (movementLockedRef.current) {\n      const encounterTransitionActive = stepEncounterTimer.current !== null\n        || encounterTimer.current !== null\n        || Boolean(encounterCue)\n        || Boolean(battle);\n      if (encounterTransitionActive) return;\n      movementLockedRef.current = false;\n    }\n'''
+          if old_lock in text:
+              text = text.replace(old_lock, new_lock, 1)
+          elif new_lock not in text:
+              raise SystemExit('interact lock anchor not found')
+
+          old_buttons = '''          <button type="button" className={styles.bButton} onPointerDown={(event) => { event.preventDefault(); openMenu(); }}><b>B</b><small>MENU</small></button>\n          <button type="button" className={styles.aButton} onPointerDown={(event) => { event.preventDefault(); interact(); }}><b>A</b><small>CHECK</small></button>'''
+          new_buttons = '''          <button type="button" className={styles.bButton} onClick={openMenu}><b>B</b><small>MENU</small></button>\n          <button type="button" className={styles.aButton} onClick={interact}><b>A</b><small>CHECK</small></button>'''
+          if old_buttons in text:
+              text = text.replace(old_buttons, new_buttons, 1)
+          elif new_buttons not in text:
+              raise SystemExit('A/B button anchor not found')
+
+          path.write_text(text)
+          PY
+
+      - name: Commit fix and remove one-shot runner
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-field-action-input-fix.yml
+          git add app/rpg/RPGMode.tsx
+          git commit -m 'Fix field action tap reliability'
+          git push
