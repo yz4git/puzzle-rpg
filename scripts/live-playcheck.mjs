@@ -131,6 +131,23 @@ async function tap(page, name) {
   return true;
 }
 
+async function startFixedBattle(page, expectedName, attempts = 6) {
+  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (await launcher.isVisible().catch(() => false)) {
+      const text = await bodyText(page);
+      return expectedName.test(text);
+    }
+    // A fixed encounter can be tapped during the short field-entry lock on a cold
+    // mobile load. Retrying A after the visual cue window is harmless: interact()
+    // ignores input while encounterCue is active.
+    await tap(page, /A\s*CHECK/i);
+    await page.waitForTimeout(720);
+  }
+  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
+  return ready && expectedName.test(await bodyText(page));
+}
+
 async function openCommand(page) {
   const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
   if (!(await launcher.count())) return null;
@@ -320,9 +337,9 @@ async function storedSave(page) {
 {
   const { context, page } = await makePage('release');
   await enterSeededRpg(page, 'release', baseSave({ position: { x: 10, y: 19 }, direction: 'right' }));
-  await tap(page, /A\s*CHECK/i);
-  await page.waitForTimeout(650);
-  assert('A CHECK opens FOREST WISP fixed battle', /FOREST WISP/i.test((await snapshot(page, '10-wisp-battle')).text));
+  const releaseBattleReady = await startFixedBattle(page, /FOREST WISP/i);
+  const releaseBattle = await snapshot(page, '10-wisp-battle');
+  assert('A CHECK opens FOREST WISP fixed battle', releaseBattleReady && /FOREST WISP/i.test(releaseBattle.text));
   for (let i = 1; i <= 3; i++) {
     const ok = await talkOnce(page);
     assert(`Forest Wisp TALK ${i} is clickable`, ok);
@@ -345,12 +362,8 @@ async function storedSave(page) {
 {
   const { context, page } = await makePage('items');
   await enterSeededRpg(page, 'items', baseSave({ hp: 10, gold: 30, position: { x: 10, y: 19 }, direction: 'right' }));
-  await tap(page, /A\s*CHECK/i);
-  // Wait on the actual player-facing command launcher. This survives cue timing
-  // changes and avoids relying on an implementation-specific battle root selector.
-  const itemLauncher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
-  const itemBattleReady = await itemLauncher.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
-  assert('Item route opens FOREST WISP battle', itemBattleReady && /FOREST WISP/i.test(await bodyText(page)));
+  const itemBattleReady = await startFixedBattle(page, /FOREST WISP/i);
+  assert('Item route opens FOREST WISP battle', itemBattleReady);
   if (!itemBattleReady) {
     await snapshot(page, '13-item-route-diagnostic');
     throw new Error('RPG COMMAND did not become available in item route');
@@ -391,8 +404,8 @@ async function storedSave(page) {
     techniques: ['gentleHand'],
     flags: ['story:openingSeen', 'test:progress'],
   }));
-  await tap(page, /A\s*CHECK/i);
-  await page.waitForTimeout(650);
+  const defeatBattleReady = await startFixedBattle(page, /FOREST WISP/i);
+  assert('Defeat route opens FOREST WISP battle', defeatBattleReady);
   await talkOnce(page);
   await page.waitForTimeout(1500);
   const defeat = await snapshot(page, '16-defeat-result');
@@ -492,10 +505,9 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
     inventory: [{ id: 'herb', count: 2 }],
     encounterMeter: 99,
   }));
-  await tap(page, /A\s*CHECK/i);
-  await page.waitForTimeout(650);
+  const bossBattleReady = await startFixedBattle(page, /OLD TEMPLE KEEPER/i, 8);
   const bossStart = await snapshot(page, '18-temple-boss');
-  assert('A CHECK opens OLD TEMPLE KEEPER', /OLD TEMPLE KEEPER/i.test(bossStart.text));
+  assert('A CHECK opens OLD TEMPLE KEEPER', bossBattleReady && /OLD TEMPLE KEEPER/i.test(bossStart.text));
 
   let actions = 0;
   let herbsUsed = 0;
