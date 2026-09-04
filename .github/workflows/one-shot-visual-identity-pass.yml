@@ -1,0 +1,176 @@
+name: One-shot RPG visual identity pass
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-visual-identity-pass.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Break tile-grid and window-box visual language
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/rpg/RPGMode.tsx')
+          s = path.read_text()
+
+          old = 'const macro = stableVisualIndex(`interior-macro-${map.id}`, Math.floor(worldX / 2), Math.floor(worldY / 2));'
+          new = 'const macro = stableVisualIndex(`interior-macro-${map.id}`, Math.floor(worldX / 4), Math.floor(worldY / 3));'
+          if old not in s:
+              raise SystemExit('interior macro anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''  context.fillStyle = palette.wallLight;
+  context.fillRect(x + 1, y + 2, 14, 2);
+  context.fillRect(x + (seed % 7), y + 8, 6, 2);
+  context.fillStyle = palette.line;
+  context.fillRect(x, y + 14, TILE, 2);
+  context.fillRect(x + 7, y + 4, 1, 4);
+  if (tileAt(map, worldX, worldY + 1) !== "#" && tileAt(map, worldX, worldY + 1) !== "m") {
+    context.fillStyle = palette.accent2; context.fillRect(x + 2, y + 13, 12, 1);
+  }
+'''
+          new = '''  const belowWall = ["#", "m"].includes(tileAt(map, worldX, worldY + 1));
+  context.fillStyle = palette.wallLight;
+  if (seed % 2 === 0) context.fillRect(x + 1, y + 2, 14, 1);
+  if (seed % 3 === 0) context.fillRect(x + 2 + seed % 5, y + 8, 6, 1);
+  context.fillStyle = palette.line;
+  if (!belowWall) context.fillRect(x, y + 14, TILE, 2);
+  else if (seed % 5 === 0) context.fillRect(x + 3 + seed % 6, y + 13, 4, 1);
+  if (seed % 4 === 0) context.fillRect(x + 7, y + 4, 1, 4);
+  if (!belowWall) {
+    context.fillStyle = palette.accent2; context.fillRect(x + 2, y + 13, 12, 1);
+  }
+'''
+          if old not in s:
+              raise SystemExit('wall reconstruction anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''    if (code === "s") {
+      if ((worldX % 2 === 0) && (worldY % 2 === 0)) {
+'''
+          new = '''    if (code === "s") {
+      const rigidSurface = ["ironCity", "ironHall", "mirrorTower", "hourSpire", "prismCitadel"].includes(map.id);
+      if (rigidSurface && (worldX % 3 === 0) && (worldY % 3 === 0)) {
+'''
+          if old not in s:
+              raise SystemExit('structural floor anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''  context.fillStyle = palette.floor; context.fillRect(x, y, TILE, TILE);
+  context.fillStyle = map.id === "crimsonMarsh" ? "#5f1738" : map.id === "prismCitadel" ? "#4e4270" : "#2a2538";
+  context.fillRect(x + 2, y + 2, 12, 12);
+  context.fillStyle = palette.accent; context.fillRect(x + 4 + seed % 5, y + 4, 4, 2);
+  context.fillStyle = palette.accent2; if (seed % 2 === 0) context.fillRect(x + 9, y + 10, 2, 2);
+'''
+          new = '''  context.fillStyle = palette.floor; context.fillRect(x, y, TILE, TILE);
+  if (map.id === "crimsonMarsh") {
+    // Organic pools deliberately bleed across gameplay-cell edges. Collision still
+    // follows the original map, but the picture no longer advertises a tile grid.
+    context.fillStyle = seed % 2 === 0 ? "#5f1738" : "#54152f";
+    context.beginPath();
+    context.moveTo(x - 2, y + 5 + seed % 3);
+    context.lineTo(x + 4, y + 1);
+    context.lineTo(x + 13, y + 3 + ((seed >> 2) % 3));
+    context.lineTo(x + 18, y + 8);
+    context.lineTo(x + 11, y + 15);
+    context.lineTo(x + 2, y + 13);
+    context.closePath(); context.fill();
+    context.fillStyle = palette.accent;
+    context.fillRect(x + 3 + seed % 6, y + 5, 5, 1);
+    context.fillStyle = palette.accent2;
+    if (seed % 3 === 0) context.fillRect(x + 10, y + 10, 2, 2);
+    return;
+  }
+  context.fillStyle = map.id === "prismCitadel" ? "#4e4270" : "#2a2538";
+  context.fillRect(x + 2, y + 2, 12, 12);
+  context.fillStyle = palette.accent; context.fillRect(x + 4 + seed % 5, y + 4, 4, 2);
+  context.fillStyle = palette.accent2; if (seed % 2 === 0) context.fillRect(x + 9, y + 10, 2, 2);
+'''
+          if old not in s:
+              raise SystemExit('hazard reconstruction anchor not found')
+          s = s.replace(old, new, 1)
+          path.write_text(s)
+          PY
+
+          cat >> app/rpg/RPGMode.module.css <<'EOF'
+
+/* Visual Identity Pass 1 — remove generic RPG-window / emulator language */
+.rpg{
+  --uiGlass:color-mix(in srgb,var(--panel2) 88%,transparent);
+  gap:0;
+  padding-top:max(4px,env(safe-area-inset-top));
+  padding-right:max(5px,env(safe-area-inset-right));
+  padding-bottom:max(4px,env(safe-area-inset-bottom));
+  padding-left:max(5px,env(safe-area-inset-left));
+  background:radial-gradient(circle at 50% 28%,color-mix(in srgb,var(--accent2) 10%,#090810),#05050a 58%,#020204 100%);
+}
+.rpg::before{opacity:.035;background:repeating-linear-gradient(0deg,transparent 0 5px,rgba(255,255,255,.16) 6px)}
+.hud{z-index:8;min-height:40px;margin:0 4px;background:linear-gradient(90deg,rgba(4,4,8,.94),rgba(10,9,15,.78) 72%,rgba(4,4,8,.94));border-bottom:1px solid color-mix(in srgb,var(--accent) 28%,#24232c)}
+.hud>div{padding:4px 7px;border:0!important;border-right:1px solid #25242e!important;background:transparent!important;box-shadow:none!important;clip-path:none!important}
+.hud>div:last-child{border-right:0!important}.hud>div::before{top:7px;bottom:7px;width:2px;opacity:.75}.hud>div:first-child strong{font-size:12px}.hud>div:nth-child(2) strong{font-size:11px}.hud>div:nth-child(3) strong{font-size:12px}
+.locationBar{z-index:9;width:calc(100% - 34px);min-height:25px;margin:0 17px -20px;transform:translateY(7px);padding:3px 9px 3px 11px;border:0;clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%);background:linear-gradient(90deg,rgba(5,5,9,.94),rgba(5,5,9,.72) 78%,transparent);box-shadow:none;pointer-events:none}
+.locationBar::before{left:3px;top:4px;bottom:4px;width:3px}.locationBar strong{font-size:6.5px;color:#e9e3d8}.locationBar strong::before{content:""}
+.worldFrame{z-index:3;margin-top:0;border:0;clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px);background:#050509;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent2) 42%,#23212a),0 8px 20px rgba(0,0,0,.34)}
+.worldGloss{box-shadow:inset 0 0 0 1px rgba(255,255,255,.11),inset 0 -28px 36px rgba(0,0,0,.16);background:radial-gradient(ellipse at 50% 48%,transparent 50%,rgba(2,2,5,.28) 100%)}
+.memoStrip{z-index:6;min-height:20px;margin:-1px 10px 0;padding:3px 7px;border:0;border-top:1px solid color-mix(in srgb,var(--accent2) 38%,#292832);background:transparent;box-shadow:none}.memoStrip::before{display:none}.memoStrip span{font-size:6px}.memoStrip strong{font-size:5.5px;color:#817d86}
+.fieldBrief{margin:0 7px;padding:7px 0 5px;border:0;background:transparent;box-shadow:none;gap:5px}
+.fieldGoal{position:relative;min-height:46px;padding:6px 12px 6px 14px;border:0;clip-path:polygon(7px 0,100% 0,calc(100% - 10px) 100%,0 100%);background:linear-gradient(90deg,color-mix(in srgb,var(--accent2) 26%,#0b0b11),rgba(8,8,13,.86) 78%,rgba(8,8,13,.18));box-shadow:inset 3px 0 var(--accent)}
+.fieldGoal span{font-size:5px}.fieldGoal strong{font-size:10px}.fieldGoal small{color:#9f9aa3}
+.fieldQuick{gap:1px;padding-left:8px}.fieldQuick>div{min-height:35px;padding:3px 7px;border:0;border-left:1px solid #2f2e39;background:transparent;box-shadow:none}.fieldQuick>div:first-child{border-left:0}.fieldQuick span{font-size:5px;color:color-mix(in srgb,var(--accent) 70%,#888)}.fieldQuick strong{font-size:6.5px;color:#bbb6bd}
+.controls{height:158px;min-height:158px;margin:0 5px;padding:6px 9px;border:0;background:radial-gradient(ellipse at 27% 50%,color-mix(in srgb,var(--accent2) 13%,transparent),transparent 34%),radial-gradient(ellipse at 78% 50%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 34%);box-shadow:none;overflow:visible}
+.controls::after{width:22px;height:22px;opacity:.38;border:1px solid color-mix(in srgb,var(--accent) 55%,#4a4650);background:transparent;box-shadow:0 0 0 5px rgba(255,255,255,.018);transform:translate(-50%,-50%) rotate(45deg)}
+.dpad{width:150px;height:150px;filter:none}.dpad button,.dpad i{min-width:50px;min-height:50px;border:0!important;background:rgba(20,20,29,.82)!important;color:#dad7df;box-shadow:inset 0 0 0 1px #41404d!important;clip-path:polygon(50% 2px,calc(100% - 2px) 50%,50% calc(100% - 2px),2px 50%)}
+.dpad button::after{inset:8px;border:0;background:radial-gradient(circle,rgba(255,255,255,.10),transparent 58%);clip-path:inherit}.dpad i{background:transparent!important;color:color-mix(in srgb,var(--accent) 42%,#585562);box-shadow:none!important;font-size:10px}.dpad button:active{background:var(--accent)!important;color:#0a090e!important;transform:scale(.9)!important;box-shadow:0 0 12px color-mix(in srgb,var(--accent) 36%,transparent)!important}
+.abButtons{gap:9px;transform:none}.abButtons button{width:68px;height:58px;border:0;border-radius:0;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);background:linear-gradient(145deg,color-mix(in srgb,var(--accent2) 38%,#16131c),#0b0a10)!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,#4e4852);transform:none!important;color:#f2ecdf}
+.abButtons button:active{filter:brightness(1.45);transform:scale(.96)!important}.abButtons b{font-size:0}.abButtons small{font-size:6px;letter-spacing:.08em}.aButton b::after{content:"✦";font-size:19px;color:var(--accent)}.bButton b::after{content:"≡";font-size:21px;color:color-mix(in srgb,var(--accent) 68%,#ddd)}
+.dialogueOverlay{background:linear-gradient(180deg,rgba(2,2,5,.02),rgba(2,2,5,.26) 52%,rgba(2,2,5,.68))}.dialogueBox{border:0;border-left:4px solid var(--accent);clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px));background:linear-gradient(105deg,rgba(7,7,12,.97),rgba(16,14,23,.94));box-shadow:0 8px 30px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.08)}
+.dialogueBox::before{left:10px;right:18px}.dialogueBox span{border-left:0;background:transparent;padding-left:0}.dialoguePortrait{border:0;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 46%,#333)}
+.menuOverlay{background:rgba(2,2,5,.76);backdrop-filter:blur(3px)}.menuWindow{border:0!important;background:rgba(7,7,12,.95)!important;box-shadow:0 16px 42px rgba(0,0,0,.6)!important;clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.menuWindow>header,.menuTabs,.menuContent,.shopList,.menuWindow footer{border-color:transparent!important;box-shadow:none!important}.menuWindow>header{border-left:3px solid var(--accent)!important;background:#0b0b12!important}.menuTabs{background:#08080d!important}.menuTabs button{border:0;border-bottom:1px solid #34333e;background:transparent;box-shadow:none}.menuTabs button[data-active="true"]{border-bottom-color:var(--accent);background:color-mix(in srgb,var(--accent2) 15%,#0d0c13);box-shadow:inset 0 -2px var(--accent)}
+.menuContent,.shopList{background:linear-gradient(180deg,#0b0c13,#07080d)!important}.listRow,.shopList>button,.memoRow{border:0!important;border-left:2px solid #464552!important;background:rgba(255,255,255,.018)!important}.menuWindow footer{background:#08080d!important}
+@media(max-width:380px){.controls{height:150px;min-height:150px}.dpad{width:138px;height:138px}.abButtons button{width:62px;height:56px}}
+@media(max-height:700px){.controls{height:148px;min-height:148px}.fieldGoal{min-height:40px}.fieldQuick>div{min-height:32px}}
+@media(max-height:620px){.controls{height:140px;min-height:140px}.dpad{width:132px;height:132px}.abButtons button{width:60px;height:52px}}
+EOF
+
+          cat >> app/rpg/RPGPuzzleBattle.module.css <<'EOF'
+
+/* Visual Identity Pass 1 — tactical prism interface, not RPG window chrome */
+.battle{background:radial-gradient(ellipse at 50% 13%,color-mix(in srgb,var(--sceneAccent) 10%,#0b0c12),#05060b 42%,#020307 100%);gap:1px}
+.battle::before{opacity:.035;background:repeating-linear-gradient(0deg,transparent 0 5px,rgba(255,255,255,.14) 6px)}
+.header{border:0;border-left:3px solid var(--sceneAccent);padding:0 6px;background:linear-gradient(90deg,rgba(7,8,13,.96),rgba(7,8,13,.42));box-shadow:none}.header span{font-size:6px}.header strong{font-size:10px}
+.battleBackdrop{left:5px;right:5px;border:0;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.10),inset 0 -16px rgba(0,0,0,.16)}
+.enemyRow{border:0;background:transparent;box-shadow:none;padding-inline:7px;overflow:visible}.enemyRow::after{opacity:.48}.enemyInfo{align-self:end;margin-bottom:5px;padding:5px 7px 6px;border:0;border-left:3px solid var(--sceneAccent);clip-path:polygon(0 0,100% 0,calc(100% - 7px) 100%,0 100%);background:linear-gradient(90deg,rgba(5,5,9,.94),rgba(5,5,9,.68) 82%,transparent)}.enemyInfo>i{border:0;height:4px;background:#24242d}.enemyInfo>small{color:#9e9ca5}
+.intentRow{gap:4px;padding:0 4px}.intentNow,.intentNext{border:0;clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%);background:#090a10;box-shadow:inset 3px 0 #555}.intentNow{background:linear-gradient(90deg,#5a101a,#1b0b11 82%);box-shadow:inset 3px 0 #ff7b72}.intentNext{opacity:.48;box-shadow:inset 2px 0 #51515c}.intentNow em{padding:1px 5px;background:#f1e5af;color:#171016}.intentRow small{opacity:.68}
+.statusRow{gap:1px;padding:0 5px}.statusRow>div{border:0;border-left:2px solid #3a3b45;background:rgba(8,9,14,.66);box-shadow:none}.statusRow>div:first-child{border-left-color:#4fe07a}.statusRow>div:nth-child(2){border-left-color:#62d9f2}.statusRow>div:nth-child(3){border-left-color:#e6ca5d}.statusRow i{border:0;background:#20212a}
+.nextMap{border:0;padding:8px 0 1px;background:transparent;box-shadow:none}.nextMap>div{border-inline:0;border-left:1px solid #292934}.nextMap>div:first-of-type{border-left:0}.nextMap small,.nextMap strong{border:0;background:#101119;box-shadow:inset 0 0 0 1px #34343e}.nextTitle{left:2px;color:color-mix(in srgb,var(--gold) 72%,#aaa)}
+.board{border:0;clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px);box-shadow:inset 0 0 0 2px #4e4d5d,0 8px 24px rgba(0,0,0,.52);background:#020205}.board::before{opacity:.045;background-size:56px 56px}
+.tile{border-width:1px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),inset 0 -5px rgba(0,0,0,.25)}.preview{box-shadow:inset 0 0 0 2px #fff,0 0 10px var(--edge)}
+.readout{gap:1px}.readout span{border:0;border-top:1px solid #33343e;color:#7f7d86}.message{border:0;border-left:2px solid var(--sceneAccent);background:rgba(7,8,13,.72);color:#bbb7bd}
+.commandButton{min-height:44px;margin:0 7px;border:0;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);background:linear-gradient(90deg,color-mix(in srgb,var(--sceneAccent) 16%,#111019),#09090f 72%,rgba(9,9,15,.5));box-shadow:inset 3px 0 var(--sceneAccent);color:#f3e5aa;letter-spacing:.06em}
+.overlay{background:rgba(2,2,5,.75);backdrop-filter:blur(3px)}.commandWindow{border:0;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);background:linear-gradient(180deg,#0d0e16,#07080d);box-shadow:0 16px 42px rgba(0,0,0,.62),inset 3px 0 var(--sceneAccent)}.commandWindow button{border:0;border-left:2px solid #41424d;background:rgba(255,255,255,.025);box-shadow:none}.commandWindow button:active{border-left-color:var(--gold);background:rgba(240,212,119,.08)}.statusPanel{border:0;border-left:2px solid #55ccef;background:#0b0c12}
+.talkMoment{border:0;border-left:4px solid var(--sceneAccent);clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px));background:rgba(7,8,13,.96);box-shadow:0 12px 34px rgba(0,0,0,.62)}
+EOF
+
+      - name: Commit visual identity pass and remove helper workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-visual-identity-pass.yml
+          git add app/rpg/RPGMode.tsx app/rpg/RPGMode.module.css app/rpg/RPGPuzzleBattle.module.css
+          git diff --cached --check
+          git commit -m 'Remove RPG Maker visual language'
+          git push origin HEAD:main
