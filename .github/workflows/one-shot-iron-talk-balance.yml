@@ -1,0 +1,68 @@
+name: One-shot Iron Tyrant TALK balance pass
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-iron-talk-balance.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Strengthen intended TALK counterplay and realistic prep
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/rpg/RPGPuzzleBattle.tsx')
+          s = p.read_text()
+          old_dep = '[intentStep, enemyHp, hp, drainWeakened, phase]'
+          if s.count(old_dep) != 2:
+              raise SystemExit(f'intent deps count unexpected: {s.count(old_dep)}')
+          s = s.replace(old_dep, '[intentStep, enemyHp, hp, drainWeakened, armorWeakened, phase]')
+          anchor = '    if (drainWeakened && base.kind === "drain") { power = Math.max(1, power - 2); detail = "TALKで弱体化"; }\n'
+          insert = anchor + '    if (enemy.id === "ironTyrant" && armorWeakened) { power = Math.max(1, power - 1); detail = `${detail} • TALKで構え崩れ`; }\n'
+          if anchor not in s:
+              raise SystemExit('adjustedIntent anchor not found')
+          p.write_text(s.replace(anchor, insert, 1))
+
+          p = Path('app/rpg/data/enemies.ts')
+          s = p.read_text()
+          old = 'conditionalTalk: "大きなATKを見てIRON ARMORが1弱まった。",'
+          new = 'conditionalTalk: "盾の構えが揺らぎ、IRON ARMORと攻撃の勢いが1弱まった。",'
+          if old not in s:
+              raise SystemExit('Iron Tyrant dialogue anchor not found')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('scripts/live-playcheck.mjs')
+          s = p.read_text()
+          old = "gold: Math.max(0, scarletSave.gold - 95),\n  inventory: [{ id: 'guardStone', count: 2 }],"
+          new = "gold: Math.max(0, scarletSave.gold - 99),\n  inventory: [{ id: 'herb', count: 2 }, { id: 'guardStone', count: 1 }],"
+          if old not in s:
+              raise SystemExit('Iron prep seed anchor not found')
+          s = s.replace(old, new, 1)
+          old = "preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2"
+          new = "preparedIronSave.gold === 6 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 1 && preparedIronSave.inventory?.find?.(item => item.id === 'herb')?.count === 2"
+          if old not in s:
+              raise SystemExit('Iron prep assertion anchor not found')
+          s = s.replace(old, new, 1)
+          s = s.replace('IRON SWORD (55G) + GUARD STONE x2 (40G) is an affordable minimum setup.', 'IRON SWORD (55G) + HERB x2 (24G) + GUARD STONE (20G) is a 99G no-grind setup.', 1)
+          p.write_text(s)
+          PY
+      - name: Commit patch and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-iron-talk-balance.yml
+          git add app/rpg/RPGPuzzleBattle.tsx app/rpg/data/enemies.ts scripts/live-playcheck.mjs
+          git diff --cached --check
+          git commit -m 'Strengthen Iron Tyrant TALK counterplay'
+          git push origin HEAD:main
