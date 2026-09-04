@@ -506,7 +506,13 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     if (enemy.id === "nullExecutioner" && !nullHesitated && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => save.techniques.includes(id as TechniqueId))) {
       nextFree += 1; setFree(nextFree); setSkipFx({ value: nextFree, phase: "armed" }); setNullHesitated(true);
     }
-    const talkLine = alternateReady(nextStats) ? enemy.conditionalTalk : enemy.talk;
+    const tacticalTalkReady =
+      (enemy.id === "scarletOracle" && nextDrainWeakened)
+      || (enemy.id === "ironTyrant" && nextArmorWeakened)
+      || (enemy.id === "voidHerald" && nextStats.skipUses >= 2)
+      || (enemy.id === "ashCrow" && nextStats.skipUses >= 3)
+      || (enemy.id === "nullExecutioner" && ["flameLore", "firstAid", "fortress", "timeTheft"].every((id) => save.techniques.includes(id as TechniqueId)));
+    const talkLine = alternateReady(nextStats) || tacticalTalkReady ? enemy.conditionalTalk : enemy.talk;
     setMessage(talkLine);
     setTalkOverlay({ speaker: enemy.name, text: talkLine });
     await delay(900);

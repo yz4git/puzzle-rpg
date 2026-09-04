@@ -659,6 +659,138 @@ const ironSeed = {
   const ironReturn = await snapshot(page, '26-iron-return');
   assert('NEXT GOAL advances to VOID PASS after Iron Tyrant', /NEXT GOAL\s+VOID PASS/i.test(ironReturn.text), { text: ironReturn.text.slice(0, 1400) });
   assert('Midgame boss screens stay inside viewport', scarletResult.overflow.length === 0 && ironResult.overflow.length === 0 && ironReturn.overflow.length === 0, { scarlet: scarletResult.overflow, iron: ironResult.overflow, return: ironReturn.overflow });
+
+  // 8) Continue the exact progression into VOID PASS. The tactic under test is
+  // not raw DPS: use SKIP twice, spend any banked FREE, then TALK at FREE 0.
+  // TALK must create one fresh stopped enemy turn without costing HP.
+  const voidSeed = {
+    ...ironSave,
+    mapId: 'voidPass',
+    position: { x: 8, y: 4 },
+    direction: 'up',
+    hp: ironSave.maxHp,
+    encounterMeter: 99,
+  };
+  await enterSeededRpg(page, 'void-herald', voidSeed);
+  const voidReady = await startFixedBattle(page, /VOID HERALD/i, 8);
+  const voidStart = await snapshot(page, '27-void-herald');
+  assert('VOID PASS opens VOID HERALD after Iron Tyrant', voidReady && /VOID HERALD/i.test(voidStart.text));
+
+  let voidSkipUses = 0;
+  let voidPrepActions = 0;
+  let voidPrepHerbs = 0;
+  const voidPrepDecisions = [];
+  while (voidSkipUses < 2 && voidPrepActions < 30 && await page.locator('main[data-enemy]').count()) {
+    const text = await bodyText(page);
+    const hpMatch = text.match(/HP\s+(\d+)\/(\d+)\s+BAR\s+(\d+)\/30\s+FREE\s+(\d+)/i);
+    const hp = Number(hpMatch?.[1] ?? 25);
+    const maxHp = Number(hpMatch?.[2] ?? 25);
+    const barrier = Number(hpMatch?.[3] ?? 0);
+    const heavy = /NOW\s+(?:!!|×Ⅱ).*VOID CRUSH/i.test(text);
+    const groups = await boardGroups(page);
+    const best = type => groups.find(group => group.type === type);
+    const skip = best('SKIP');
+    const guard = best('BAR');
+    const heal = best('HEAL');
+    const attack = best('ATK');
+
+    if (hp <= 7 && voidPrepHerbs < 2) {
+      const used = await useBattleItem(page, /HERB/i);
+      if (used) {
+        voidPrepHerbs += 1; voidPrepActions += 1;
+        voidPrepDecisions.push({ action: 'HERB', hp, barrier });
+        await page.waitForTimeout(1150);
+        continue;
+      }
+    }
+
+    let chosen = skip;
+    if (!chosen && heavy && guard) chosen = guard;
+    if (!chosen && hp <= maxHp - 6 && heal) chosen = heal;
+    if (!chosen && barrier < 6 && guard) chosen = guard;
+    if (!chosen) chosen = heal ?? guard ?? attack ?? groups[0];
+    if (!chosen) break;
+    if (chosen.type === 'SKIP') voidSkipUses += 1;
+    voidPrepDecisions.push({ action: chosen.type, size: chosen.size, hp, barrier, skipUses: voidSkipUses });
+    await chosen.locator.tap({ force: true });
+    voidPrepActions += 1;
+    await page.waitForTimeout(1200);
+  }
+  assert('VOID HERALD setup can use SKIP twice through real board play', voidSkipUses >= 2, { voidSkipUses, voidPrepActions, voidPrepHerbs, decisions: voidPrepDecisions });
+
+  // Spend old FREE without using another SKIP so the TALK-generated stop can be
+  // distinguished from time already banked by the puzzle move.
+  let burnActions = 0;
+  while (burnActions < 12 && await page.locator('main[data-enemy]').count()) {
+    const text = await bodyText(page);
+    const free = Number(text.match(/FREE\s+(\d+)/i)?.[1] ?? 0);
+    if (free <= 0) break;
+    const hpMatch = text.match(/HP\s+(\d+)\/(\d+)/i);
+    const hp = Number(hpMatch?.[1] ?? 25);
+    const maxHp = Number(hpMatch?.[2] ?? 25);
+    const groups = await boardGroups(page);
+    const guard = groups.find(group => group.type === 'BAR');
+    const heal = groups.find(group => group.type === 'HEAL');
+    const attack = groups.find(group => group.type === 'ATK');
+    const chosen = guard ?? (hp < maxHp ? heal : null) ?? attack ?? groups.find(group => group.type !== 'SKIP');
+    if (!chosen) break;
+    voidPrepDecisions.push({ action: `BURN-${chosen.type}`, size: chosen.size, hp, free });
+    await chosen.locator.tap({ force: true });
+    burnActions += 1;
+    await page.waitForTimeout(1200);
+  }
+
+  const voidBeforeTalkText = await bodyText(page);
+  const voidFreeBeforeTalk = Number(voidBeforeTalkText.match(/FREE\s+(\d+)/i)?.[1] ?? -1);
+  const voidHpBeforeTalk = Number(voidBeforeTalkText.match(/HP\s+(\d+)\/(\d+)/i)?.[1] ?? -1);
+  assert('VOID TALK test reaches FREE 0 before speaking', voidFreeBeforeTalk === 0, { free: voidFreeBeforeTalk, text: voidBeforeTalkText.slice(0, 1200) });
+  const voidTalk = await talkOnce(page);
+  const voidTalkMoment = await snapshot(page, '28-void-talk');
+  assert('VOID HERALD explains the SKIP x2 TALK reward', voidTalk && /SKIPを2回使うと次のVOID CRUSHが遅れる/i.test(voidTalkMoment.text), { text: voidTalkMoment.text.slice(0, 1400) });
+  await page.waitForTimeout(950);
+  const voidAfterTalkText = await bodyText(page);
+  const voidHpAfterTalk = Number(voidAfterTalkText.match(/HP\s+(\d+)\/(\d+)/i)?.[1] ?? -2);
+  const voidFreeAfterTalk = Number(voidAfterTalkText.match(/FREE\s+(\d+)/i)?.[1] ?? -2);
+  assert('VOID TALK creates one fresh stopped enemy turn', voidHpAfterTalk === voidHpBeforeTalk && voidFreeAfterTalk === 0, { beforeHp: voidHpBeforeTalk, afterHp: voidHpAfterTalk, afterFree: voidFreeAfterTalk, text: voidAfterTalkText.slice(0, 1400) });
+
+  const voidFight = await fightBossSmart(page, 70, 2);
+  const voidResult = await snapshot(page, '29-void-result');
+  assert('VOID HERALD is beatable after using its intended SKIP TALK tactic', /VICTORY/i.test(voidResult.text), voidFight);
+  const voidSave = await storedSave(page);
+  assert('VOID boss persists clear flags and tempoBlade', voidSave.flags?.includes('boss:voidHerald') && voidSave.flags?.includes('void:clear') && voidSave.techniques?.includes('tempoBlade'), { flags: voidSave.flags, techniques: voidSave.techniques });
+  assert('VOID boss fixed encounter is cleared', voidSave.defeatedEncounters?.includes('void-boss'), { defeatedEncounters: voidSave.defeatedEncounters });
+  await tap(page, /CONTINUE/i);
+  await page.waitForTimeout(500);
+  const voidReturn = await snapshot(page, '30-void-return');
+  assert('NEXT GOAL advances to MIRROR TOWER after VOID clear', /NEXT GOAL\s+MIRROR TOWER/i.test(voidReturn.text), { text: voidReturn.text.slice(0, 1400) });
+
+  // 9) Follow the next goal into MIRROR TOWER. A legal 18G inn rest is modeled
+  // before the tower so this checks progression rather than carrying arbitrary HP.
+  const mirrorSeed = {
+    ...voidSave,
+    mapId: 'mirrorTower',
+    position: { x: 10, y: 4 },
+    direction: 'up',
+    hp: voidSave.maxHp,
+    gold: Math.max(0, voidSave.gold - 18),
+    lastInn: { mapId: 'mirrorTown', position: { x: 8, y: 11 } },
+    encounterMeter: 99,
+  };
+  await enterSeededRpg(page, 'mirror-lost-knight', mirrorSeed);
+  const knightReady = await startFixedBattle(page, /LOST KNIGHT/i, 8);
+  const knightStart = await snapshot(page, '31-lost-knight');
+  assert('MIRROR TOWER opens LOST KNIGHT', knightReady && /LOST KNIGHT/i.test(knightStart.text));
+  const knightFight = await fightBossSmart(page, 60, 2);
+  const knightResult = await snapshot(page, '32-lost-knight-result');
+  assert('LOST KNIGHT can be defeated with post-VOID resources', /VICTORY/i.test(knightResult.text), knightFight);
+  const mirrorSave = await storedSave(page);
+  assert('Mirror key persists after LOST KNIGHT', mirrorSave.flags?.includes('key:mirror') && mirrorSave.flags?.includes('fixed:lostKnight'), { flags: mirrorSave.flags });
+  assert('LOST KNIGHT fixed encounter is cleared', mirrorSave.defeatedEncounters?.includes('mirror-lost'), { defeatedEncounters: mirrorSave.defeatedEncounters });
+  await tap(page, /CONTINUE/i);
+  await page.waitForTimeout(500);
+  const mirrorReturn = await snapshot(page, '33-mirror-return');
+  assert('NEXT GOAL advances to four training seals after mirror key', /NEXT GOAL\s+四つの修行印/i.test(mirrorReturn.text), { text: mirrorReturn.text.slice(0, 1600) });
+  assert('VOID and Mirror screens stay inside viewport', voidStart.overflow.length === 0 && voidResult.overflow.length === 0 && voidReturn.overflow.length === 0 && knightStart.overflow.length === 0 && knightResult.overflow.length === 0 && mirrorReturn.overflow.length === 0, { voidStart: voidStart.overflow, voidResult: voidResult.overflow, voidReturn: voidReturn.overflow, knightStart: knightStart.overflow, knightResult: knightResult.overflow, mirrorReturn: mirrorReturn.overflow });
   await context.close();
 }
 
