@@ -1,0 +1,28 @@
+name: One-shot play review layout fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-play-review-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply layout and playcheck fix
+        run: python3 scripts/one-shot-play-review-fix.py
+      - name: Commit fix and clean helpers
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-play-review-fix.yml scripts/one-shot-play-review-fix.py
+          git add app/rpg/RPGMode.tsx app/rpg/RPGMode.module.css scripts/live-playcheck.mjs
+          git commit -m 'Fix world-first portrait control layout'
+          git push
