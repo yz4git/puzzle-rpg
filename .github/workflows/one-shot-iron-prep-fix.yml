@@ -20,143 +20,34 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
-          script_path = Path('scripts/live-playcheck.mjs')
-          script = script_path.read_text()
-
-          old = """async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
-  let actions = 0;
-  let herbsUsed = 0;
-  const decisions = [];
-"""
-          new = """async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
-  let actions = 0;
-  let herbsUsed = 0;
-  let guardStonesUsed = 0;
-  const decisions = [];
-  const strategicSave = await storedSave(page);
-  const canOverheal = strategicSave.techniques?.includes('overheal');
-"""
-          if old not in script:
-              raise SystemExit('fightBossSmart header anchor not found')
-          script = script.replace(old, new, 1)
-
-          old = """    if (hp <= 7 && herbsUsed < herbLimit) {
-      const used = await useBattleItem(page, /HERB/i);
-      if (used) {
-        herbsUsed += 1;
-        actions += 1;
-        decisions.push({ action: 'HERB', hp, barrier, free, heavy });
-        await page.waitForTimeout(1150);
-        continue;
-      }
-    }
-
-    let chosen = null;
-    if (free > 0 && attack) chosen = attack;
-    else if (heavy && barrier < 7 && guard) chosen = guard;
-    else if (hp <= Math.max(9, maxHp - 8) && heal) chosen = heal;
-"""
-          new = """    if (heavy && barrier < 5) {
-      const used = await useBattleItem(page, /GUARD STONE/i);
-      if (used) {
-        guardStonesUsed += 1;
-        actions += 1;
-        decisions.push({ action: 'GUARD STONE', hp, barrier, free, heavy });
-        await page.waitForTimeout(1150);
-        continue;
-      }
-    }
-
-    if (hp <= 7 && herbsUsed < herbLimit) {
-      const used = await useBattleItem(page, /HERB/i);
-      if (used) {
-        herbsUsed += 1;
-        actions += 1;
-        decisions.push({ action: 'HERB', hp, barrier, free, heavy });
-        await page.waitForTimeout(1150);
-        continue;
-      }
-    }
-
-    let chosen = null;
-    if (free > 0 && attack) chosen = attack;
-    else if (heavy && barrier < 7 && guard) chosen = guard;
-    else if (canOverheal && heal && barrier < 6 && heal.size >= Math.max(5, maxHp - hp + 2)) chosen = heal;
-    else if (hp <= Math.max(9, maxHp - 8) && heal) chosen = heal;
-"""
-          if old not in script:
-              raise SystemExit('boss strategy anchor not found')
-          script = script.replace(old, new, 1)
-
-          old = """  return { actions, herbsUsed, decisions, text: await bodyText(page) };
-}
-
-// 6) First dungeon boss"""
-          new = """  return { actions, herbsUsed, guardStonesUsed, decisions, text: await bodyText(page) };
-}
-
-// 6) First dungeon boss"""
-          if old not in script:
-              raise SystemExit('fightBossSmart return anchor not found')
-          script = script.replace(old, new, 1)
-
-          old = """  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
-
-  const ironSeed = {
-    ...scarletSave,
-    mapId: 'ironCity',
-    position: { x: 9, y: 6 },
-    direction: 'up',
-    hp: scarletSave.maxHp,
-    inventory: [{ id: 'herb', count: 2 }],
-    encounterMeter: 99,
-  };
-"""
-          new = """  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
-  assert('Iron City goal teaches boss preparation', /GUARD STONE/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
-
-  // The guaranteed boss rewards leave 105G here. Iron City's smith sells an
-  // IRON SWORD (55G) and GUARD STONE (20G), so this models a minimal, fully
-  // affordable preparation instead of giving the bot free healing items.
-  const ironSeed = {
-    ...scarletSave,
-    mapId: 'ironCity',
-    position: { x: 9, y: 6 },
-    direction: 'up',
-    hp: scarletSave.maxHp,
-    gold: Math.max(0, scarletSave.gold - 95),
-    inventory: [{ id: 'guardStone', count: 2 }],
-    equipmentOwned: [...new Set([...(scarletSave.equipmentOwned ?? []), 'ironSword'])],
-    equipment: { ...scarletSave.equipment, weapon: 'ironSword' },
-    encounterMeter: 99,
-  };
-"""
-          if old not in script:
-              raise SystemExit('iron seed anchor not found')
-          script = script.replace(old, new, 1)
-
-          old = """  const ironStart = await snapshot(page, '24-iron-tyrant');
-  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));
-"""
-          new = """  const ironStart = await snapshot(page, '24-iron-tyrant');
-  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));
-  const preparedIronSave = await storedSave(page);
-  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });
-"""
-          if old not in script:
-              raise SystemExit('iron start assertion anchor not found')
-          script = script.replace(old, new, 1)
-
-          script_path.write_text(script)
-
-          mode_path = Path('app/rpg/RPGMode.tsx')
-          mode = mode_path.read_text()
-          old_text = 'if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、IRON TYRANTと向き合う。" };'
-          new_text = 'if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、鍛冶屋で装備とGUARD STONEを整えてIRON TYRANTと向き合う。" };'
-          if old_text not in mode:
-              raise SystemExit('Iron City NEXT GOAL anchor not found')
-          mode_path.write_text(mode.replace(old_text, new_text, 1))
+          p = Path('scripts/live-playcheck.mjs')
+          s = p.read_text()
+          old = "async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {\n  let actions = 0;\n  let herbsUsed = 0;\n  const decisions = [];\n"
+          new = "async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {\n  let actions = 0;\n  let herbsUsed = 0;\n  let guardStonesUsed = 0;\n  const decisions = [];\n  const strategicSave = await storedSave(page);\n  const canOverheal = strategicSave.techniques?.includes('overheal');\n"
+          if old not in s: raise SystemExit('fightBossSmart header anchor not found')
+          s = s.replace(old, new, 1)
+          old = "    if (hp <= 7 && herbsUsed < herbLimit) {\n      const used = await useBattleItem(page, /HERB/i);\n      if (used) {\n        herbsUsed += 1;\n        actions += 1;\n        decisions.push({ action: 'HERB', hp, barrier, free, heavy });\n        await page.waitForTimeout(1150);\n        continue;\n      }\n    }\n\n    let chosen = null;\n    if (free > 0 && attack) chosen = attack;\n    else if (heavy && barrier < 7 && guard) chosen = guard;\n    else if (hp <= Math.max(9, maxHp - 8) && heal) chosen = heal;\n"
+          new = "    if (heavy && barrier < 5) {\n      const used = await useBattleItem(page, /GUARD STONE/i);\n      if (used) {\n        guardStonesUsed += 1;\n        actions += 1;\n        decisions.push({ action: 'GUARD STONE', hp, barrier, free, heavy });\n        await page.waitForTimeout(1150);\n        continue;\n      }\n    }\n\n    if (hp <= 7 && herbsUsed < herbLimit) {\n      const used = await useBattleItem(page, /HERB/i);\n      if (used) {\n        herbsUsed += 1;\n        actions += 1;\n        decisions.push({ action: 'HERB', hp, barrier, free, heavy });\n        await page.waitForTimeout(1150);\n        continue;\n      }\n    }\n\n    let chosen = null;\n    if (free > 0 && attack) chosen = attack;\n    else if (heavy && barrier < 7 && guard) chosen = guard;\n    else if (canOverheal && heal && barrier < 6 && heal.size >= Math.max(5, maxHp - hp + 2)) chosen = heal;\n    else if (hp <= Math.max(9, maxHp - 8) && heal) chosen = heal;\n"
+          if old not in s: raise SystemExit('boss strategy anchor not found')
+          s = s.replace(old, new, 1)
+          old = "  return { actions, herbsUsed, decisions, text: await bodyText(page) };\n}\n\n// 6) First dungeon boss"
+          new = "  return { actions, herbsUsed, guardStonesUsed, decisions, text: await bodyText(page) };\n}\n\n// 6) First dungeon boss"
+          if old not in s: raise SystemExit('fightBossSmart return anchor not found')
+          s = s.replace(old, new, 1)
+          old = "  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\\\\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n\n  const ironSeed = {\n    ...scarletSave,\n    mapId: 'ironCity',\n    position: { x: 9, y: 6 },\n    direction: 'up',\n    hp: scarletSave.maxHp,\n    inventory: [{ id: 'herb', count: 2 }],\n    encounterMeter: 99,\n  };\n"
+          new = "  assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\\\\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n  assert('Iron City goal teaches boss preparation', /GUARD STONE/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });\n\n  // Guaranteed boss rewards leave 105G. IRON SWORD (55G) + GUARD STONE x2 (40G) is an affordable minimum setup.\n  const ironSeed = {\n    ...scarletSave,\n    mapId: 'ironCity',\n    position: { x: 9, y: 6 },\n    direction: 'up',\n    hp: scarletSave.maxHp,\n    gold: Math.max(0, scarletSave.gold - 95),\n    inventory: [{ id: 'guardStone', count: 2 }],\n    equipmentOwned: [...new Set([...(scarletSave.equipmentOwned ?? []), 'ironSword'])],\n    equipment: { ...scarletSave.equipment, weapon: 'ironSword' },\n    encounterMeter: 99,\n  };\n"
+          if old not in s: raise SystemExit('iron seed anchor not found')
+          s = s.replace(old, new, 1)
+          old = "  const ironStart = await snapshot(page, '24-iron-tyrant');\n  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));\n"
+          new = "  const ironStart = await snapshot(page, '24-iron-tyrant');\n  assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));\n  const preparedIronSave = await storedSave(page);\n  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });\n"
+          if old not in s: raise SystemExit('iron start assertion anchor not found')
+          p.write_text(s.replace(old, new, 1))
+          p = Path('app/rpg/RPGMode.tsx')
+          s = p.read_text()
+          old = 'if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、IRON TYRANTと向き合う。" };'
+          new = 'if (flag("boss:scarletOracle")) return { title: "IRON CITY", text: "SCARLET ORACLEを越えた。IRON CITYへ戻り、鍛冶屋で装備とGUARD STONEを整えてIRON TYRANTと向き合う。" };'
+          if old not in s: raise SystemExit('Iron City NEXT GOAL anchor not found')
+          p.write_text(s.replace(old, new, 1))
           PY
       - name: Commit patch and remove one-shot workflow
         shell: bash
