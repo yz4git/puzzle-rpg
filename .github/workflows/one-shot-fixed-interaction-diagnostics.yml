@@ -16,52 +16,13 @@ jobs:
         with:
           fetch-depth: 0
       - name: Add fixed battle state logging
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('scripts/live-playcheck.mjs')
-          text = path.read_text()
-          start = text.index('async function startFixedBattle(page, expectedName, attempts = 6) {')
-          end = text.index('\n}\n', start) + 2
-          old = text[start:end]
-          new = r'''async function startFixedBattle(page, expectedName, attempts = 6) {
-  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
-  const action = page.getByRole('button', { name: /A\s*CHECK/i }).first();
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    if (await launcher.isVisible().catch(() => false)) {
-      const text = await bodyText(page);
-      return expectedName.test(text);
-    }
-    const before = await action.evaluate(el => {
-      const r = el.getBoundingClientRect();
-      return {
-        dataset: { ...el.dataset },
-        disabled: el.disabled,
-        rect: { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) },
-        visibility: getComputedStyle(el).visibility,
-        pointerEvents: getComputedStyle(el).pointerEvents,
-      };
-    }).catch(error => ({ error: String(error) }));
-    console.log(`FIXED_INTERACTION before ${String(expectedName)} #${attempt + 1}`, JSON.stringify(before));
-    const tapped = await tap(page, /A\s*CHECK/i);
-    await page.waitForTimeout(90);
-    const after90 = await action.evaluate(el => ({ ...el.dataset })).catch(error => ({ error: String(error) }));
-    const cue90 = /GUARDIAN|PATH BLOCKED|FOREST WISP/i.test(await bodyText(page));
-    console.log(`FIXED_INTERACTION after90 ${String(expectedName)} #${attempt + 1}`, JSON.stringify({ tapped, state: after90, cue90 }));
-    await page.waitForTimeout(630);
-  }
-  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
-  return ready && expectedName.test(await bodyText(page));
-}'''
-          path.write_text(text[:start] + new + text[end:])
-          PY
+        run: python3 scripts/patch-fixed-interaction-diagnostics.py
       - name: Commit diagnostics and clean runner
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/one-shot-fixed-interaction-diagnostics.yml
+          git rm .github/workflows/one-shot-fixed-interaction-diagnostics.yml scripts/patch-fixed-interaction-diagnostics.py
           git add scripts/live-playcheck.mjs
           git commit -m 'Log fixed encounter interaction state in live QA'
           git push
