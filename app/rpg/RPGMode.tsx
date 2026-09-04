@@ -1672,8 +1672,22 @@ export default function RPGMode({ initialSave, onExit }: Props) {
       openDialogue(npc.name, DIALOGUE[npc.dialogueKey] ?? ["……"], () => handleNpcAction(npc, npc.action));
       return;
     }
-    const fixed = findAt(visibleFixed);
-    if (fixed) { startBattle(fixed.enemyId, { fixedId: fixed.id, afterFlag: fixed.afterFlag }); return; }
+    // FIELD threat UI promises “A • CONFRONT” whenever a fixed enemy is one tile
+    // away. Honor that promise even if the hero is not already facing the exact
+    // cardinal direction; touch users should not get a silent A-button no-op.
+    const fixed = findAt(visibleFixed) ?? visibleFixed.find((entry) =>
+      Math.abs(entry.x - save.position.x) + Math.abs(entry.y - save.position.y) === 1
+    );
+    if (fixed) {
+      const dx = fixed.x - save.position.x;
+      const dy = fixed.y - save.position.y;
+      const face: Direction = Math.abs(dx) > Math.abs(dy)
+        ? (dx > 0 ? "right" : "left")
+        : (dy > 0 ? "down" : "up");
+      if (face !== save.direction) commit((current) => ({ ...current, direction: face }));
+      startBattle(fixed.enemyId, { fixedId: fixed.id, afterFlag: fixed.afterFlag });
+      return;
+    }
     const chest = findAt(map.chests.filter((entry) => !save.openedChests.includes(entry.id) && hasFlag(save, entry.requireFlag)));
     if (chest) {
       let found: Exclude<DiscoveryState, null> = { kind: "item", kicker: "TREASURE FOUND", name: "TREASURE", detail: "宝箱を開けた。" };
