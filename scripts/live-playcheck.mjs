@@ -390,7 +390,10 @@ async function storedSave(page) {
 async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
   let actions = 0;
   let herbsUsed = 0;
+  let guardStonesUsed = 0;
   const decisions = [];
+  const strategicSave = await storedSave(page);
+  const canOverheal = strategicSave.techniques?.includes('overheal');
   while (actions < maxActions && await page.locator('main[data-enemy]').count()) {
     const text = await bodyText(page);
     if (/VICTORY|YOU AWAKEN/i.test(text)) break;
@@ -407,6 +410,17 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
     const guard = best('BAR');
     const skip = best('SKIP');
 
+    if (heavy && barrier < 5) {
+      const used = await useBattleItem(page, /GUARD STONE/i);
+      if (used) {
+        guardStonesUsed += 1;
+        actions += 1;
+        decisions.push({ action: 'GUARD STONE', hp, barrier, free, heavy });
+        await page.waitForTimeout(1150);
+        continue;
+      }
+    }
+
     if (hp <= 7 && herbsUsed < herbLimit) {
       const used = await useBattleItem(page, /HERB/i);
       if (used) {
@@ -421,6 +435,7 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
     let chosen = null;
     if (free > 0 && attack) chosen = attack;
     else if (heavy && barrier < 7 && guard) chosen = guard;
+    else if (canOverheal && heal && barrier < 6 && heal.size >= Math.max(5, maxHp - hp + 2)) chosen = heal;
     else if (hp <= Math.max(9, maxHp - 8) && heal) chosen = heal;
     else if (free === 0 && skip && skip.size >= 2) chosen = skip;
     else if (barrier < 5 && guard && guard.size >= 3) chosen = guard;
@@ -434,7 +449,7 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
     actions += 1;
     await page.waitForTimeout(1200);
   }
-  return { actions, herbsUsed, decisions, text: await bodyText(page) };
+  return { actions, herbsUsed, guardStonesUsed, decisions, text: await bodyText(page) };
 }
 
 // 6) First dungeon boss with real LV1 stats. The bot uses the same choices available to a player.
@@ -565,21 +580,28 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
   await page.waitForTimeout(500);
   const scarletReturn = await snapshot(page, '23-scarlet-return');
   assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
+  assert('Iron City goal teaches boss preparation', /GUARD STONE/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
 
-  const ironSeed = {
-    ...scarletSave,
-    mapId: 'ironCity',
-    position: { x: 9, y: 6 },
-    direction: 'up',
-    hp: scarletSave.maxHp,
-    inventory: [{ id: 'herb', count: 2 }],
-    encounterMeter: 99,
-  };
+  // Guaranteed boss rewards leave 105G. IRON SWORD (55G) + GUARD STONE x2 (40G) is an affordable minimum setup.
+const ironSeed = {
+  ...scarletSave,
+  mapId: 'ironCity',
+  position: { x: 9, y: 6 },
+  direction: 'up',
+  hp: scarletSave.maxHp,
+  gold: Math.max(0, scarletSave.gold - 95),
+  inventory: [{ id: 'guardStone', count: 2 }],
+  equipmentOwned: [...new Set([...(scarletSave.equipmentOwned ?? []), 'ironSword'])],
+  equipment: { ...scarletSave.equipment, weapon: 'ironSword' },
+  encounterMeter: 99,
+};
   await enterSeededRpg(page, 'iron-tyrant', ironSeed);
   await tap(page, /A\s*CHECK/i);
   await page.waitForTimeout(650);
   const ironStart = await snapshot(page, '24-iron-tyrant');
   assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));
+  const preparedIronSave = await storedSave(page);
+  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });
   const ironTalk = await talkOnce(page);
   await page.waitForTimeout(1200);
   assert('Iron Tyrant accepts armor-weakening TALK', ironTalk && /IRON TYRANT/i.test(await bodyText(page)));
