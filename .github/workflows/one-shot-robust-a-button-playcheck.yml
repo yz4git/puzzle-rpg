@@ -15,51 +15,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Make field A action selector independent of label text
+      - name: Make field A selector independent of label text
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('scripts/live-playcheck.mjs')
           s = p.read_text()
-          old = """async function startFixedBattle(page, expectedName, attempts = 6) {
-  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
-  const fieldAction = /A(?:\\s*•)?\\s*(?:CHECK|CONFRONT)/i;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    if (await launcher.isVisible().catch(() => false)) {
-      return expectedName.test(await bodyText(page));
-    }
-    const action = page.getByRole('button', { name: fieldAction }).first();
-    if (await action.count()) await action.tap({ force: true });
-    await page.waitForTimeout(720);
-  }
-  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
-  return ready && expectedName.test(await bodyText(page));
-}"""
-          new = """async function tapFieldA(page) {
-  const action = page.locator('button[class*=\"aButton\"]').first();
-  if (!(await action.count())) return false;
-  await action.tap({ force: true });
-  await page.waitForTimeout(140);
-  return true;
-}
-
-async function startFixedBattle(page, expectedName, attempts = 6) {
-  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    if (await launcher.isVisible().catch(() => false)) {
-      return expectedName.test(await bodyText(page));
-    }
-    await tapFieldA(page);
-    await page.waitForTimeout(580);
-  }
-  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
-  return ready && expectedName.test(await bodyText(page));
-}"""
-          if old not in s:
-              raise SystemExit('startFixedBattle block not found')
-          s = s.replace(old, new)
-          # Field-only A checks outside startFixedBattle should use the stable control locator too.
+          start = s.index('async function startFixedBattle(page, expectedName, attempts = 6) {')
+          end = s.index('\n}\n\nasync function openCommand', start) + 2
+          new = (
+              "async function tapFieldA(page) {\n"
+              "  const action = page.locator('button[class*=\\\"aButton\\\"]').first();\n"
+              "  if (!(await action.count())) return false;\n"
+              "  await action.tap({ force: true });\n"
+              "  await page.waitForTimeout(140);\n"
+              "  return true;\n"
+              "}\n\n"
+              "async function startFixedBattle(page, expectedName, attempts = 6) {\n"
+              "  const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();\n"
+              "  for (let attempt = 0; attempt < attempts; attempt++) {\n"
+              "    if (await launcher.isVisible().catch(() => false)) {\n"
+              "      return expectedName.test(await bodyText(page));\n"
+              "    }\n"
+              "    await tapFieldA(page);\n"
+              "    await page.waitForTimeout(580);\n"
+              "  }\n"
+              "  const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);\n"
+              "  return ready && expectedName.test(await bodyText(page));\n"
+              "}"
+          )
+          s = s[:start] + new + s[end:]
           s = s.replace("await tap(page, /A(?:\\s*•)?\\s*(?:CHECK|CONFRONT)/i);", "await tapFieldA(page);")
           p.write_text(s)
           PY
