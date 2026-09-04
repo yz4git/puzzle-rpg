@@ -372,7 +372,7 @@ async function storedSave(page) {
     await snapshot(page, '13-item-route-diagnostic');
     throw new Error('RPG COMMAND did not become available in item route');
   }
-  const win = await openCommand(page);
+  let win = await openCommand(page);
   if (!win) throw new Error('RPG COMMAND launcher was visible but could not open');
   await win.locator('button').filter({ hasText: 'ITEM' }).first().tap({ force: true });
   win = page.locator('[class*="commandWindow"]');
