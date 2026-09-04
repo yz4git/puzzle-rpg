@@ -1,0 +1,52 @@
+name: One-shot field interaction state probe
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-field-state-probe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Expose nonvisual field interaction state
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/rpg/RPGMode.tsx')
+          text = path.read_text()
+          old = '<button type="button" className={styles.aButton} onClick={interact}><b>A</b><small>CHECK</small></button>'
+          new = '''<button
+            type="button"
+            className={styles.aButton}
+            data-rpg-screen={screen}
+            data-movement-locked={movementLockedRef.current ? "true" : "false"}
+            data-step-encounter-pending={stepEncounterTimer.current !== null ? "true" : "false"}
+            data-encounter-timer-pending={encounterTimer.current !== null ? "true" : "false"}
+            data-encounter-cue={encounterCue?.enemyId ?? ""}
+            data-nearby-threat={nearbyThreat?.entry.id ?? ""}
+            data-nearby-distance={nearbyThreat?.distance ?? -1}
+            onClick={interact}
+          ><b>A</b><small>CHECK</small></button>'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif 'data-rpg-screen={screen}' not in text:
+              raise SystemExit('A action button anchor not found')
+          path.write_text(text)
+          PY
+      - name: Commit probe and clean runner
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/one-shot-field-state-probe.yml
+          git add app/rpg/RPGMode.tsx
+          git commit -m 'Expose field interaction state for live QA'
+          git push
