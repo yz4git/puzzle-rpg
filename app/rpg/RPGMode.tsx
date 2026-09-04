@@ -1662,7 +1662,17 @@ export default function RPGMode({ initialSave, onExit }: Props) {
   }
 
   function interact() {
-    if (movementLockedRef.current) return;
+    // A stale movement lock must never permanently disable field actions. Only an
+    // actually pending encounter transition is allowed to consume A input. This
+    // also recovers safely after iOS page/animation timing interruptions.
+    if (movementLockedRef.current) {
+      const encounterTransitionActive = stepEncounterTimer.current !== null
+        || encounterTimer.current !== null
+        || Boolean(encounterCue)
+        || Boolean(battle);
+      if (encounterTransitionActive) return;
+      movementLockedRef.current = false;
+    }
     if (discovery) { setDiscovery(null); playSfx("uiSelect"); return; }
     if (areaTransition || encounterCue) return;
     if (screen === "dialogue" || screen === "event") { advanceDialogue(); return; }
@@ -2293,8 +2303,8 @@ const fieldGoal = (() => {
           <button type="button" aria-label="Move down" onPointerDown={(event) => startHold("down", event)} onPointerUp={stopHold} onPointerCancel={stopHold}>▼</button>
         </div>
         <div className={styles.abButtons}>
-          <button type="button" className={styles.bButton} onPointerDown={(event) => { event.preventDefault(); openMenu(); }}><b>B</b><small>MENU</small></button>
-          <button type="button" className={styles.aButton} onPointerDown={(event) => { event.preventDefault(); interact(); }}><b>A</b><small>CHECK</small></button>
+          <button type="button" className={styles.bButton} onClick={openMenu}><b>B</b><small>MENU</small></button>
+          <button type="button" className={styles.aButton} onClick={interact}><b>A</b><small>CHECK</small></button>
         </div>
       </section>
 
