@@ -1,0 +1,33 @@
+name: One-shot VOID and Mirror progression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-void-mirror.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extend progression coverage
+        run: python3 .github/one-shot-void-mirror.py
+
+      - name: Commit implementation and self-clean
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/rpg/RPGPuzzleBattle.tsx scripts/live-playcheck.mjs
+          git rm .github/one-shot-void-mirror.py .github/workflows/one-shot-void-mirror.yml
+          git commit -m "Extend live progression through Void and Mirror"
+          git push origin HEAD:main
