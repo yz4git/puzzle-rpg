@@ -270,18 +270,21 @@ async function storedSave(page) {
   const field = await snapshot(page, '04-rpg-field');
   assert('Seeded save reaches PRISM ROAD', /PRISM ROAD/i.test(field.text));
   assert('Field controls meet 44px target', field.tinyButtons.length === 0, { tiny: field.tinyButtons });
-  for (let step = 0; step < 6 && !(await page.locator('main[data-enemy]').count()); step++) {
+  const encounterLauncher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
+  for (let step = 0; step < 8; step++) {
+    if (await encounterLauncher.isVisible().catch(() => false)) break;
     await tap(page, 'Move right');
-    await page.waitForTimeout(220);
+    await page.waitForTimeout(260);
   }
-  await page.waitForTimeout(750);
+  const encounterReady = await encounterLauncher.waitFor({ state: 'visible', timeout: 6000 }).then(() => true).catch(() => false);
   const battle = await snapshot(page, '05-rpg-encounter');
-  assert('Field movement triggers RPG encounter', await page.locator('main[data-enemy]').count() > 0);
+  assert('Field movement triggers RPG encounter', encounterReady, { text: battle.text.slice(0, 500) });
   assert('RPG battle controls meet 44px target', battle.tinyButtons.length === 0, { tiny: battle.tinyButtons });
   const beforeTurn = Number(battle.text.match(/TURN\s+(\d+)/i)?.[1] ?? 0);
-  let win = await openCommand(page);
+  const win = encounterReady ? await openCommand(page) : null;
   const command = await snapshot(page, '06-rpg-command');
-  assert('RPG command exposes TALK ITEM STATUS RUN', ['TALK', 'ITEM', 'STATUS', 'RUN'].every(value => command.text.includes(value)));
+  assert('RPG command exposes TALK ITEM STATUS RUN', Boolean(win) && ['TALK', 'ITEM', 'STATUS', 'RUN'].every(value => command.text.includes(value)));
+  if (!win) throw new Error('Normal RPG encounter did not expose an operable RPG COMMAND');
   await win.locator('button').filter({ hasText: 'STATUS' }).first().tap({ force: true });
   const status = await snapshot(page, '07-rpg-status');
   assert('STATUS is no-turn information', /STATUS • NO TURN/i.test(status.text) && /TECHNIQUES/i.test(status.text));
@@ -294,7 +297,7 @@ async function storedSave(page) {
   const talked = await talkOnce(page);
   const talkTurn = await waitForTurnAdvance(page, afterTurn, 2400);
   const afterTalk = await snapshot(page, '09-rpg-after-talk');
-  assert('TALK consumes one battle turn', talked && talkTurn > afterTurn && await page.locator('main[data-enemy]').count() > 0, { afterTurn, talkTurn });
+  assert('TALK consumes one battle turn', talked && talkTurn > afterTurn && await page.getByRole('button', { name: /RPG COMMAND/i }).count() > 0, { afterTurn, talkTurn });
   assert('Normal RPG battle stays inside viewport', afterTalk.overflow.length === 0, { overflow: afterTalk.overflow });
   await context.close();
 }

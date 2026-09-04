@@ -382,3 +382,63 @@
   .dpad button,.dpad i{min-width:44px;min-height:44px}
   .abButtons{margin-top:20px}.abButtons button{width:62px;height:54px}
 }
+
+
+/* Play review pass 36 — restore visible controls with a taller 13x17 world */
+/* fieldBrief is an in-flow grid child again; this prevents the controls from auto-placing into the zero-height row. */
+.rpg{
+  grid-template-rows:auto auto auto auto 42px minmax(150px,1fr);
+  align-content:stretch;
+}
+.worldFrame{
+  width:100%;
+  aspect-ratio:13/17;
+  justify-self:center;
+}
+.fieldBrief{
+  position:relative;
+  left:auto;
+  right:auto;
+  bottom:auto;
+  z-index:7;
+  margin:0 8px;
+  padding:2px 0;
+  display:block;
+  pointer-events:none;
+}
+.fieldGoal{
+  width:100%;
+  max-width:none;
+  min-height:38px;
+  padding:4px 11px 4px 13px;
+  background:linear-gradient(90deg,rgba(7,7,12,.95),rgba(7,7,12,.74) 72%,rgba(7,7,12,.20));
+}
+.fieldGoal small{display:none}
+.fieldQuick{display:none}
+.controls{
+  min-height:150px;
+  height:auto;
+  margin:0;
+  padding:5px 10px max(6px,env(safe-area-inset-bottom));
+  align-self:stretch;
+  align-items:center;
+  background:radial-gradient(ellipse at 26% 50%,color-mix(in srgb,var(--accent2) 13%,transparent),transparent 34%),radial-gradient(ellipse at 79% 50%,color-mix(in srgb,var(--accent) 9%,transparent),transparent 34%),linear-gradient(180deg,rgba(6,6,11,.72),#020205 100%);
+}
+.controls::after{top:50%}
+.abButtons{margin-top:0}
+@media(max-height:700px){
+  .rpg{grid-template-rows:auto auto auto auto 38px minmax(138px,1fr)}
+  .worldFrame{
+    width:min(100%,calc((100dvh - 260px) * 13 / 17));
+    aspect-ratio:13/17;
+  }
+  .fieldBrief{margin-inline:5px;padding-block:1px}
+  .fieldGoal{min-height:34px;padding-block:3px}
+  .controls{min-height:138px}
+}
+@media(max-height:620px){
+  .rpg{grid-template-rows:auto auto auto auto 34px minmax(132px,1fr)}
+  .worldFrame{width:min(100%,calc((100dvh - 238px) * 13 / 17))}
+  .fieldGoal{min-height:31px}
+  .controls{min-height:132px}
+}

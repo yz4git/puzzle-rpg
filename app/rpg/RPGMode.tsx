@@ -33,7 +33,7 @@ type EncounterCueState = { enemyId: string; kind: EncounterCueKind; title: strin
 
 const TILE = 16;
 const VIEW_W = 13;
-const VIEW_H = 15;
+const VIEW_H = 17;
 const WORLD_RENDER_SCALE = 2;
 type AtlasImageKey = "hero" | "npcs" | "field" | "town" | "dungeon" | "ui" | "enemyA" | "enemyB" | "bosses";
 const DIR_DELTA: Record<Direction, Vec2> = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
