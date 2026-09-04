@@ -1,6 +1,6 @@
 name: Deploy Puzzle RPG to GitHub Pages
 
-# Public deployment for the iPhone/Web RPG build, story guidance, boss balance, Iron Tyrant tactical counterplay, visual identity, play-review composition, portrait controls, adjacent encounters, reliable field action taps, and interaction QA state.
+# Public deployment for the iPhone/Web RPG build, story guidance, boss balance, Iron Tyrant tactical counterplay, VOID/Mirror progression, conditional TALK feedback, visual identity, play-review composition, portrait controls, adjacent encounters, reliable field action taps, and interaction QA state.
 on:
   push:
     branches: [main]
