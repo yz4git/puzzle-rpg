@@ -1,6 +1,6 @@
 name: Deploy Puzzle RPG to GitHub Pages
 
-# Public deployment for the iPhone/Web RPG build, story guidance, boss balance, and visual identity pass 2.
+# Public deployment for the iPhone/Web RPG build, story guidance, boss balance, visual identity, and play-review composition.
 on:
   push:
     branches: [main]
