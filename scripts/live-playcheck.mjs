@@ -329,8 +329,23 @@ async function storedSave(page) {
   const { context, page } = await makePage('items');
   await enterSeededRpg(page, 'items', baseSave({ hp: 10, gold: 30, position: { x: 10, y: 19 }, direction: 'right' }));
   await tap(page, /A\s*CHECK/i);
-  await page.waitForTimeout(650);
-  let win = await openCommand(page);
+  // Fixed encounters can spend a short moment in the encounter cue before the
+  // battle root mounts. Wait for the real battle instead of assuming 650ms is enough.
+  let itemBattleReady = false;
+  for (let attempt = 0; attempt < 3 && !itemBattleReady; attempt += 1) {
+    itemBattleReady = await page.locator('main[data-enemy]').waitFor({ state: 'visible', timeout: 1600 }).then(() => true).catch(() => false);
+    if (!itemBattleReady) {
+      await tap(page, /A\s*CHECK/i);
+      await page.waitForTimeout(280);
+    }
+  }
+  assert('Item route opens FOREST WISP battle', itemBattleReady && /FOREST WISP/i.test(await bodyText(page)));
+  let win = null;
+  for (let attempt = 0; attempt < 3 && !win; attempt += 1) {
+    win = await openCommand(page);
+    if (!win) await page.waitForTimeout(360);
+  }
+  if (!win) throw new Error('RPG COMMAND did not become available in item route');
   await win.locator('button').filter({ hasText: 'ITEM' }).first().tap({ force: true });
   win = page.locator('[class*="commandWindow"]');
   await win.locator('button').filter({ hasText: /HERB.*×2/i }).first().tap({ force: true });
