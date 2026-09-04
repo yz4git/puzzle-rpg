@@ -1,6 +1,6 @@
 name: Puzzle RPG Live Playcheck
 
-# One browser install covers the full public gameplay regression suite.
+# One browser install covers the full public gameplay regression suite and field-interaction diagnostics.
 on:
   workflow_run:
     workflows: ["Deploy Puzzle RPG to GitHub Pages"]
