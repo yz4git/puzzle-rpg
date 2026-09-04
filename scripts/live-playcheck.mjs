@@ -582,15 +582,15 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
   assert('NEXT GOAL advances to IRON CITY after Scarlet Oracle', /NEXT GOAL\s+IRON CITY/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
   assert('Iron City goal teaches boss preparation', /GUARD STONE/i.test(scarletReturn.text), { text: scarletReturn.text.slice(0, 1400) });
 
-  // Guaranteed boss rewards leave 105G. IRON SWORD (55G) + GUARD STONE x2 (40G) is an affordable minimum setup.
+  // Guaranteed boss rewards leave 105G. IRON SWORD (55G) + HERB x2 (24G) + GUARD STONE (20G) is a 99G no-grind setup.
 const ironSeed = {
   ...scarletSave,
   mapId: 'ironCity',
   position: { x: 9, y: 6 },
   direction: 'up',
   hp: scarletSave.maxHp,
-  gold: Math.max(0, scarletSave.gold - 95),
-  inventory: [{ id: 'guardStone', count: 2 }],
+  gold: Math.max(0, scarletSave.gold - 99),
+  inventory: [{ id: 'herb', count: 2 }, { id: 'guardStone', count: 1 }],
   equipmentOwned: [...new Set([...(scarletSave.equipmentOwned ?? []), 'ironSword'])],
   equipment: { ...scarletSave.equipment, weapon: 'ironSword' },
   encounterMeter: 99,
@@ -601,7 +601,7 @@ const ironSeed = {
   const ironStart = await snapshot(page, '24-iron-tyrant');
   assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));
   const preparedIronSave = await storedSave(page);
-  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 10 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });
+  assert('Iron Tyrant test uses only affordable Iron City preparation', preparedIronSave.gold === 6 && preparedIronSave.equipment?.weapon === 'ironSword' && preparedIronSave.inventory?.find?.(item => item.id === 'guardStone')?.count === 1 && preparedIronSave.inventory?.find?.(item => item.id === 'herb')?.count === 2, { gold: preparedIronSave.gold, equipment: preparedIronSave.equipment, inventory: preparedIronSave.inventory });
   const ironTalk = await talkOnce(page);
   await page.waitForTimeout(1200);
   assert('Iron Tyrant accepts armor-weakening TALK', ironTalk && /IRON TYRANT/i.test(await bodyText(page)));

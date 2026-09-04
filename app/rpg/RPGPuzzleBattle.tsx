@@ -179,8 +179,8 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
   const feedbackTimer = useRef<number | null>(null);
 
   const hasTechnique = (id: TechniqueId) => save.techniques.includes(id);
-  const intent = useMemo(() => adjustedIntent(intentStep, enemyHp, hp), [intentStep, enemyHp, hp, drainWeakened, phase]);
-  const nextIntent = useMemo(() => adjustedIntent(intentStep + 1, enemyHp, hp), [intentStep, enemyHp, hp, drainWeakened, phase]);
+  const intent = useMemo(() => adjustedIntent(intentStep, enemyHp, hp), [intentStep, enemyHp, hp, drainWeakened, armorWeakened, phase]);
+  const nextIntent = useMemo(() => adjustedIntent(intentStep + 1, enemyHp, hp), [intentStep, enemyHp, hp, drainWeakened, armorWeakened, phase]);
   const largest = useMemo(() => Object.fromEntries(PANEL_TYPES.map((type) => [type, largestGroup(tiles, type)])) as Record<PanelType, number>, [tiles]);
   const boardMap = useMemo(() => new Map(tiles.filter((tile) => tile.row >= 0).map((tile) => [`${tile.row}:${tile.col}`, tile])), [tiles]);
   const previewDrops = useMemo(() => {
@@ -204,6 +204,7 @@ export default function RPGPuzzleBattle({ enemy, save, training = null, onFinish
     }
     if (enemy.id === "citadelEye" && Object.values(save.releasedEnemies).reduce((sum, count) => sum + count, 0) >= 3) power = Math.max(1, power - 1);
     if (drainWeakened && base.kind === "drain") { power = Math.max(1, power - 2); detail = "TALKで弱体化"; }
+    if (enemy.id === "ironTyrant" && armorWeakened) { power = Math.max(1, power - 1); detail = `${detail} • TALKで構え崩れ`; }
     return { ...base, power, detail };
   }
 

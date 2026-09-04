@@ -127,7 +127,7 @@ const list: EnemyDefinition[] = [
   {
     id: "ironTyrant", name: "IRON TYRANT", portrait: "bastion", tier: 3, hp: 52, exp: 75, gold: 90, boss: true,
     trait: "ATK×4以下を2軽減するIRON ARMOR。", intro: "『守り切れるか。それとも先に砕くか』",
-    intents: [hit("SHIELD BASH", 5), heavy("IRON CRUSH", 7)], talk: "城壁の外にいる者を守るため、門を閉ざしたと言う。", conditionalTalk: "大きなATKを見てIRON ARMORが1弱まった。",
+    intents: [hit("SHIELD BASH", 5), heavy("IRON CRUSH", 7)], talk: "城壁の外にいる者を守るため、門を閉ざしたと言う。", conditionalTalk: "盾の構えが揺らぎ、IRON ARMORと攻撃の勢いが1弱まった。",
     phaseDialogue: ["『盾の内側にも、守る者がいる』", "『この門の先を、最後まで守れるか』"], victoryTalk: "Tyrantは盾を下ろし、北門を旅人へ開いた。",
   },
   {
