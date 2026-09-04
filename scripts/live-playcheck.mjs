@@ -131,16 +131,22 @@ async function tap(page, name) {
   return true;
 }
 
+async function tapFieldA(page) {
+  const action = page.locator('button[class*=\"aButton\"]').first();
+  if (!(await action.count())) return false;
+  await action.tap({ force: true });
+  await page.waitForTimeout(140);
+  return true;
+}
+
 async function startFixedBattle(page, expectedName, attempts = 6) {
   const launcher = page.getByRole('button', { name: /RPG COMMAND/i }).first();
-  const fieldAction = /A(?:\s*•)?\s*(?:CHECK|CONFRONT)/i;
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (await launcher.isVisible().catch(() => false)) {
       return expectedName.test(await bodyText(page));
     }
-    const action = page.getByRole('button', { name: fieldAction }).first();
-    if (await action.count()) await action.tap({ force: true });
-    await page.waitForTimeout(720);
+    await tapFieldA(page);
+    await page.waitForTimeout(580);
   }
   const ready = await launcher.waitFor({ state: 'visible', timeout: 2500 }).then(() => true).catch(() => false);
   return ready && expectedName.test(await bodyText(page));
@@ -569,7 +575,7 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
   const templeReturn = await snapshot(page, '20-temple-return');
   assert('Boss victory returns to OLD TEMPLE', /OLD TEMPLE/i.test(templeReturn.text) && !/YOU AWAKEN/i.test(templeReturn.text));
   assert('NEXT GOAL advances from Old Temple to Crimson Marsh', /NEXT GOAL\s+CRIMSON MARSH/i.test(templeReturn.text) && !/北のOld Templeへ向かう/i.test(templeReturn.text), { text: templeReturn.text.slice(0, 1400) });
-  await tap(page, /A(?:\s*•)?\s*(?:CHECK|CONFRONT)/i);
+  await tapFieldA(page);
   await page.waitForTimeout(500);
   assert('Cleared boss does not reopen when checked again', await page.locator('main[data-enemy]').count() === 0 && !/OLD TEMPLE KEEPER/i.test(await bodyText(page)));
   await context.close();
@@ -599,7 +605,7 @@ async function fightBossSmart(page, maxActions = 70, herbLimit = 2) {
     ],
     encounterMeter: 99,
   }));
-  await tap(page, /A(?:\s*•)?\s*(?:CHECK|CONFRONT)/i);
+  await tapFieldA(page);
   await page.waitForTimeout(650);
   const scarletStart = await snapshot(page, '21-scarlet-oracle');
   assert('A CHECK opens SCARLET ORACLE', /SCARLET ORACLE/i.test(scarletStart.text));
@@ -632,7 +638,7 @@ const ironSeed = {
   encounterMeter: 99,
 };
   await enterSeededRpg(page, 'iron-tyrant', ironSeed);
-  await tap(page, /A(?:\s*•)?\s*(?:CHECK|CONFRONT)/i);
+  await tapFieldA(page);
   await page.waitForTimeout(650);
   const ironStart = await snapshot(page, '24-iron-tyrant');
   assert('A CHECK opens IRON TYRANT after Scarlet Oracle', /IRON TYRANT/i.test(ironStart.text));
