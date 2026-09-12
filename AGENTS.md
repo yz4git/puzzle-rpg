@@ -8,7 +8,7 @@ This repository is `yz4git/puzzle-rpg`.
 - This project was bootstrapped from `yz4git/sky-dancer`, but Sky Dancer gameplay and branding are not product requirements.
 - Never deploy using Sky Dancer's ChatGPT Sites project identity. Create/use a Puzzle RPG-specific hosting configuration only when publishing is explicitly set up.
 - Do not modify `yz4git/sky-dancer` while working on this repository.
-- Save meaningful progress to GitHub frequently so work is recoverable.
+- Commit at coherent milestones and before risky refactors so work is recoverable.
 
 ## Service Worker update safety
 - A published update must never reload, redirect, replace, or otherwise navigate a running game.
